@@ -1,0 +1,76 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { BrandMark } from './BrandMark';
+
+/**
+ * Navigation follows the journey, in order: see it, use the tool, find the
+ * content, see the hands-on side, find yourself, then check the evidence. Six
+ * short labels so the row never wraps at 1240px, and the one thing a visitor
+ * might want to do at any moment stays pinned as the CTA.
+ */
+const links = [
+  ['Khám phá', '#kham-pha'],
+  ['YooStudio', '#cong-cu'],
+  ['Thư viện', '#thu-vien'],
+  ['Thực hành', '#thuc-hanh'],
+  ['Giáo dục', '#giao-duc'],
+  ['Bài học mẫu', '#bai-hoc-mau'],
+] as const;
+
+export function SiteHeader() {
+  const [open, setOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 24);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setOpen(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open]);
+
+  return (
+    <header
+      className={`site-header${open ? ' is-open' : ''}${scrolled ? ' is-scrolled' : ''}`}
+      aria-label="Điều hướng chính"
+    >
+      <a className="brand" href="#trang-chu" aria-label="YooLab — Trang chủ" onClick={() => setOpen(false)}>
+        <BrandMark size={34} />
+        <span className="brand-wordmark">YooLab</span>
+      </a>
+      <nav className="desktop-nav" aria-label="Các khu vực của YooLab">
+        {links.map(([label, href]) => <a href={href} key={href}>{label}</a>)}
+      </nav>
+      <a className="header-cta" href="#bat-dau-voi-yoolab">
+        Bắt đầu với YooLab <span aria-hidden="true">↗</span>
+      </a>
+      <button
+        className="menu-toggle"
+        type="button"
+        aria-label={open ? 'Đóng menu' : 'Mở menu'}
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+      >
+        <i /><i />
+      </button>
+      <nav
+        className="mobile-nav"
+        aria-label="Điều hướng trên thiết bị di động"
+        aria-hidden={!open}
+        inert={!open}
+      >
+        {links.map(([label, href], index) => (
+          <a href={href} key={href} onClick={() => setOpen(false)}><span>0{index + 1}</span>{label}</a>
+        ))}
+        <a className="mobile-nav-cta" href="#bat-dau-voi-yoolab" onClick={() => setOpen(false)}>Bắt đầu với YooLab →</a>
+      </nav>
+    </header>
+  );
+}
