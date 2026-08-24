@@ -10,6 +10,7 @@ import {
   prepareCarVisual,
 } from '../lib/formula/carRuntime';
 import { createProceduralEnvironment, studioEnvironmentPalette } from '../lib/three/environment';
+import { createVisibilityGate, whenOnScreen } from '../lib/three/visibility';
 
 /**
  * Live Formula preview for the library card.
@@ -87,7 +88,6 @@ export function FormulaPreview({ onOpen }: { onOpen: () => void }) {
 
       const loaders = createCarLoaders(renderer);
       let disposed = false;
-      let visible = true;
       let ready = false;
 
       void (async () => {
@@ -126,11 +126,7 @@ export function FormulaPreview({ onOpen }: { onOpen: () => void }) {
       resizeObserver.observe(host);
       resize();
 
-      const visibilityObserver = new IntersectionObserver(
-        ([entry]) => { visible = entry?.isIntersecting ?? true; },
-        { rootMargin: '80px 0px' },
-      );
-      visibilityObserver.observe(host);
+      const gate = createVisibilityGate(host, 80);
       let documentVisible = document.visibilityState !== 'hidden';
       const onDocumentVisibility = () => { documentVisible = document.visibilityState !== 'hidden'; };
       document.addEventListener('visibilitychange', onDocumentVisibility);
@@ -141,7 +137,7 @@ export function FormulaPreview({ onOpen }: { onOpen: () => void }) {
         // Advanced before the visibility gate so a preview that scrolls back
         // into view resumes from where it was rather than jumping.
         timer.update();
-        if (!visible || !documentVisible || !ready) return;
+        if (!gate.visible() || !documentVisible || !ready) return;
         // The camera sweeps a limited arc instead of spinning the car through a
         // full turn: a 360 spin passes through head-on and tail-on angles where
         // the silhouette reads as a jumble of parts.
@@ -162,7 +158,7 @@ export function FormulaPreview({ onOpen }: { onOpen: () => void }) {
         disposed = true;
         renderer.setAnimationLoop(null);
         resizeObserver.disconnect();
-        visibilityObserver.disconnect();
+        gate.dispose();
         document.removeEventListener('visibilitychange', onDocumentVisibility);
         disposeScene(world);
         environment.dispose();
@@ -172,14 +168,12 @@ export function FormulaPreview({ onOpen }: { onOpen: () => void }) {
       };
     };
 
-    const trigger = new IntersectionObserver(
-      ([entry]) => { if (entry?.isIntersecting) { start(); trigger.disconnect(); } },
-      { rootMargin: '260px 0px' },
-    );
-    trigger.observe(host);
+    // Same self-healing rule as the render gates: a start trigger that never
+    // fires leaves the preview a blank box for the whole session.
+    const stopTrigger = whenOnScreen(host, () => { void start(); }, 260);
 
     return () => {
-      trigger.disconnect();
+      stopTrigger();
       cleanup?.();
     };
   }, []);

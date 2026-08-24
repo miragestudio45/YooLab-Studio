@@ -1,0 +1,646 @@
+/* ============================================================== practice === */
+/*
+ * One real thing, and one honest gap — composed as such.
+ *
+ * The previous layout put them in a `1.18fr 0.82fr` pair of matching cards, which
+ * gave a section with one working experience and one stated absence the shape of
+ * a section with two products. It also opened with a three-line heading at 70 px
+ * and then 100 px of nothing before the cards, so on a 1366×768 laptop you landed
+ * on a headline and the top edge of a photograph.
+ *
+ * Now: the head band is one row, the Formula workshop is a wide two-part card
+ * that reads as an application, and the lab bench is a narrow column beside it
+ * with no frame of its own and nothing to click. The asymmetry is the point — it
+ * is what tells the truth about the section before a word is read.
+ */
+.practice {
+  --practice-head: clamp(104px, 15.5vh, 158px);
+  padding: calc(var(--header-h) + var(--section-gap)) 0 clamp(48px, 7vh, 92px);
+  scroll-margin-top: 0;
+  /* The lavender note in the section chain: ivory -> a breath of lavender-ivory
+     -> ivory. It is four units of value; the point is that the eye never meets
+     an edge, not that anyone can name the colour. */
+  background: linear-gradient(180deg, var(--color-bg) 0%, #f7f2f4 48%, var(--color-bg) 100%);
+}
+
+.practice-head { min-height: var(--practice-head); }
+
+.practice-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2.3fr) minmax(258px, 1fr);
+  gap: clamp(20px, 2.4vw, 40px);
+  align-items: stretch;
+  margin-top: clamp(20px, 3vh, 40px);
+}
+
+/*
+ * The workshop card is itself two columns: the experience on the left at the size
+ * of a real preview, what it is on the right. A stacked visual-over-body card at
+ * this width would have put the three modes below the fold on every laptop.
+ */
+.practice-live {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(280px, 0.95fr);
+  min-height: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.practice-visual {
+  position: relative;
+  /* The ceiling matters as much as the floor here: capped at 460 px, the card
+     ended two thirds of the way down a 1080 display and left the bottom third of
+     the section empty. */
+  min-height: clamp(280px, calc(100svh - var(--practice-head) - 268px), 620px);
+  background: var(--color-surface-2);
+}
+.practice-visual img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.practice-open {
+  position: absolute;
+  bottom: 18px;
+  left: 18px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 46px;
+  padding: 0 22px;
+  border: 0;
+  border-radius: var(--radius-md);
+  color: #fff;
+  background: var(--color-accent-strong);
+  box-shadow: 0 14px 34px rgba(180, 88, 70, 0.32);
+  font-size: 13px;
+  font-weight: 620;
+  transition: transform 200ms ease, background 200ms ease;
+}
+.practice-open:hover { background: var(--color-accent-deep); transform: translateY(-2px); }
+
+.practice-body {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+  padding: clamp(20px, 2.6vh, 30px) clamp(20px, 2vw, 30px);
+}
+
+.practice-tag {
+  align-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  color: #2f5f33;
+  background: rgba(118, 157, 116, 0.16);
+  font-size: 9.5px;
+  font-weight: 660;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.practice-tag--pending { color: var(--color-pending); background: rgba(176, 138, 74, 0.14); }
+
+.practice-live h3,
+.practice-next h3 {
+  margin: 12px 0 8px;
+  font-family: var(--font-display);
+  font-size: clamp(20px, 1.6vw, 26px);
+  font-weight: 680;
+  letter-spacing: -0.036em;
+  line-height: 1.14;
+}
+.practice-live p,
+.practice-next p { margin: 0; color: var(--color-ink-2); font-size: 13px; line-height: 1.66; }
+
+.practice-modes { margin: clamp(12px, 2vh, 18px) 0 0; padding: 0; border-top: 1px solid var(--color-border-hair); list-style: none; }
+.practice-modes li {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr);
+  gap: 14px;
+  padding: clamp(8px, 1.3vh, 11px) 0;
+  border-bottom: 1px solid var(--color-border-hair);
+}
+.practice-modes li:last-child { border-bottom: 0; }
+.practice-modes b {
+  color: var(--color-accent-deep);
+  font-size: 10.5px;
+  font-weight: 680;
+  letter-spacing: 0.07em;
+}
+.practice-modes span { color: var(--color-muted); font-size: 12px; line-height: 1.5; }
+
+/*
+ * The stated gap. No card, no border, no button.
+ *
+ * It used to be a full peer card with a 260 px instrument drawing in it, which
+ * made a thing that does not exist look like half the section's offering. It is a
+ * column with a rule down its left edge now: present, explained, obviously not a
+ * product. The drawing survives at a third of the size, as a mark rather than as
+ * a picture.
+ */
+.practice-next {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0;
+  padding: clamp(20px, 2.6vh, 30px) 0 clamp(20px, 2.6vh, 30px) clamp(20px, 2vw, 32px);
+  border-left: 1px solid var(--color-border);
+}
+.practice-art {
+  width: clamp(88px, 34%, 122px);
+  height: auto;
+  margin-bottom: clamp(14px, 2.2vh, 24px);
+  color: var(--color-muted-2);
+}
+.practice-next p { color: var(--color-muted); font-size: 12.5px; }
+.practice-pending-note { margin-top: 14px !important; color: var(--color-muted) !important; font-size: 12px !important; }
+.practice-pending-note a,
+.practice-pending-note button {
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--color-accent-line);
+  color: var(--color-accent-deep);
+  background: transparent;
+  font: inherit;
+  font-weight: 620;
+}
+
+/* ============================================================= education === */
+/*
+ * Vertical rhythm scaled by viewport HEIGHT, not by a constant.
+ *
+ * A flat 108 px of padding is right on a 1080 display and wrong on a 1366x768
+ * laptop, where it plus a 155 px heading plus the tab strip left the role panel
+ * starting 340 px down a 768 px screen — so the thing the section exists to show
+ * was cut in half. Every vertical measure in this section is now a `clamp` whose
+ * middle term is `vh`, and the numbers are chosen so a 1080 screen renders
+ * exactly what it rendered before.
+ */
+.education {
+  /*
+   * The role switch is the structural anchor, so the height budget is written
+   * around it: head band, tab strip, and then the panel takes what is left.
+   * `--edu-chrome` is what the panel has to subtract, in one place, the same
+   * contract the Library and YooStudio use.
+   */
+  --edu-head: clamp(104px, 15vh, 152px);
+  --edu-tabs: 66px;
+  --edu-chrome: calc(
+    var(--header-h) + var(--section-gap) * 2 + var(--edu-head) + var(--edu-tabs) + 12px
+  );
+  padding: calc(var(--header-h) + var(--section-gap)) 0 clamp(48px, 7vh, 92px);
+  scroll-margin-top: 0;
+  background: linear-gradient(180deg, var(--color-bg) 0%, #fdf7f2 50%, var(--color-bg) 100%);
+}
+
+.education .section-heading { min-height: var(--edu-head); }
+
+.education-tabs {
+  display: inline-flex;
+  gap: 4px;
+  margin-top: clamp(16px, 2.6vh, 30px);
+  padding: 5px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+.education-tabs button {
+  min-height: 42px;
+  padding: 0 22px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--color-ink-2);
+  background: transparent;
+  font-size: 13px;
+  font-weight: 580;
+  transition: color 180ms ease, background 180ms ease, box-shadow 180ms ease;
+}
+.education-tabs button.is-active {
+  color: #fff;
+  background: var(--color-accent-strong);
+  box-shadow: 0 9px 22px rgba(180, 88, 70, 0.24);
+}
+
+/* Asymmetric on purpose: the role's own story gets the wider half, and the
+   product shot sits beside it rather than above a wall of bullets. */
+/*
+ * Asymmetric on purpose: the role's own story gets the narrower, denser half and
+ * the product shot the wider one, because the shot is the evidence.
+ *
+ * The panel is now height-bounded rather than `align-items: start` over whatever
+ * the content measures. At 1366×768 the old panel was 483 px tall inside a 342 px
+ * budget — 141 px of it below the fold, which is exactly the "you only ever see
+ * the top half of this section" fault.
+ */
+.education-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 0.88fr) minmax(0, 1.12fr);
+  gap: clamp(26px, 3.2vw, 52px);
+  /*
+   * `start`, not `stretch`.
+   *
+   * With the columns stretched, the copy column was as tall as the product shot
+   * and its `margin-top: auto` call to action went to the bottom of it — which on
+   * a 1366 left a 123 px hole between the last row of the list and the button
+   * belonging to it. Two columns of honestly different length read better than
+   * one column with a gap in the middle of it.
+   */
+  align-items: start;
+  min-height: 0;
+  margin-top: clamp(16px, 2.4vh, 28px);
+}
+
+.education-copy { display: flex; min-width: 0; flex-direction: column; }
+
+.education-kicker {
+  margin: 0;
+  color: var(--color-accent-strong);
+  font-size: 10px;
+  font-weight: 680;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.education-copy h3 {
+  margin: 10px 0 0;
+  font-family: var(--font-display);
+  font-size: clamp(23px, min(2.2vw, 3.4vh), 34px);
+  font-weight: 680;
+  line-height: 1.1;
+  letter-spacing: -0.04em;
+  text-wrap: balance;
+}
+.education-lede { max-width: 48ch; margin: clamp(10px, 1.6vh, 16px) 0 0; color: var(--color-ink-2); font-size: 14px; line-height: 1.66; }
+
+.education-points { margin: clamp(12px, 2vh, 24px) 0 0; padding: 0; border-top: 1px solid var(--color-border); list-style: none; }
+.education-points li {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 148px) minmax(0, 1fr);
+  align-items: baseline;
+  gap: 4px 16px;
+  padding: clamp(6px, 1.05vh, 11px) 0;
+  border-bottom: 1px solid var(--color-border-hair);
+}
+.education-points li:last-child { border-bottom: 0; }
+.education-points span { color: var(--color-muted-2); font-size: 10px; font-weight: 600; letter-spacing: 0.02em; }
+.education-points b { color: var(--color-ink); font-size: 13px; font-weight: 600; }
+.education-points small { color: var(--color-muted); font-size: 12px; line-height: 1.5; }
+
+.education-cta {
+  align-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  margin-top: clamp(18px, 2.6vh, 30px);
+  padding: 0 22px;
+  border-radius: var(--radius-md);
+  color: #fff;
+  background: var(--color-accent-strong);
+  box-shadow: 0 14px 32px rgba(180, 88, 70, 0.24);
+  font-size: 13px;
+  font-weight: 620;
+  transition: transform 200ms ease;
+}
+.education-cta:hover { transform: translateY(-2px); }
+
+/*
+ * One height for all three role visuals, derived from the viewport.
+ *
+ * The three were pinned at 460 px, which is most of a 768 px screen's usable
+ * height on its own — and because they were three different mocks with three
+ * different intrinsic heights, switching role made the section jump. A single
+ * budget on the container fixes both: the panel never grows past what the section
+ * reserved for it, and the mocks inside fill it.
+ */
+.education-visual {
+  position: relative;
+  min-width: 0;
+  height: clamp(292px, calc(100svh - var(--edu-chrome)), 600px);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+
+/* teacher */
+.edu-compose { display: grid; grid-template-rows: minmax(0, 1fr) auto; height: 100%; }
+/* Proportional side panels, like the editor they are a picture of: at a fixed
+   46 / 150 the mock's tool rail stayed laptop-sized inside a 940 px frame on a
+   1920 display and the whole thing read as a diagram rather than as software. */
+.edu-compose-frame {
+  display: grid;
+  grid-template-columns: clamp(44px, 6%, 62px) minmax(0, 1fr) clamp(140px, 19%, 216px);
+  min-height: 0;
+}
+.edu-rail { display: flex; flex-direction: column; gap: 8px; padding: 12px 0; border-right: 1px solid var(--color-border-hair); align-items: center; }
+.edu-rail i { width: 20px; height: 20px; border: 1px solid var(--color-border); border-radius: 6px; background: var(--color-surface-raised); }
+.edu-stage { position: relative; display: grid; place-items: center; min-width: 0; background: radial-gradient(90% 80% at 50% 40%, #fff, var(--color-surface-2)); }
+.edu-stage .model-thumbnail { width: 100%; height: 100%; }
+.edu-marker {
+  position: absolute;
+  top: 26%;
+  left: 22%;
+  padding: 4px 9px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  color: var(--color-ink-2);
+  background: rgba(255, 253, 249, 0.9);
+  font-size: 9.5px;
+  font-weight: 600;
+}
+.edu-layers { display: flex; flex-direction: column; gap: 7px; padding: 12px 14px; border-left: 1px solid var(--color-border-hair); }
+.edu-layers b { color: var(--color-muted); font-size: 9px; font-weight: 660; letter-spacing: 0.11em; text-transform: uppercase; }
+.edu-layers i { color: var(--color-ink-2); font-size: 11px; font-style: normal; }
+.edu-timeline { display: flex; gap: 5px; padding: 10px 12px; border-top: 1px solid var(--color-border-hair); }
+.edu-timeline span {
+  flex: 1;
+  padding: 5px 8px;
+  border-radius: 5px;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 620;
+  opacity: 0.86;
+}
+
+/* student */
+.edu-explore { position: relative; height: 100%; background: radial-gradient(90% 80% at 50% 40%, #fff, var(--color-surface-2)); }
+.edu-explore .model-thumbnail { width: 100%; height: 100%; }
+.edu-pin {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--color-ink-2);
+  font-size: 9.5px;
+  font-weight: 620;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.edu-pin i { display: block; width: 26px; height: 1px; background: var(--color-border-strong); }
+.edu-pin--a { top: 26%; left: 12%; }
+.edu-pin--b { top: 44%; right: 12%; flex-direction: row-reverse; }
+.edu-pin--c { bottom: 30%; left: 16%; }
+.edu-hint {
+  position: absolute;
+  bottom: 62px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 5px 12px;
+  border-radius: 999px;
+  color: var(--color-muted);
+  background: rgba(255, 253, 249, 0.88);
+  font-size: 9.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.edu-steps {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  gap: 5px;
+  padding: 11px 14px;
+  border-top: 1px solid var(--color-border-hair);
+  background: var(--color-surface);
+}
+.edu-steps span {
+  flex: 1;
+  padding: 6px 8px;
+  border: 1px solid var(--color-border-hair);
+  border-radius: 6px;
+  color: var(--color-muted-2);
+  font-size: 9.5px;
+  font-weight: 600;
+  text-align: center;
+}
+.edu-steps .is-done { color: var(--color-ink-2); background: var(--color-surface-2); }
+.edu-steps .is-active { border-color: transparent; color: #fff; background: var(--color-accent-strong); }
+
+/* school */
+.edu-deploy {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: minmax(0, 1.12fr) minmax(0, 1fr);
+  gap: 1px;
+  height: 100%;
+  background: var(--color-border-hair);
+}
+.edu-deploy > * { min-height: 0; background: var(--color-surface); }
+.edu-deploy .model-thumbnail { width: 100%; height: 100%; }
+.edu-tile { display: flex; flex-direction: column; justify-content: center; gap: 6px; padding: 22px; }
+.edu-tile b { font-family: var(--font-display); font-size: 16px; font-weight: 620; letter-spacing: -0.02em; }
+.edu-tile small { color: var(--color-muted); font-size: 11.5px; line-height: 1.5; }
+
+/* ================================================================= proof === */
+.proof {
+  --proof-head: clamp(104px, 15.5vh, 158px);
+  padding: calc(var(--header-h) + var(--section-gap)) 0 clamp(48px, 7vh, 92px);
+  scroll-margin-top: 0;
+  background: linear-gradient(180deg, var(--color-bg) 0%, var(--color-surface) 62%, var(--color-bg) 100%);
+}
+
+.proof .section-heading { min-height: var(--proof-head); }
+
+/*
+ * Four cards, explicitly four.
+ *
+ * `repeat(auto-fit, minmax(258px, 1fr))` looked flexible and behaved as a bug: at
+ * 1024 px it silently reflowed to three-plus-one, so the row that is supposed to
+ * be evidence of range read as a grid that had run out. Four named columns down
+ * to the tablet breakpoint, then two, then one.
+ */
+.proof-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(14px, 1.4vw, 24px);
+  margin-top: clamp(20px, 3vh, 40px);
+}
+
+/*
+ * A grid, not a flex column, so the four cards share baselines.
+ *
+ * The visual, the subject label, the title, the description and the action are
+ * five rows, and the description row is the flexible one — so a two-line
+ * description on one card cannot push its "Mở bài học" a line below its
+ * neighbours'. That alignment across the row is most of what makes four cards
+ * read as one set.
+ */
+.proof-card {
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  padding: 0 0 18px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--color-surface);
+  transition: transform 220ms ease, box-shadow 220ms ease;
+}
+.proof-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lift); }
+
+/*
+ * One height for every visual on the row, scaled to the viewport.
+ *
+ * 168 px of picture under a 104 px section padding was the reason this row read
+ * as four chips in a large empty slab. It is now a fifth of the screen, which on
+ * a 1080 display is 216 px and on a 768 laptop is 165 — the same proportion of
+ * the page rather than the same number of pixels.
+ */
+.proof-visual {
+  position: relative;
+  height: clamp(146px, 22svh, 260px);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: linear-gradient(160deg, #fdf3ea, #f8e4da);
+}
+.proof-visual img,
+.proof-visual .model-thumbnail { width: 100%; height: 100%; }
+.proof-visual img { object-fit: cover; }
+
+/*
+ * The two experiences with no bakeable mesh — the periodic table and the globe
+ * are a DOM grid and a canvas, so there is no GLB to render — get the same
+ * treatment the Library rail gives its drawn marks: the subject's own tint as
+ * both the wash and `currentColor`, on a soft dome. That is what stops a line
+ * drawing from reading as a missing image next to two photographs.
+ */
+.proof-visual--mark {
+  background:
+    radial-gradient(120% 120% at 32% 22%, var(--color-surface-raised) 0%, var(--color-surface-2) 100%);
+}
+.proof-visual--mark::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--proof-tint, var(--color-accent-strong));
+  /* Enough to colour-code the plate, not enough to make two of the four cards a
+     different temperature from the row they belong to. */
+  opacity: 0.06;
+}
+.proof-mark {
+  position: relative;
+  display: block;
+  width: clamp(96px, 46%, 136px);
+  height: auto;
+  aspect-ratio: 1;
+  color: var(--proof-tint, var(--color-accent-deep));
+}
+.proof-mark .library-mark { width: 100%; height: 100%; }
+
+.proof-subject {
+  margin: 16px 18px 0;
+  color: var(--color-muted-2);
+  font-size: 9.5px;
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.proof-card h3 {
+  margin: 6px 18px 0;
+  font-size: 19px;
+  font-weight: 660;
+  letter-spacing: -0.034em;
+  line-height: 1.16;
+}
+.proof-card > p { margin: 7px 18px 0; color: var(--color-muted); font-size: 12px; line-height: 1.6; }
+
+.proof-action {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 18px 0;
+  padding: 0;
+  border: 0;
+  color: var(--color-accent-deep);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 620;
+}
+.proof-action:hover { color: var(--color-accent-strong); }
+
+.proof-note { max-width: 74ch; margin: clamp(20px, 3vh, 32px) 0 0; color: var(--color-muted); font-size: 11.5px; line-height: 1.7; }
+
+.study-readout--compact div { padding: 9px 0; }
+
+/* ============================================================ responsive === */
+/*
+ * Same four widths as the page chrome — 1180 / 1000 / 860 / 700 — so the whole
+ * page changes shape at the same places rather than at seven.
+ */
+@media (max-width: 1180px) {
+  /*
+   * Still two columns, but the copy column is now under 400 px wide, so the lede
+   * and the point rows wrap one line more than they do on a 1366 — which was
+   * exactly the pixels by which the panel overran its budget at 1024×768. The
+   * rhythm tightens; nothing is removed.
+   */
+  .education-lede { font-size: 13.5px; }
+  .education-points li { padding: clamp(4px, 0.72vh, 9px) 0; }
+  .education-copy h3 { font-size: clamp(21px, min(2.1vw, 2.9vh), 28px); }
+  .education-cta { margin-top: clamp(12px, 1.8vh, 26px); }
+  .practice-grid { grid-template-columns: minmax(0, 1.85fr) minmax(228px, 1fr); }
+}
+
+/*
+ * The workshop card keeps its two columns down to 900 px.
+ *
+ * Collapsing it at 1180 was what broke 1024×768: a stacked visual-over-body card
+ * is 510 px tall where the side-by-side one is 385, and 1024 is a landscape
+ * screen with 768 px of height to spend. Two columns is also simply the better
+ * composition wherever there is width for it — the three modes belong beside the
+ * car, not underneath a photograph of it.
+ */
+@media (max-width: 1000px) {
+  .practice-grid { grid-template-columns: minmax(0, 1fr); gap: 0; }
+}
+
+@media (max-width: 900px) {
+  .practice-live { grid-template-columns: minmax(0, 1fr); }
+  .practice-visual { min-height: clamp(230px, 30svh, 340px); }
+}
+
+@media (max-width: 1000px) {
+  /* No frame, no border-left: below the two-column regime the gap is the rule. */
+  .practice-next {
+    padding: clamp(22px, 3vh, 30px) 0 0;
+    border-top: 1px solid var(--color-border);
+    border-left: 0;
+  }
+  .practice-art { width: 92px; }
+  .education-panel { grid-template-columns: minmax(0, 1fr); gap: 26px; align-items: start; }
+  /* Full width now, so the visual no longer needs to be tall to hold its own
+     against the copy beside it. */
+  .education-visual { height: clamp(280px, 34svh, 400px); }
+  .education-cta { margin-top: clamp(16px, 2.4vh, 26px); }
+  .proof-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  /* Two rows of cards instead of one, so each visual gives back what the second
+     row costs: at 22svh the pair of rows was 17 px taller than a 768×1024
+     tablet's viewport. */
+  .proof-visual { height: clamp(140px, 17svh, 210px); }
+}
+
+@media (max-width: 860px) {
+  .education-tabs { display: flex; width: 100%; }
+  .education-tabs button { flex: 1; padding: 0 10px; font-size: 12.5px; }
+  .edu-deploy { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 700px) {
+  .practice-live { border-radius: var(--radius-md); }
+  .education-points li { grid-template-columns: 24px minmax(0, 1fr); }
+  /* The third column becomes a second line under the label rather than a
+     100 px-wide paragraph. */
+  .education-points small { grid-column: 2; }
+  .edu-compose-frame { grid-template-columns: 40px minmax(0, 1fr); }
+  .edu-layers { display: none; }
+  .edu-pin--a, .edu-pin--b, .edu-pin--c { display: none; }
+  .proof-grid { grid-template-columns: minmax(0, 1fr); }
+  .proof-visual { height: clamp(170px, 26svh, 230px); }
+}

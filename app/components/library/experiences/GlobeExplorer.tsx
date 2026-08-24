@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
+import { createVisibilityGate } from '../../../lib/three/visibility';
 
 /**
  * Interactive globe.
@@ -69,6 +70,9 @@ const CONTINENT_COLOR: Record<string, number> = {
 };
 
 const RADIUS = 2;
+
+/** Fraction of the panel's narrow axis the globe spans. */
+const GLOBE_FILL = 0.9;
 
 /** Longitude/latitude in degrees to a point on the sphere. */
 function toSphere(lon: number, lat: number, radius: number, out = new THREE.Vector3()) {
@@ -327,23 +331,34 @@ export function GlobeExplorer() {
       yawTarget = Math.atan2(point.x, point.z);
     };
 
+    /*
+     * Distance is solved from the panel, not fixed.
+     *
+     * A hard-coded 5.6 put the horizon outside the frame on any panel narrower
+     * than it was tuned for: at 36° the half-frame is 1.82 units at that
+     * distance and the globe's radius is 2, so Africa ran off the bottom edge
+     * and the Atlantic off the left. A sphere of radius R is exactly tangent to
+     * the frustum at R / sin(half-angle), and the binding angle is whichever of
+     * the two is smaller — so this fits the globe to the *narrow* axis of
+     * whatever panel it is given and keeps a twelfth of the frame as air.
+     */
+    let distance = 7.4;
     const resize = () => {
       const width = Math.max(host.clientWidth, 1);
       const height = Math.max(host.clientHeight, 1);
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
       renderer.setSize(width, height, false);
+      const halfV = THREE.MathUtils.degToRad(camera.fov) * 0.5;
+      const halfH = Math.atan(Math.tan(halfV) * camera.aspect);
+      distance = RADIUS / (Math.sin(Math.min(halfV, halfH)) * GLOBE_FILL);
     };
     const resizeObserver = new ResizeObserver(resize);
     resizeObserver.observe(host);
     resize();
 
-    let onScreen = true;
-    const visibility = new IntersectionObserver(
-      ([entry]) => { onScreen = entry?.isIntersecting ?? true; },
-      { rootMargin: '160px 0px' },
-    );
-    visibility.observe(host);
+    const gate = createVisibilityGate(host, 160);
+    const onScreen = () => gate.visible();
     let tabVisible = document.visibilityState !== 'hidden';
     const onVisibility = () => { tabVisible = document.visibilityState !== 'hidden'; };
     document.addEventListener('visibilitychange', onVisibility);
@@ -351,11 +366,10 @@ export function GlobeExplorer() {
     const timer = new THREE.Timer();
     let lastSelection = selectedRef.current;
     let lastLayer = layerRef.current;
-    const distance = 5.6;
     renderer.setAnimationLoop(() => {
       timer.update();
       const delta = Math.min(timer.getDelta(), 0.05);
-      if (!onScreen || !tabVisible) return;
+      if (!onScreen() || !tabVisible) return;
       if (selectedRef.current !== lastSelection || layerRef.current !== lastLayer) {
         lastSelection = selectedRef.current;
         lastLayer = layerRef.current;
@@ -371,6 +385,19 @@ export function GlobeExplorer() {
         Math.cos(yaw) * Math.cos(pitch) * distance,
       );
       camera.lookAt(0, 0, 0);
+      /*
+       * The key light rides with the camera.
+       *
+       * Fixed at (-3, 3, 5) it lit one hemisphere of a globe that turns
+       * continuously, so for most of the idle rotation the visitor was looking
+       * at the night side: the ocean's pale blue read as flat grey and the
+       * country borders lost their relief. Offsetting from the eye keeps the
+       * face being read lit, and keeps the terminator near the limb where it
+       * looks like a globe rather than like a bug.
+       */
+      key.position.copy(camera.position).multiplyScalar(0.9)
+        .addScaledVector(camera.up, distance * 0.45)
+        .add(new THREE.Vector3(-distance * 0.3, 0, 0).applyQuaternion(camera.quaternion));
       renderer.render(scene, camera);
     });
 
@@ -383,7 +410,7 @@ export function GlobeExplorer() {
       host.removeEventListener('pointercancel', onPointerUp);
       document.removeEventListener('visibilitychange', onVisibility);
       resizeObserver.disconnect();
-      visibility.disconnect();
+      gate.dispose();
       for (const item of disposables) item.dispose();
       renderer.dispose();
       renderer.domElement.remove();

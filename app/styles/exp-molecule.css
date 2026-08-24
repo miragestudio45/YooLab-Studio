@@ -1,0 +1,384 @@
+/* ========================================================= periodic table === */
+.periodic { display: flex; height: 100%; flex-direction: column; padding: 14px 16px 12px; }
+
+.periodic-legend { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 12px; }
+.periodic-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  color: var(--color-muted);
+  background: var(--color-surface-raised);
+  font-size: 10px;
+  font-weight: 580;
+  transition: border-color 160ms ease, color 160ms ease;
+}
+.periodic-chip i { width: 8px; height: 8px; border-radius: 2px; }
+.periodic-chip:hover { border-color: var(--color-border-strong); color: var(--color-ink-2); }
+.periodic-chip.is-active { border-color: var(--color-accent-line); color: var(--color-ink); background: var(--color-accent-wash); }
+
+.periodic-grid {
+  display: grid;
+  flex: 1;
+  grid-template-columns: repeat(var(--pt-cols), minmax(0, 1fr));
+  grid-template-rows: repeat(var(--pt-rows), minmax(0, 1fr));
+  gap: 3px;
+  min-height: 0;
+}
+
+.periodic-cell {
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  gap: 0;
+  min-width: 0;
+  padding: 4px 5px;
+  border: 1px solid var(--color-border-hair);
+  border-left-width: 2.5px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--color-surface-raised);
+  transition: transform 160ms ease, box-shadow 160ms ease, opacity 200ms ease;
+}
+.periodic-cell small { color: var(--color-muted-2); font-size: 8px; line-height: 1.1; }
+.periodic-cell b {
+  color: var(--color-ink);
+  font-family: var(--font-display);
+  font-size: clamp(11px, 0.95vw, 15px);
+  font-weight: 640;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+.periodic-cell span {
+  width: 100%;
+  color: var(--color-muted);
+  font-size: 7.5px;
+  line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.periodic-cell:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 18px rgba(87, 62, 43, 0.12);
+}
+.periodic-cell.is-dim { opacity: 0.28; }
+
+.periodic-note {
+  display: grid;
+  place-content: center;
+  color: var(--color-muted-2);
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.periodic-hint {
+  margin: 10px 0 0;
+  color: var(--color-muted);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+
+/* ------------------------------------------------------------ atom view --- */
+.atom-view { display: grid; height: 100%; grid-template-rows: auto minmax(0, 1fr) auto; }
+
+.atom-head {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--color-border-hair);
+}
+.atom-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 11px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-ink-2);
+  background: var(--color-surface-raised);
+  font-size: 11.5px;
+  font-weight: 560;
+}
+.atom-back:hover { border-color: var(--color-accent-line); color: var(--color-accent-deep); }
+.atom-title { display: flex; align-items: baseline; gap: 10px; }
+.atom-title i { width: 9px; height: 9px; border-radius: 2px; align-self: center; }
+.atom-title b { font-family: var(--font-display); font-size: 26px; font-weight: 660; letter-spacing: -0.03em; }
+.atom-title span { color: var(--color-muted); font-size: 12px; }
+
+.atom-stage { min-height: 0; }
+
+.atom-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0;
+  margin: 0;
+  border-top: 1px solid var(--color-border-hair);
+}
+.atom-facts div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 16px;
+  border-right: 1px solid var(--color-border-hair);
+  border-bottom: 1px solid var(--color-border-hair);
+}
+.atom-facts dt { color: var(--color-muted); font-size: 10px; }
+.atom-facts dd { margin: 0; color: var(--color-ink); font-size: 11px; font-weight: 560; text-align: right; }
+
+/* ========================================================= molecule viewer === */
+/*
+ * The specimen keeps the frame; the panel is 246 px of readout beside it.
+ *
+ * Same proportion as the globe, on purpose. A student who has learned that the
+ * instrument is on the left and what it is telling you is on the right should
+ * not have to relearn that per subject.
+ */
+.mol { display: grid; height: 100%; grid-template-columns: minmax(0, 1fr) 246px; }
+.mol .stage { min-width: 0; }
+.mol-canvas { position: absolute; inset: 0; }
+
+/* ---- the control bar, floating top-left inside the stage ---- */
+/*
+ * Horizontal chips rather than the vertical `.stage-tools` rail the model stages
+ * use. Those stages have four controls; this one has ten, and ten 40 px cells
+ * stacked vertically is a column down the whole left edge of the specimen.
+ */
+.mol-bar {
+  position: absolute;
+  z-index: 3;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+}
+.mol-group {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: rgba(255, 253, 249, 0.84);
+  box-shadow: 0 8px 22px rgba(87, 62, 43, 0.09);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.mol-chip {
+  padding: 5px 11px;
+  border: 0;
+  border-radius: 999px;
+  color: var(--color-muted);
+  background: transparent;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  transition: color 160ms ease, background 160ms ease;
+}
+.mol-chip:hover { color: var(--color-ink-2); background: var(--color-surface-2); }
+.mol-chip.is-active { color: #fff; background: var(--color-accent-strong); }
+.mol-chip-icon {
+  display: grid;
+  width: 26px;
+  padding: 0;
+  place-items: center;
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+/* ---- projected atom labels ---- */
+/*
+ * DOM, not sprites. The stage writes `transform: translate(x, y)
+ * translate(-50%, -50%)` every frame, which only lands correctly from a
+ * zero origin — hence `top: 0; left: 0` rather than any centring here.
+ */
+.mol-overlay { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+.mol-label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 1px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  color: var(--color-ink);
+  background: rgba(255, 253, 249, 0.78);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+.mol-label i { color: var(--color-muted-2); font-size: 7.5px; font-style: normal; }
+
+/* The measurement tag: the one number the "Đo" tool exists to print. */
+.mol-tag {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 3px 9px;
+  border-radius: 999px;
+  color: #fff;
+  background: var(--color-accent-strong);
+  box-shadow: 0 8px 20px rgba(180, 88, 70, 0.28);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* ---- the side panel ---- */
+.mol-panel {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  min-height: 0;
+  border-left: 1px solid var(--color-border-hair);
+}
+
+.mol-legend { padding: 13px 14px 11px; border-bottom: 1px solid var(--color-border-hair); }
+.mol-legend ul { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.mol-legend li {
+  display: grid;
+  grid-template-columns: 10px auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+.mol-legend li i { width: 10px; height: 10px; border-radius: 50%; }
+.mol-legend li b { color: var(--color-ink); font-family: var(--font-mono); font-size: 11px; font-weight: 500; }
+.mol-legend li span {
+  color: var(--color-muted);
+  font-size: 10.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mol-legend li em {
+  color: var(--color-muted-2);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-style: normal;
+}
+.mol-mass {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 10px 0 0;
+  padding-top: 9px;
+  border-top: 1px solid var(--color-border-hair);
+  color: var(--color-muted);
+  font-size: 10px;
+}
+.mol-mass b { color: var(--color-ink); font-family: var(--font-mono); font-size: 11.5px; font-weight: 500; }
+
+/*
+ * The atom strip is the keyboard path into the model: picking atoms by clicking
+ * the canvas is the natural gesture, but "Đo" is the feature that makes this a
+ * lesson, and a lesson that only works with a mouse is not finished.
+ */
+.mol-atoms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  max-height: 108px;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--color-border-hair);
+  overflow-y: auto;
+}
+.mol-atom {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 7px;
+  border: 1px solid var(--color-border-hair);
+  border-radius: 999px;
+  color: var(--color-ink-2);
+  background: var(--color-surface-raised);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 500;
+  transition: border-color 150ms ease, background 150ms ease;
+}
+.mol-atom i { width: 7px; height: 7px; border-radius: 50%; }
+.mol-atom:hover { border-color: var(--color-border-strong); }
+.mol-atom.is-active {
+  border-color: transparent;
+  color: #fff;
+  background: var(--color-accent-strong);
+}
+
+.mol-readout {
+  display: grid;
+  align-content: start;
+  gap: 9px;
+  min-height: 0;
+  padding: 13px 14px 16px;
+  overflow-y: auto;
+}
+.mol-readout p { display: grid; gap: 3px; margin: 0; }
+.mol-readout b { color: var(--color-ink); font-size: 12.5px; font-weight: 640; }
+.mol-readout em {
+  color: var(--color-accent-deep);
+  font-family: var(--font-mono);
+  font-size: 17px;
+  font-style: normal;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+.mol-readout span { color: var(--color-muted); font-size: 11px; line-height: 1.6; }
+.mol-fact {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 0 0;
+  border-top: 1px solid var(--color-border-hair);
+}
+.mol-fact i { color: var(--color-ink-2); font-family: var(--font-mono); font-size: 11px; font-style: normal; }
+.mol-clear {
+  justify-self: start;
+  padding: 5px 11px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-muted);
+  background: var(--color-surface-raised);
+  font-size: 10.5px;
+  font-weight: 580;
+}
+.mol-clear:hover { border-color: var(--color-accent-line); color: var(--color-accent-deep); }
+
+/* ------------------------------------------------------------ responsive --- */
+@media (max-width: 1240px) {
+  .mol { grid-template-columns: minmax(0, 1fr) 218px; }
+}
+@media (max-width: 900px) {
+  .atom-facts { grid-template-columns: repeat(2, 1fr); }
+  .mol { grid-template-columns: 1fr; grid-template-rows: minmax(260px, 1fr) auto; }
+  .mol-panel {
+    grid-template-rows: auto auto auto;
+    border-left: 0;
+    border-top: 1px solid var(--color-border-hair);
+  }
+  .mol-atoms { max-height: 72px; }
+  .mol-readout { max-height: 148px; }
+}
+@media (max-width: 820px) {
+  .periodic { overflow-x: auto; }
+  .periodic-grid { min-width: 620px; }
+}
+@media (max-width: 700px) {
+  .atom-facts { grid-template-columns: 1fr; }
+  .mol-bar { gap: 5px 6px; }
+  .mol-chip { padding: 5px 8px; font-size: 10px; }
+}
+@media (max-width: 560px) {
+  .periodic-legend { max-height: 60px; overflow-y: auto; }
+}

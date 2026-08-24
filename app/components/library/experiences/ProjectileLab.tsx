@@ -114,6 +114,18 @@ export function ProjectileLab() {
     const accent = style.getPropertyValue('--sim-accent').trim() || '#e87868';
     const line = style.getPropertyValue('--sim-line').trim() || 'rgba(117,91,70,0.2)';
     const muted = style.getPropertyValue('--sim-muted').trim() || '#706a73';
+    /*
+     * The page's own family, read from the token rather than named here.
+     *
+     * These labels used to be hardcoded as `Inter, system-ui, sans-serif` and
+     * `"JetBrains Mono", ui-monospace, monospace`. Neither face is loaded any
+     * more — the site is one family now — so both fell back to a system font, and
+     * a 10 px readout drawn into a canvas in a different typeface from the label
+     * beside it is exactly the kind of seam that is invisible in review and
+     * obvious once you see it. Numbers get `tabular-nums` for the column
+     * alignment the monospaced face used to provide.
+     */
+    const face = style.getPropertyValue('--font-sans').trim() || 'system-ui, sans-serif';
 
     const padding = { left: 46, right: 22, top: 20, bottom: 34 };
     const plotWidth = Math.max(10, width - padding.left - padding.right);
@@ -130,7 +142,7 @@ export function ProjectileLab() {
     const gridStep = spanX > 160 ? 40 : spanX > 80 ? 20 : spanX > 40 ? 10 : 5;
     context.strokeStyle = line;
     context.fillStyle = muted;
-    context.font = '500 10px Inter, system-ui, sans-serif';
+    context.font = `500 10px ${face}`;
     context.lineWidth = 1;
     for (let value = 0; value <= spanX; value += gridStep) {
       const screenX = toScreenX(value);

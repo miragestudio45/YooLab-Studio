@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
+import { createVisibilityGate } from '../../../lib/three/visibility';
 import {
   CATEGORY_COLOR,
   CATEGORY_LABEL,
@@ -242,19 +243,15 @@ function AtomView({ element, onBack }: { element: ElementData; onBack: () => voi
     resizeObserver.observe(host);
     resize();
 
-    let onScreen = true;
-    const visibility = new IntersectionObserver(
-      ([entry]) => { onScreen = entry?.isIntersecting ?? true; },
-      { rootMargin: '160px 0px' },
-    );
-    visibility.observe(host);
+    const gate = createVisibilityGate(host, 160);
+    const onScreen = () => gate.visible();
 
     const timer = new THREE.Timer();
     const axis = new THREE.Vector3();
     renderer.setAnimationLoop(() => {
       timer.update();
       const delta = Math.min(timer.getDelta(), 0.05);
-      if (!onScreen) return;
+      if (!onScreen()) return;
       const time = reduceMotion ? 0 : timer.getElapsed();
       root.rotation.y += reduceMotion ? 0 : delta * 0.1;
       for (const ring of rings) {
@@ -277,7 +274,7 @@ function AtomView({ element, onBack }: { element: ElementData; onBack: () => voi
     return () => {
       renderer.setAnimationLoop(null);
       resizeObserver.disconnect();
-      visibility.disconnect();
+      gate.dispose();
       electrons.dispose();
       for (const item of disposables) item.dispose();
       renderer.dispose();

@@ -3,7 +3,9 @@
 import { useFormulaGate } from './FormulaGate';
 import { openLibraryExperience } from '../lib/library/openExperience';
 import { ModelThumbnail } from './ModelThumbnail';
-import { BEE_THUMBNAIL, JELLYFISH_THUMBNAIL } from '../lib/three/thumbnailRequests';
+import { LibraryMark } from './library/LibraryMark';
+import { BEE_THUMBNAIL } from '../lib/three/thumbnailRequests';
+import type { MarkId } from '../lib/library/types';
 
 /**
  * Proof, built from evidence rather than from claims.
@@ -13,6 +15,14 @@ import { BEE_THUMBNAIL, JELLYFISH_THUMBNAIL } from '../lib/three/thumbnailReques
  * trust more than having none. What it carries instead is stronger and checkable
  * on the spot — every card opens something that is running on this page right
  * now, and the set spans four different subjects so the range is evidence too.
+ *
+ * Four cards, not five, and every one of them *opens an experience* rather than
+ * scrolling to a section. Five cards on a 1512 px screen are 265 px wide, which
+ * is small enough that the picture stops being a specimen and becomes a chip —
+ * and the fifth was a link to the studio section, which is the one promise on
+ * the row that "mở ngay" did not actually keep. The two cards that used to show
+ * a letter now show the same drawn diagrams the Library rail uses, so no card
+ * on the row is visibly weaker than its neighbours.
  */
 
 type Sample = {
@@ -20,6 +30,14 @@ type Sample = {
   subject: string;
   title: string;
   task: string;
+  /*
+   * The subject's own accent, for the two cards whose experience has no mesh to
+   * render. It arrives as a custom property and becomes both the plate's wash and
+   * `currentColor` inside the drawn mark — the same mechanism the Library rail
+   * uses to make nineteen hand-drawn diagrams read as one colour-coded set rather
+   * than as nineteen missing images.
+   */
+  tint?: string;
   /*
    * `library` opens a named experience in the workspace rather than linking to
    * the section. A card that says "mở bảng tuần hoàn" and delivers whatever the
@@ -30,7 +48,7 @@ type Sample = {
     | { kind: 'link'; href: string; label: string }
     | { kind: 'library'; id: string; label: string }
     | { kind: 'formula'; label: string };
-  visual: { kind: 'thumbnail'; request: typeof BEE_THUMBNAIL } | { kind: 'poster'; src: string } | { kind: 'glyph'; glyph: string };
+  visual: { kind: 'thumbnail'; request: typeof BEE_THUMBNAIL } | { kind: 'poster'; src: string } | { kind: 'mark'; mark: MarkId };
 };
 
 const SAMPLES: Sample[] = [
@@ -39,7 +57,7 @@ const SAMPLES: Sample[] = [
     subject: 'Sinh học · Giải phẫu',
     title: 'Ong mật',
     task: 'Đổi giữa ba trạng thái để thấy cơ chế bay.',
-    action: { kind: 'link', href: '#ong-mat', label: 'Mở bài học' },
+    action: { kind: 'library', id: 'bee', label: 'Mở bài học' },
     visual: { kind: 'thumbnail', request: BEE_THUMBNAIL },
   },
   {
@@ -48,7 +66,8 @@ const SAMPLES: Sample[] = [
     title: 'Bảng tuần hoàn',
     task: 'Chọn một trong 118 nguyên tố và mở mô hình nguyên tử.',
     action: { kind: 'library', id: 'periodic-table', label: 'Mở bảng tuần hoàn' },
-    visual: { kind: 'glyph', glyph: 'Fe' },
+    visual: { kind: 'mark', mark: 'atom-grid' },
+    tint: 'var(--color-lavender)',
   },
   {
     id: 'globe',
@@ -56,7 +75,8 @@ const SAMPLES: Sample[] = [
     title: 'Địa cầu tương tác',
     task: 'Xoay quả cầu, chọn quốc gia và đọc số liệu thật.',
     action: { kind: 'library', id: 'globe-explorer', label: 'Mở địa cầu' },
-    visual: { kind: 'glyph', glyph: '◍' },
+    visual: { kind: 'mark', mark: 'globe' },
+    tint: 'var(--color-cyan)',
   },
   {
     id: 'formula',
@@ -65,14 +85,6 @@ const SAMPLES: Sample[] = [
     task: 'Lắp ráp từng chi tiết, quan sát, rồi tự cầm lái.',
     action: { kind: 'formula', label: 'Mở trải nghiệm' },
     visual: { kind: 'poster', src: '/asset/Library/Car/formula-preview.jpg' },
-  },
-  {
-    id: 'studio',
-    subject: 'YooStudio · Biên soạn',
-    title: 'Bài học sứa biển',
-    task: 'Chọn lớp, kéo mũi neo, thêm ghi chú, chạy timeline.',
-    action: { kind: 'link', href: '#cong-cu', label: 'Mở không gian biên soạn' },
-    visual: { kind: 'thumbnail', request: JELLYFISH_THUMBNAIL },
   },
 ];
 
@@ -87,7 +99,7 @@ export function ProofSection() {
             <p className="section-kicker">Bài học mẫu</p>
             <h2 id="proof-title">Những bài học<br /><em>bạn có thể mở ngay.</em></h2>
           </div>
-          <p>Năm nội dung dưới đây đang chạy thật trên trang này. Mở một mục và tự đánh giá.</p>
+          <p>Bốn nội dung dưới đây đang chạy thật trên trang này. Mở một mục và tự đánh giá.</p>
         </div>
 
         <div className="proof-grid" data-stagger>
@@ -95,7 +107,10 @@ export function ProofSection() {
             const actionId = sample.action.kind === 'library' ? sample.action.id : '';
             return (
             <article className="proof-card" key={sample.id} data-reveal>
-              <div className="proof-visual">
+              <div
+                className={`proof-visual${sample.visual.kind === 'mark' ? ' proof-visual--mark' : ''}`}
+                style={sample.tint ? ({ '--proof-tint': sample.tint } as React.CSSProperties) : undefined}
+              >
                 {sample.visual.kind === 'thumbnail' && (
                   <ModelThumbnail request={sample.visual.request} alt={sample.title} />
                 )}
@@ -103,8 +118,8 @@ export function ProofSection() {
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={sample.visual.src} alt={sample.title} loading="lazy" decoding="async" />
                 )}
-                {sample.visual.kind === 'glyph' && (
-                  <span className="proof-glyph" aria-hidden="true">{sample.visual.glyph}</span>
+                {sample.visual.kind === 'mark' && (
+                  <span className="proof-mark" aria-hidden="true"><LibraryMark mark={sample.visual.mark} /></span>
                 )}
               </div>
               <span className="proof-subject">{sample.subject}</span>

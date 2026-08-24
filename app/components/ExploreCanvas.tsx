@@ -2,13 +2,20 @@
 
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
-import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { createProceduralEnvironment, exploreEnvironmentPalette } from '../lib/three/environment';
 import { createLiquidSurface, liquidPalette, type LiquidPalette } from '../lib/three/liquid';
-import { buildBeeAnatomy, createBeeMaterials, shareSkinnedMesh } from '../lib/three/beeOptics';
+import type { BeeMaterialSet } from '../lib/three/beeOptics';
+import {
+  createBeeCreature,
+  createCreatureLoader,
+  createFishCreature,
+  createJellyfishCreature,
+  loadBeeAssets,
+  CREATURE_ASSETS,
+  type CreatureHandle,
+} from '../lib/three/creatures';
 import { EXPLORE_SCENES, type ExploreScene } from '../lib/exploreScenes';
+import { createVisibilityGate } from '../lib/three/visibility';
 
 type ExploreCanvasProps = {
   /**
@@ -31,6 +38,18 @@ type Placement = {
   pitch: number;
 };
 
+/**
+ * How wide each creature is in world units at `scale: 1`.
+ *
+ * These are the `targetSize` values handed to `createBeeCreature` and friends
+ * below, which normalise each mesh's largest dimension to them. They are needed
+ * up here because the narrow-viewport fit has to know how much room a creature
+ * asks for *before* deciding how much to give it — a portrait phone frame is
+ * about 2 world units wide where a laptop's is 6, so a constant mobile scale
+ * either overflowed the two wide creatures or shrank the tall one to a thumbnail.
+ */
+const CREATURE_SPAN: Record<CreatureKey, number> = { bee: 3.6, fish: 3.15, jelly: 3.42 };
+
 /** A camera shot. `roll` tilts the frame, which is how the jellyfish panel gets
  *  a diagonal composition instead of a very tall vertical one. */
 type Shot = {
@@ -38,17 +57,18 @@ type Shot = {
   layout: Placement;
 };
 
+/**
+ * One creature on the track.
+ *
+ * The material setup itself lives in `lib/three/creatures.ts` now, because the
+ * Library needs exactly the same bee, fish and jellyfish and used to render them
+ * through a generic GLB viewer instead. What stays here is the only thing the
+ * hero adds on top: where each one sits along the scroll and how present it is.
+ */
 type Creature = {
   key: CreatureKey;
-  root: THREE.Group;
+  handle: CreatureHandle;
   presence: number;
-  setPresence: (value: number) => void;
-};
-
-type FadeTarget = {
-  material: THREE.Material & { opacity: number; alphaTest: number };
-  opacity: number;
-  alphaTest: number;
 };
 
 const place = (x: number, y: number, z: number, scale: number, yaw = 0, pitch = 0): Placement => ({
@@ -70,29 +90,70 @@ const place = (x: number, y: number, z: number, scale: number, yaw = 0, pitch = 
  * crossfade depth instead of making it a dissolve between two flat images.
  */
 const shots: Record<ExploreScene, Shot> = {
-  /* Hero. The bee sits right of centre and large — a little over half the
-     frame width — with the whole left half left clear for the proposition. */
+  /*
+   * Hero. The bee sits right of centre and large — a little over half the frame
+   * width — with the whole left half left clear for the proposition.
+   *
+   * `scale: 1.12` and `y: 0.16`, up from 1.0 and 0. Twelve percent larger because
+   * the hero read as underweight against its own empty frame, and the flower
+   * valley that now fills the lower third makes a bee at the old size look like it
+   * is standing in the meadow rather than flying over it. The lift is what
+   * restores that: the creature clears the vegetation line, and the gap between
+   * the two is what says "hovering".
+   */
   'bee-hero': {
     camera: { position: new THREE.Vector3(0.16, 0.2, 6.55), target: new THREE.Vector3(0.86, 0.02, 0), fov: 33, roll: 0 },
-    layout: place(1.62, 0.0, 0.1, 1.0, -0.52, -0.05),
+    layout: place(1.62, 0.16, 0.1, 1.12, -0.52, -0.05),
   },
-  /* Study. Same creature, closer and turned: the copy moves right, so the bee
-     moves left and the camera comes in about half a metre. */
+  /*
+   * Study. Same creature, closer and turned — and moved a full unit further left
+   * than it used to be.
+   *
+   * The copy column is columns 8–12 of the shell grid, which starts at 58% of the
+   * frame. At `x = -1.58` the bee spanned roughly 12–74% of the frame, so its
+   * back legs and one wing crossed into the headline, the readout and the mode
+   * buttons: three text-on-text collisions in a single screen. At `x = -2.48` it
+   * spans about 0–57% and the two halves never touch.
+   */
   'bee-study': {
     camera: { position: new THREE.Vector3(-0.6, 0.12, 6.05), target: new THREE.Vector3(-1.16, -0.02, 0), fov: 31, roll: 0.015 },
-    layout: place(-1.58, -0.02, 0.2, 1.04, 0.42, -0.02),
+    layout: place(-2.48, -0.02, 0.2, 0.99, 0.42, -0.02),
   },
+  /*
+   * Fish. Bigger and further left.
+   *
+   * This chapter had the worst composition on the page: the fish occupied the
+   * middle of the frame at 42% of its width, which left a wide empty strip down
+   * the left and put the tail fin straight through "quan sát chuyển động". It now
+   * fills columns 1–6 of twelve — the camera is half a metre closer and the model
+   * is 8% larger, so removing the dead strip makes the fish *more* present rather
+   * than just moving the hole to the other side.
+   */
   fish: {
-    camera: { position: new THREE.Vector3(-0.9, -0.02, 7.4), target: new THREE.Vector3(-1.22, -0.06, 0), fov: 33, roll: -0.02 },
-    layout: place(-1.52, -0.04, 0.2, 1.04, 1.36, 0.07),
+    camera: { position: new THREE.Vector3(-0.75, 0.02, 7.05), target: new THREE.Vector3(-1.05, -0.02, 0), fov: 33, roll: -0.02 },
+    layout: place(-2.53, 0.04, 0.2, 1.12, 1.36, 0.07),
   },
-  /* Jellyfish. The bell is framed rather than the whole animal: aiming above
-     the model centre and tilting the camera turns a very tall subject into a
-     diagonal that fits one screen, instead of asking for two of scrolling
-     before the tentacles end. */
+  /*
+   * Jellyfish. Vertical subject, so the constraint is height, not width.
+   *
+   * Two faults here. The animal was 19% taller than the frame — the tentacles ran
+   * off the bottom edge, which is what a viewer reads as "this section needs more
+   * scrolling than it has". And it sat at 55% of the frame width, leaving the last
+   * quarter of the screen empty next to a copy column that ends at 42%.
+   *
+   * Pulling the camera back to 8.2 makes the frame tall enough for the whole
+   * animal and putting the model on the camera's own target height centres it
+   * there, so nothing is cut. The `roll` also had to come back from -0.075 to
+   * -0.05: a tilted frame costs `|sin(roll)| × half-width` of usable height at
+   * top and bottom, which at 3.9 units of half-width was 0.29 — more than the
+   * margin the pull-back had bought, and the bell was still clipped by the header.
+   * Moving the model to `x = 2.68` fills columns 6–12: far enough right that the
+   * two annotations in the last three columns have a tentacle to point at rather
+   * than empty ground beside them, which is what the band on that edge had been.
+   */
   jelly: {
-    camera: { position: new THREE.Vector3(0.62, 0.42, 6.0), target: new THREE.Vector3(1.22, 0.34, 0), fov: 30, roll: -0.075 },
-    layout: place(1.5, -0.34, 0.15, 1.12, 0.22, -0.05),
+    camera: { position: new THREE.Vector3(0.52, 0.28, 8.2), target: new THREE.Vector3(1.10, 0.24, 0), fov: 30, roll: -0.05 },
+    layout: place(2.68, 0.24, 0.15, 1.08, 0.22, -0.05),
   },
 };
 
@@ -169,83 +230,6 @@ function creatureWeights(progress: number) {
     fish: toFish * (1 - toJelly),
     jelly: toJelly,
   };
-}
-
-function normalizeObject(object: THREE.Object3D, targetSize: number) {
-  const bounds = new THREE.Box3().setFromObject(object);
-  const size = bounds.getSize(new THREE.Vector3());
-  const center = bounds.getCenter(new THREE.Vector3());
-  const scale = targetSize / Math.max(size.x, size.y, size.z);
-  object.scale.setScalar(scale);
-  object.position.sub(center.clone().multiplyScalar(scale));
-  return { scale, size };
-}
-
-function disposeObject(object: THREE.Object3D) {
-  const geometries = new Set<THREE.BufferGeometry>();
-  const materials = new Set<THREE.Material>();
-  object.traverse((child) => {
-    const mesh = child as THREE.Mesh;
-    if (!mesh.isMesh) return;
-    geometries.add(mesh.geometry);
-    const list = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-    for (const material of list) if (material) materials.add(material);
-  });
-  for (const geometry of geometries) geometry.dispose();
-  for (const material of materials) material.dispose();
-}
-
-/**
- * Crossfades a creature without breaking its render queue.
- *
- * `alphaTest` is scaled with the fade rather than left fixed: an alpha-masked
- * fin would otherwise vanish the moment `opacity` fell below the cutoff. The
- * value is clamped above zero so the `USE_ALPHATEST` define never toggles and
- * the program stays cached.
- */
-function fadeTargets(targets: FadeTarget[], presence: number) {
-  for (const target of targets) {
-    target.material.opacity = target.opacity * presence;
-    if (target.alphaTest > 0) {
-      target.material.alphaTest = Math.max(0.02, target.alphaTest * presence);
-    }
-    target.material.transparent = true;
-  }
-}
-
-/**
- * Promotes a glTF material to MeshPhysicalMaterial while keeping its maps.
- *
- * Only `JF_skin_out` ships a clearcoat extension, so the loader hands back a
- * plain MeshStandardMaterial for the other two jellyfish layers. Assigning
- * transmission or IOR to those would define USE_TRANSMISSION against the
- * standard material struct and fail to compile.
- */
-function toPhysical(mesh: THREE.Mesh): THREE.MeshPhysicalMaterial {
-  const source = mesh.material as THREE.MeshStandardMaterial;
-  if ((source as THREE.MeshPhysicalMaterial).isMeshPhysicalMaterial) {
-    return source as THREE.MeshPhysicalMaterial;
-  }
-  const physical = new THREE.MeshPhysicalMaterial({
-    name: source.name,
-    color: source.color.clone(),
-    map: source.map,
-    emissive: source.emissive.clone(),
-    emissiveMap: source.emissiveMap,
-    emissiveIntensity: source.emissiveIntensity,
-    normalMap: source.normalMap,
-    normalScale: source.normalScale.clone(),
-    roughnessMap: source.roughnessMap,
-    metalnessMap: source.metalnessMap,
-    aoMap: source.aoMap,
-    alphaMap: source.alphaMap,
-    roughness: source.roughness,
-    metalness: source.metalness,
-    side: source.side,
-  });
-  mesh.material = physical;
-  source.dispose();
-  return physical;
 }
 
 export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
@@ -352,300 +336,56 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
     const creatures = new Map<CreatureKey, Creature>();
     const mixers: THREE.AnimationMixer[] = [];
     let beeActions: THREE.AnimationAction[] = [];
-    let beeMaterialSet: ReturnType<typeof createBeeMaterials> | undefined;
+    let beeMaterialSet: BeeMaterialSet | undefined;
     let beeShell: THREE.SkinnedMesh | undefined;
     let beeWings: THREE.SkinnedMesh | undefined;
+    let beeMaps: THREE.Texture[] = [];
     let renderWidth = 1;
     let renderHeight = 1;
 
-    const draco = new DRACOLoader();
-    draco.setDecoderPath('/asset/draco/');
-    const loader = new GLTFLoader();
-    loader.setDRACOLoader(draco);
-    loader.setMeshoptDecoder(MeshoptDecoder);
-    const textureLoader = new THREE.TextureLoader();
+    const loader = createCreatureLoader();
 
-    const registerCreature = (key: CreatureKey, root: THREE.Group, setPresence: (value: number) => void) => {
-      root.visible = false;
-      scene.add(root);
-      creatures.set(key, { key, root, presence: 0, setPresence });
+    const registerCreature = (key: CreatureKey, handle: CreatureHandle) => {
+      handle.root.visible = false;
+      scene.add(handle.root);
+      creatures.set(key, { key, handle, presence: 0 });
+      if (handle.mixer) mixers.push(handle.mixer);
     };
 
     const configureJelly = async () => {
-      const gltf = await loader.loadAsync('/asset/fish/jellyfish.glb');
-      const visual = gltf.scene;
-      const fades: FadeTarget[] = [];
-      // Either every layer is transmissive or none is: three sorts transmissive
-      // and transparent objects into separate passes, and a split would draw the
-      // inner bell over the outer membrane.
-      const transmissive = !compact;
-      visual.traverse((child) => {
-        const mesh = child as THREE.Mesh;
-        if (!mesh.isMesh) return;
-        mesh.frustumCulled = false;
-        const material = toPhysical(mesh);
-        material.toneMapped = true;
-        material.transparent = true;
-        material.alphaTest = 0;
-        if (material.name === 'JF_heart') {
-          // Inner bell. Source of the internal glow, kept low enough that the
-          // two membranes above it stay readable.
-          material.color.set(0x6f8dff);
-          material.emissive.set(0x3d1f86);
-          material.emissiveIntensity = 0.52;
-          material.metalness = 0;
-          material.roughness = 0.28;
-          material.opacity = 1;
-          material.depthWrite = true;
-          material.transmission = transmissive ? 0.08 : 0;
-          material.thickness = 0.35;
-          material.ior = 1.36;
-          material.clearcoat = 0.45;
-          material.clearcoatRoughness = 0.32;
-          material.sheen = 0.7;
-          material.sheenColor = new THREE.Color(0xa8f0ff);
-          material.sheenRoughness = 0.48;
-          material.envMapIntensity = 0.62;
-          mesh.renderOrder = 1;
-          fades.push({ material, opacity: 1, alphaTest: 0 });
-        } else if (material.name === 'JF_skin_in') {
-          // Living tissue. Translucent with real transmission so the heart
-          // reads through it instead of being alpha-masked away.
-          material.color.set(0xa79bff);
-          material.emissive.set(0x8a5cf0);
-          material.emissiveIntensity = 0.54;
-          material.metalness = 0;
-          material.roughness = 0.18;
-          material.opacity = transmissive ? 0.9 : 0.78;
-          material.depthWrite = false;
-          material.transmission = transmissive ? 0.44 : 0;
-          material.thickness = 0.55;
-          material.ior = 1.34;
-          material.attenuationDistance = 1.5;
-          material.attenuationColor = new THREE.Color(0x7a34ff);
-          material.iridescence = 0.45;
-          material.iridescenceIOR = 1.28;
-          material.iridescenceThicknessRange = [180, 640];
-          material.clearcoat = 0.55;
-          material.clearcoatRoughness = 0.28;
-          material.envMapIntensity = 0.78;
-          material.side = THREE.FrontSide;
-          mesh.renderOrder = 2;
-          fades.push({ material, opacity: material.opacity, alphaTest: 0 });
-        } else if (material.name === 'JF_skin_out') {
-          // Opal shell. High transmission, low opacity, heavy iridescence: the
-          // layer that has to carry the holographic colour shift.
-          material.color.set(0xb9aaff);
-          material.emissive.set(0x7a5ce6);
-          material.emissiveIntensity = 0.30;
-          material.metalness = 0;
-          material.roughness = 0.08;
-          material.opacity = transmissive ? 0.6 : 0.5;
-          material.depthWrite = false;
-          material.transmission = transmissive ? 0.74 : 0;
-          material.thickness = 0.95;
-          material.ior = 1.31;
-          material.attenuationDistance = 2.3;
-          material.attenuationColor = new THREE.Color(0x9560ff);
-          material.iridescence = 0.9;
-          material.iridescenceIOR = 1.33;
-          material.iridescenceThicknessRange = [220, 800];
-          material.clearcoat = 1;
-          material.clearcoatRoughness = 0.08;
-          material.sheen = 1;
-          material.sheenColor = new THREE.Color(0xffc6ec);
-          material.sheenRoughness = 0.32;
-          material.specularIntensity = 1;
-          material.specularColor = new THREE.Color(0xdff6ff);
-          material.envMapIntensity = 0.92;
-          material.side = THREE.FrontSide;
-          mesh.renderOrder = 3;
-          fades.push({ material, opacity: material.opacity, alphaTest: 0 });
-        }
-        material.needsUpdate = true;
-      });
-      normalizeObject(visual, 3.6);
-      const root = new THREE.Group();
-      root.add(visual);
-      registerCreature('jelly', root, (presence) => fadeTargets(fades, presence));
-      if (gltf.animations[0]) {
-        const mixer = new THREE.AnimationMixer(visual);
-        mixer.clipAction(gltf.animations[0]).setEffectiveTimeScale(0.72).play();
-        mixers.push(mixer);
-      }
+      const gltf = await loader.gltf.loadAsync(CREATURE_ASSETS.jellyfish);
+      registerCreature('jelly', createJellyfishCreature(gltf, {
+        targetSize: 3.6,
+        // Phones get the blended path instead: three sorts transmissive and
+        // transparent objects into separate passes, so the three membranes are
+        // all transmissive or none of them is.
+        transmissive: !compact,
+      }));
     };
 
     const configureFish = async () => {
-      const gltf = await loader.loadAsync('/asset/fish/Fish.glb');
-      const visual = gltf.scene;
-      const fades: FadeTarget[] = [];
-      visual.traverse((child) => {
-        const mesh = child as THREE.Mesh;
-        if (!mesh.isMesh) return;
-        mesh.frustumCulled = false;
-        const source = mesh.material as THREE.MeshStandardMaterial;
-        if (source.name === 'fish_Fin') {
-          const fin = new THREE.MeshPhysicalMaterial({
-            name: 'fish_Fin_calibrated',
-            color: source.color,
-            map: source.map,
-            alphaMap: source.alphaMap,
-            metalnessMap: source.metalnessMap,
-            roughnessMap: source.roughnessMap,
-            roughness: Math.max(source.roughness, 0.34),
-            metalness: 0.06,
-            alphaTest: 0.82,
-            transparent: true,
-            opacity: 1,
-            depthWrite: true,
-            iridescence: 0.52,
-            iridescenceIOR: 1.3,
-            iridescenceThicknessRange: [160, 520],
-            sheen: 0.7,
-            sheenColor: new THREE.Color(0xffd9ec),
-            sheenRoughness: 0.5,
-            clearcoat: 0.4,
-            clearcoatRoughness: 0.35,
-            envMapIntensity: 0.62,
-            side: THREE.DoubleSide,
-          });
-          mesh.material = fin;
-          mesh.renderOrder = 1;
-          source.dispose();
-          fades.push({ material: fin, opacity: 1, alphaTest: 0.82 });
-        } else if (source.name === 'fish_Eyes') {
-          source.color.set(0x2c2d35);
-          source.emissive.set(0x000000);
-          source.emissiveIntensity = 0;
-          source.transparent = true;
-          source.opacity = 1;
-          source.depthWrite = true;
-          source.alphaTest = 0;
-          source.metalness = 0.92;
-          source.roughness = 0.1;
-          source.envMapIntensity = 0.85;
-          source.needsUpdate = true;
-          mesh.renderOrder = 2;
-          fades.push({ material: source, opacity: 1, alphaTest: 0 });
-        } else {
-          source.emissive.set(0x000000);
-          source.emissiveIntensity = 0;
-          source.envMapIntensity = 0.5;
-          source.metalness = 0.05;
-          source.roughness = Math.max(source.roughness, 0.38);
-          source.aoMapIntensity = 0.62;
-          source.transparent = true;
-          source.opacity = 1;
-          source.depthWrite = true;
-          source.needsUpdate = true;
-          mesh.renderOrder = 0;
-          fades.push({ material: source, opacity: 1, alphaTest: 0 });
-        }
-      });
-      normalizeObject(visual, 3.15);
-      const root = new THREE.Group();
-      root.add(visual);
-      registerCreature('fish', root, (presence) => fadeTargets(fades, presence));
-      if (gltf.animations[0]) {
-        const mixer = new THREE.AnimationMixer(visual);
-        mixer.clipAction(gltf.animations[0]).setEffectiveTimeScale(0.82).play();
-        mixers.push(mixer);
-      }
+      const gltf = await loader.gltf.loadAsync(CREATURE_ASSETS.fish);
+      registerCreature('fish', createFishCreature(gltf, { targetSize: 3.15 }));
     };
 
     const configureBee = async () => {
-      const [gltf, normalMap, ormMap] = await Promise.all([
-        loader.loadAsync('/asset/bee/bee_fixed.glb'),
-        textureLoader.loadAsync('/asset/bee/bee_normal.webp'),
-        textureLoader.loadAsync('/asset/bee/bee_orm.webp'),
-      ]);
-      normalMap.wrapS = normalMap.wrapT = THREE.RepeatWrapping;
-      ormMap.wrapS = ormMap.wrapT = THREE.RepeatWrapping;
-      normalMap.colorSpace = THREE.NoColorSpace;
-      ormMap.colorSpace = THREE.NoColorSpace;
-      normalMap.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
-
-      const visual = gltf.scene;
-      let source: THREE.SkinnedMesh | undefined;
-      visual.traverse((child) => {
-        const skinned = child as THREE.SkinnedMesh;
-        if (!source && skinned.isSkinnedMesh) source = skinned;
-      });
-      if (!source) throw new Error('bee_fixed.glb no longer contains a skinned mesh');
-
-      buildBeeAnatomy(source);
-      const geometryBounds = source.geometry.boundingBox
-        ?? new THREE.Box3().setFromBufferAttribute(source.geometry.getAttribute('position') as THREE.BufferAttribute);
-      const geometrySpan = geometryBounds.getSize(new THREE.Vector3()).length();
-
-      const materials = createBeeMaterials({
-        normalMap,
-        ormMap,
+      const assets = await loadBeeAssets(loader, renderer.capabilities.getMaxAnisotropy());
+      beeMaps = [assets.normalMap, assets.ormMap];
+      const handle = createBeeCreature(assets.gltf, {
+        normalMap: assets.normalMap,
+        ormMap: assets.ormMap,
         sceneTexture: sceneCapture.texture,
         resolution: new THREE.Vector2(renderWidth, renderHeight),
+        targetSize: 3.42,
+        // The procedural path further down owns locomotion here, so the authored
+        // world-scale root motion on the hover and take-off clips has to go.
+        anchorRootMotion: true,
       });
-      // The reference insets the inner body by exactly one geometry unit and
-      // relies on polygon offset for the rest. On this asset the diagonal is
-      // ~2860 units, so the ratio below reproduces that almost exactly while
-      // still scaling if the model is ever re-exported.
-      materials.coreInset.value = Math.max(geometrySpan * 0.00035, 1e-4);
-      beeMaterialSet = materials;
-
-      const previousMaterial = source.material as THREE.Material;
-      source.material = materials.shell;
-      source.frustumCulled = false;
-      source.renderOrder = 1;
-      beeShell = source;
-      previousMaterial?.dispose();
-
-      const core = shareSkinnedMesh(source, materials.core, 'bee_core');
-      core.renderOrder = 0;
-      const wings = shareSkinnedMesh(source, materials.wings, 'bee_wings');
-      wings.renderOrder = 2;
-      beeWings = wings;
-      (source.parent ?? visual).add(core, wings);
-
-      normalizeObject(visual, 3.42);
-      const root = new THREE.Group();
-      root.add(visual);
-      registerCreature('bee', root, (presence) => {
-        materials.presence.value = presence;
-        // Opaque while fully present so the shell keeps writing depth; only the
-        // crossfade needs the blended path.
-        const blend = presence < 0.995;
-        if (materials.core.transparent !== blend) {
-          materials.core.transparent = blend;
-          materials.core.needsUpdate = true;
-        }
-        if (materials.shell.transparent !== blend) {
-          materials.shell.transparent = blend;
-          materials.shell.needsUpdate = true;
-        }
-      });
-
-      const beeClips = gltf.animations.map((clip) => clip.clone());
-      const isBodyPositionTrack = (track: THREE.KeyframeTrack) => (
-        track.name.toLowerCase().includes('body_jnt') && track.name.endsWith('.position')
-      );
-      const idleRootTrack = beeClips[0]?.tracks.find(isBodyPositionTrack);
-      const anchoredRoot = idleRootTrack?.values.slice(0, 3);
-      if (anchoredRoot?.length === 3) {
-        // Hover and take-off carry world-scale authored root motion (the fly
-        // track reaches ~4,479 source units). Keep the skeletal performance and
-        // anchor the body joint; the procedural path below supplies locomotion.
-        for (const clip of beeClips.slice(1)) {
-          const rootTrack = clip.tracks.find(isBodyPositionTrack);
-          if (!rootTrack) continue;
-          for (let index = 0; index < rootTrack.values.length; index += 3) {
-            rootTrack.values[index] = anchoredRoot[0];
-            rootTrack.values[index + 1] = anchoredRoot[1];
-            rootTrack.values[index + 2] = anchoredRoot[2];
-          }
-        }
-      }
-      const mixer = new THREE.AnimationMixer(visual);
-      mixers.push(mixer);
-      beeActions = beeClips.map((clip) => mixer.clipAction(clip).setLoop(THREE.LoopRepeat, Infinity));
+      beeMaterialSet = handle.materials;
+      beeShell = handle.opticalLayers?.shell;
+      beeWings = handle.opticalLayers?.wings;
+      beeActions = handle.actions ?? [];
+      registerCreature('bee', handle);
       // Starts on the fly clip: the very first thing the bee does is fly in.
       beeActions[2]?.reset().fadeIn(0.01).play();
     };
@@ -688,6 +428,22 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
         deferredTimer = setTimeout(loadDeferredModels, 240);
       }
     });
+
+    /*
+     * The hero's botanical world is not here any more.
+     *
+     * It used to be an instanced field of procedural plant silhouettes added to
+     * this scene, and it is now `FlowerValleyLayer` — a Canvas2D field of
+     * photographic sprites over this canvas, ported from the flower-valley
+     * reference. The two could not coexist: they would be two vegetation systems
+     * composing the same lower third of the same frame, and the procedural one
+     * was the reason the hero read as crude polygon grass.
+     *
+     * What that layer gives up by living above this canvas is the bee's
+     * refraction: the shell no longer picks the meadow up for free, because the
+     * capture pass only sees this scene. What it gains is the actual flowers. That
+     * is not a close trade.
+     */
 
     /* ----------------------------------------------------------------- input --- */
     const pointerTarget = new THREE.Vector2(0.62, 0.54);
@@ -743,13 +499,8 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
     resizeObserver.observe(host);
     resize();
 
-    let stageVisible = true;
-    const visibilityTarget = host.closest('.explore-story') ?? host;
-    const visibilityObserver = new IntersectionObserver(
-      ([entry]) => { stageVisible = entry?.isIntersecting ?? true; },
-      { rootMargin: '200px 0px' },
-    );
-    visibilityObserver.observe(visibilityTarget);
+    const gate = createVisibilityGate(host.closest('.explore-story') ?? host, 200);
+    const stageVisible = () => gate.visible();
     let documentVisible = document.visibilityState !== 'hidden';
     const onVisibility = () => { documentVisible = document.visibilityState !== 'hidden'; };
     document.addEventListener('visibilitychange', onVisibility);
@@ -781,7 +532,7 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
     renderer.setAnimationLoop(() => {
       timer.update();
       const delta = Math.min(timer.getDelta(), 0.05);
-      if (!stageVisible || !documentVisible) return;
+      if (!stageVisible() || !documentVisible) return;
       const elapsed = timer.getElapsed();
       const motionTime = reduceMotion ? 0 : elapsed;
       /* Continuous panel position. Everything below reads from this one number,
@@ -815,7 +566,7 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
 
       /* camera choreography. On narrow viewports the lateral framing collapses
          toward the centre so the creature stays inside the frame. */
-      const mobileFrame = viewportWidth < 780 ? 0.3 : 1;
+      const mobileFrame = viewportWidth < 780 ? 0.22 : 1;
       shotPosition.copy(shotA.camera.position).lerp(shotB.camera.position, mix);
       shotTarget.copy(shotA.camera.target).lerp(shotB.camera.target, mix);
       const shotFov = shotA.camera.fov + (shotB.camera.fov - shotA.camera.fov) * mix;
@@ -925,6 +676,19 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
 
       /* creature presence + placement */
       const mobile = viewportWidth < 780;
+      /*
+       * The frame, in world units, measured from the camera that is actually
+       * looking through it — not guessed from a breakpoint.
+       *
+       * A phone panel is portrait, so its frame is roughly 2 units wide against a
+       * laptop's 6, and the flat `scale × 0.66` this used to apply left the fish
+       * 117% as wide as the frame it had to fit in: on a 390 px screen the
+       * chapter showed a fragment of a fish behind its own headline. `frameW` and
+       * `frameH` here are the same numbers the shots were composed against, so
+       * the fit below is exact rather than tuned per device.
+       */
+      const frameH = 2 * Math.tan((cameraFov * Math.PI) / 360) * cameraPosition.distanceTo(cameraTarget);
+      const frameW = frameH * camera.aspect;
       const presenceBlend = 1 - Math.pow(0.004, delta);
       // The bee is on screen across two panels, so its own placement travels
       // with the camera rather than snapping at the panel boundary.
@@ -939,13 +703,14 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
       beeLayout.pitch = hero.pitch + (study.pitch - hero.pitch) * beeMix;
 
       for (const creature of creatures.values()) {
+        const root = creature.handle.root;
         const weight = weights[creature.key];
         creature.presence += (weight - creature.presence) * presenceBlend;
         if (weight < 0.004 && creature.presence < 0.004) creature.presence = 0;
         const visible = creature.presence > 0.002;
-        if (creature.root.visible !== visible) creature.root.visible = visible;
+        if (root.visible !== visible) root.visible = visible;
         if (!visible) continue;
-        creature.setPresence(creature.presence);
+        creature.handle.setPresence(creature.presence);
 
         const layout = creature.key === 'bee'
           ? beeLayout
@@ -990,17 +755,30 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
           // than the folded idle pose; this keeps the apparent size steady.
           motionScale = beeFlightState === 0 ? 1 : 0.94;
         }
-        // On narrow viewports the copy sits at the bottom of the panel, so the
-        // creature moves up and toward the centre instead of behind the text.
-        creature.root.position.set(
-          layout.x * (mobile ? 0.34 : 1) + extraX + exit.x * arc,
-          layout.y + idleY + extraY + exit.y * arc + (mobile ? 0.42 : 0),
+        /*
+         * On a narrow viewport the copy sits at the bottom of the panel, so the
+         * creature collapses toward the centre, lifts into the upper half, and is
+         * scaled to the frame it actually has: 86% of the width, or half the
+         * height, whichever binds first. The width term is what saves the fish
+         * and the bee; the height term is what stops the jellyfish from running
+         * off the top and bottom of a tall phone screen.
+         */
+        let fit = 1;
+        let lift = 0;
+        if (mobile) {
+          const span = layout.scale * CREATURE_SPAN[creature.key];
+          fit = Math.min(1, (frameW * 0.86) / span, (frameH * 0.5) / span);
+          lift = frameH * 0.2;
+        }
+        root.position.set(
+          layout.x * (mobile ? 0.12 : 1) + extraX + exit.x * arc,
+          layout.y + idleY + extraY + exit.y * arc + lift,
           layout.z + exit.z * arc - recede * 1.1,
         );
-        creature.root.scale.setScalar(
-          layout.scale * (mobile ? 0.66 : 1) * motionScale * (1 - recede * 0.14),
+        root.scale.setScalar(
+          layout.scale * fit * motionScale * (1 - recede * 0.14),
         );
-        creature.root.rotation.set(
+        root.rotation.set(
           layout.pitch + (pointer.y - 0.5) * -0.07,
           layout.yaw + (pointer.x - 0.5) * 0.16 + Math.sin(motionTime * 0.24) * 0.06
             + extraX * 0.1 + exit.yaw * arc,
@@ -1048,14 +826,17 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
       window.removeEventListener('scroll', onScroll);
       document.removeEventListener('visibilitychange', onVisibility);
       resizeObserver.disconnect();
-      visibilityObserver.disconnect();
+      gate.dispose();
       for (const mixer of mixers) mixer.stopAllAction();
-      for (const creature of creatures.values()) disposeObject(creature.root);
-      beeMaterialSet?.dispose();
+      // Each handle owns its own geometry, materials and — for the bee — the
+      // three shader programs; the two data maps are ours because both callers
+      // load them.
+      for (const creature of creatures.values()) creature.handle.dispose();
+      for (const map of beeMaps) map.dispose();
       liquid.dispose();
       environment.dispose();
       sceneCapture.dispose();
-      draco.dispose();
+      loader.dispose();
       renderer.dispose();
       renderer.domElement.remove();
     };

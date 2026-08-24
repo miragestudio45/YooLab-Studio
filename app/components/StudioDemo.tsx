@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { createProceduralEnvironment, studioEnvironmentPalette } from '../lib/three/environment';
+import { createVisibilityGate } from '../lib/three/visibility';
 
 /**
  * YooStudio workspace.
@@ -484,12 +485,8 @@ export function StudioDemo() {
     resizeObserver.observe(host);
     resize();
 
-    let visible = true;
-    const visibilityObserver = new IntersectionObserver(
-      ([entry]) => { visible = entry?.isIntersecting ?? true; },
-      { rootMargin: '160px 0px' },
-    );
-    visibilityObserver.observe(host);
+    const gate = createVisibilityGate(host, 160);
+    const visible = () => gate.visible();
     let documentVisible = document.visibilityState !== 'hidden';
     const onDocumentVisibility = () => { documentVisible = document.visibilityState !== 'hidden'; };
     document.addEventListener('visibilitychange', onDocumentVisibility);
@@ -503,7 +500,7 @@ export function StudioDemo() {
     renderer.setAnimationLoop(() => {
       timer.update();
       const delta = Math.min(timer.getDelta(), 0.05);
-      if (!visible || !documentVisible) return;
+      if (!visible() || !documentVisible) return;
 
       camera.position.set(
         orbitTarget.x + Math.sin(orbitYaw) * Math.cos(orbitPitch) * orbitRadius,
@@ -598,7 +595,7 @@ export function StudioDemo() {
       canvas.removeEventListener('pointercancel', onPointerUp);
       canvas.removeEventListener('wheel', onWheel);
       resizeObserver.disconnect();
-      visibilityObserver.disconnect();
+      gate.dispose();
       document.removeEventListener('visibilitychange', onDocumentVisibility);
       mixer?.stopAllAction();
       const geometries = new Set<THREE.BufferGeometry>();

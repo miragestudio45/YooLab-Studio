@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { createProceduralEnvironment, exploreEnvironmentPalette } from './environment';
+import { loadLibraryGltf } from './creatures';
 
 /**
  * Offscreen thumbnail baker.
@@ -14,7 +15,7 @@ import { createProceduralEnvironment, exploreEnvironmentPalette } from './enviro
  * context and one frame per asset for the whole page.
  */
 
-export type ThumbnailPreset = 'opal' | 'ruby' | 'natural' | 'plastic';
+export type ThumbnailPreset = 'opal' | 'ruby' | 'natural' | 'plastic' | 'tissue' | 'steel';
 
 export type ThumbnailRequest = {
   url: string;
@@ -106,6 +107,44 @@ function applyPreset(root: THREE.Object3D, preset: ThumbnailPreset) {
       if ('emissive' in material) material.emissiveIntensity = Math.min(material.emissiveIntensity ?? 0, 0.4);
       material.needsUpdate = true;
     }
+    if (preset === 'tissue') {
+      // Soft biological tissue. The bacterial wall mesh arrives with no
+      // materials at all, and a glassy preset on a scientific model reads as a
+      // trinket rather than as a specimen.
+      mesh.material = new THREE.MeshPhysicalMaterial({
+        color: 0xe9a08a,
+        emissive: new THREE.Color(0x3a0f08),
+        emissiveIntensity: 0.06,
+        roughness: 0.6,
+        metalness: 0,
+        ior: 1.4,
+        clearcoat: 0.18,
+        clearcoatRoughness: 0.3,
+        sheen: 0.4,
+        sheenColor: new THREE.Color(0xffd8c4),
+        sheenRoughness: 0.4,
+        envMapIntensity: 1.05,
+        side: THREE.FrontSide,
+      });
+      return;
+    }
+    if (preset === 'steel') {
+      // Tool steel. The toolkit meshes carry a flat 0.8 grey and no texture, so
+      // left alone the rail chip was a white smudge in a pink circle. Metal
+      // gives the silhouette an edge highlight, which is the only thing that
+      // makes a screwdriver readable at 56 px.
+      mesh.material = new THREE.MeshPhysicalMaterial({
+        color: 0x9ba3ab,
+        roughness: 0.24,
+        metalness: 0.86,
+        ior: 2.2,
+        clearcoat: 0.2,
+        clearcoatRoughness: 0.2,
+        envMapIntensity: 1.15,
+        side: THREE.FrontSide,
+      });
+      return;
+    }
     if (preset === 'opal' || preset === 'ruby') {
       // Deliberately opaque. The canvas clears to transparent so the card can
       // tint behind the render, and a transmissive material over an empty
@@ -143,7 +182,7 @@ async function bake(request: ThumbnailRequest): Promise<string | null> {
   const { renderer, loader, environment } = ensureRuntime();
   const width = request.width ?? 560;
   const height = request.height ?? 420;
-  const gltf = await loader.loadAsync(request.url);
+  const gltf = await loadLibraryGltf(loader, request.url);
   const scene = new THREE.Scene();
   scene.environment = environment.texture;
   const camera = new THREE.PerspectiveCamera(30, width / height, 0.05, 100);
@@ -186,6 +225,21 @@ async function bake(request: ThumbnailRequest): Promise<string | null> {
     target.z + Math.cos(yaw) * Math.cos(pitch) * distance,
   );
   camera.lookAt(target);
+  /*
+   * Clip planes from the subject, not from a constant.
+   *
+   * The camera was built with a fixed 0.05 / 100 and the models arrive in their
+   * own units — the jellyfish's bounding sphere is about 32 across, so its
+   * fitted distance is already 75, and nudging its `zoom` from 0.62 to 0.9 put
+   * the whole animal behind the far plane. What that produced was not a small
+   * jellyfish or a clipped one but a completely blank PNG, cached for the
+   * session, with no error: the education section and the studio mock showed an
+   * empty box. Deriving both planes from the fit makes `zoom` safe to author at
+   * any value.
+   */
+  camera.near = Math.max(0.01, distance - sphere.radius * 2.5);
+  camera.far = distance + sphere.radius * 4;
+  camera.updateProjectionMatrix();
 
   renderer.setSize(width, height, false);
   renderer.render(scene, camera);

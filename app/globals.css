@@ -1,5 +1,21 @@
 @import 'tailwindcss';
 
+/*
+ * Partials.
+ *
+ * This file was 3,000 lines and every section of the site wanted to edit it at
+ * once. The Library workspace, the editorial sections and each built experience
+ * now own a file, so a change to the molecule viewer cannot move the hero.
+ * Everything above the partials is tokens + page chrome, which is shared.
+ */
+@import './styles/library.css';
+@import './styles/sections.css';
+@import './styles/exp-cells.css';
+@import './styles/exp-molecule.css';
+@import './styles/exp-physics.css';
+@import './styles/exp-earth.css';
+@import './styles/exp-toolkit.css';
+
 /* ==========================================================================
    YooLab design tokens
 
@@ -16,16 +32,33 @@
 
 :root {
   /* --------------------------------------------------------------- type --- */
-  --font-display: 'Inter Tight', 'Inter', -apple-system, BlinkMacSystemFont,
-    'Segoe UI Variable Display', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  --font-body: 'Inter', -apple-system, BlinkMacSystemFont,
+  /*
+   * One family. Not four.
+   *
+   * `--font-display`, `--font-body`, `--font-editorial` and `--font-mono` all
+   * resolve to Plus Jakarta Sans. The four names survive because sixty rules
+   * across six files speak in them, and collapsing them here re-skins the whole
+   * site from one place instead of needing sixty edits — but there is no second
+   * face behind any of them any more.
+   *
+   * What each one used to buy, and where that job went:
+   *
+   *   --font-editorial  was Instrument Serif on specimen names. A serif "Ong mật"
+   *                     inside a sans application read as a different website. The
+   *                     names are now 650–700 weight with tight tracking, which is
+   *                     what actually made them feel catalogued.
+   *   --font-mono       was JetBrains Mono on every readout, for column alignment.
+   *                     `font-variant-numeric: tabular-nums` on the body does the
+   *                     same job in this family, so the numbers still line up and
+   *                     they no longer belong to a different typeface than their
+   *                     own labels.
+   */
+  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont,
     'Segoe UI Variable Text', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  /* Editorial serif, used *only* for specimen names and a couple of subject
-     headings. Navigation, buttons, labels and body stay sans — the site is a
-     science application, not a fashion magazine. */
-  --font-editorial: 'Instrument Serif', 'Iowan Old Style', 'Palatino Linotype',
-    'Times New Roman', serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-display: var(--font-sans);
+  --font-body: var(--font-sans);
+  --font-editorial: var(--font-sans);
+  --font-mono: var(--font-sans);
 
   /* ------------------------------------------------------------ palette --- */
   --color-accent: #ed8a72;
@@ -75,16 +108,70 @@
   --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.7);
 
   /* ------------------------------------------------------ layout regimes --- */
-  /* Exactly three widths for the whole site. Anything that invents a fourth is
-     a bug: it is what made section edges disagree at 1920. */
-  --gutter: clamp(20px, 3.2vw, 48px);
-  /* All three share the same 64 px outer margin, so once a viewport is narrow
-     enough that a regime stops capping, its edges line up exactly with the
-     others'. Different margins per regime is what made adjacent sections look
-     misaligned by a dozen pixels on a laptop. */
-  --shell-wide: min(1600px, calc(100vw - 64px));
-  --shell-editorial: min(1400px, calc(100vw - 64px));
-  --shell-narrow: min(1080px, calc(100vw - 64px));
+  /*
+   * ONE horizontal system for the entire page, header included.
+   *
+   * The previous build ran three: a 1240 px header, a 1400 px editorial column
+   * and a 1600 px workspace. On a 1920 display those are three different left
+   * edges within one screen, and no amount of styling inside a section can hide
+   * that its heading does not line up with the logo above it. There is now one
+   * shell and four aliases pointing at it.
+   *
+   *   --page-gutter  the outer margin, at every width.
+   *   --page-max     the widest the content ever gets.
+   *   --shell        what every band on the page is: the header, every section
+   *                  wrapper, the footer, and the text safe area of the
+   *                  full-bleed 3D canvases.
+   *
+   * `calc(100% - ...)` rather than `100vw`: custom properties are substituted
+   * textually, so the percentage resolves against the element's own containing
+   * block — which is the section, which is the body. `100vw` includes the
+   * scrollbar and would make every shell a scrollbar wider than the space it has.
+   */
+  --page-gutter: clamp(20px, 3vw, 64px);
+  --page-max: 1760px;
+  --shell: min(var(--page-max), calc(100% - var(--page-gutter) * 2));
+  /* Kept because a handful of rules still say `--gutter`. */
+  --gutter: var(--page-gutter);
+
+  /* ------------------------------------------------------ safe area ------- */
+  /*
+   * The header is `position: fixed` at the top of the viewport and occupies
+   * exactly `--header-h`. That band is RESERVED, never overlapped:
+   *
+   *   --header-h     what the header covers. Nothing may render into it.
+   *   --section-gap  the vertical rhythm between a section's edge and its
+   *                  content, and between stacked blocks inside a section.
+   *   --fit-h        the height a block gets if it must be whole on arrival:
+   *                  the screen, less the header band and one gap either side.
+   *
+   * Every major section reserves the header band in its own `padding-top` and
+   * declares `scroll-margin-top: 0`, so anchor navigation lands the section's own
+   * top edge at viewport 0 and its heading appears one gap below the header. The
+   * previous build did this in two places at once — a global `[id]` scroll margin
+   * *and* a section padding — which reserved the band twice and pushed the
+   * Library workspace off the bottom of a 1512×982 screen.
+   *
+   * `svh` rather than `vh` throughout: on mobile Safari `vh` is the *largest*
+   * viewport, so a 100vh section is taller than the screen for as long as the URL
+   * bar is showing, and the bottom of every such section is cut off.
+   */
+  --header-h: 64px;
+  --section-gap: clamp(32px, 5vh, 72px);
+  --fit-h: calc(100svh - var(--header-h) - var(--section-gap) * 2);
+  /* Aliases for the older names, so the partials keep working. */
+  --safe-top: var(--header-h);
+  --safe-gap: var(--section-gap);
+  /* Height available to a block that must be fully visible on arrival. */
+  --stage-h: clamp(460px, var(--fit-h), 880px);
+  /*
+   * The three width regimes are now one. The names survive as aliases; a rule
+   * that wants a narrower *measure* sets `max-width` in `ch` on the text block
+   * instead, because alignment is global and measure is local.
+   */
+  --shell-wide: var(--shell);
+  --shell-editorial: var(--shell);
+  --shell-narrow: var(--shell);
 
   --ease-reveal: cubic-bezier(0.22, 0.61, 0.36, 1);
 
@@ -132,7 +219,17 @@ body {
   background: var(--surface);
   font-family: var(--font-body);
   font-size: 16px;
-  font-feature-settings: 'cv11', 'ss01';
+  /*
+   * Tabular figures for the whole document.
+   *
+   * This is what replaced the monospaced readouts. Every number column on the
+   * site — the Library's element properties, the molecule measurements, the
+   * timeline clock, the subject counts — needs its digits to line up, and the
+   * only reason those were set in JetBrains Mono was to get a fixed advance
+   * width. Inheriting `tnum` gives the same alignment in the one family, and the
+   * `cv11`/`ss01` settings below it were Inter-specific and did nothing here.
+   */
+  font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -165,77 +262,148 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 .brand-lockup--light .brand-wordmark { color: #fff; }
 
 /* ----------------------------------------------------------------- header --- */
+/*
+ * A bar, not a pill.
+ *
+ * The floating 1240 px capsule was the single loudest "these sections were
+ * designed separately" signal on the page: it was narrower than every band below
+ * it, so the logo never lined up with a single heading, and at 1920 it sat 260 px
+ * inside the workspace it was supposed to belong to. It is now full-bleed glass
+ * whose *contents* sit in the same shell as everything else — so the wordmark
+ * shares a left edge with every section heading on the page, which is the
+ * strongest possible statement that this is one product.
+ *
+ * The premium quality moves from the capsule's border to the material: at rest
+ * there is no chrome at all, only a soft top scrim that keeps the navigation
+ * legible over the hero's creature, and the glass, hairline and shadow arrive on
+ * scroll. It occupies exactly `--header-h`, and nothing on the page renders into
+ * that band.
+ */
 .site-header {
   position: fixed;
   z-index: 50;
-  top: 16px;
-  left: 50%;
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: 22px;
-  width: min(1240px, calc(100% - 36px));
-  min-height: 62px;
-  padding: 8px 10px 8px 16px;
-  transform: translateX(-50%);
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  border-radius: 20px;
-  background: rgba(255, 253, 249, 0.6);
-  box-shadow: 0 16px 50px rgba(87, 62, 43, 0.08);
-  backdrop-filter: blur(22px) saturate(1.2);
-  transition: background 240ms ease, box-shadow 240ms ease;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--header-h);
+  transition: background 260ms ease, box-shadow 260ms ease, border-color 260ms ease;
+  border-bottom: 1px solid transparent;
+}
+
+/*
+ * The scrim. Present at rest, gone once the bar has its own ground, so the two
+ * never stack into a grey band across the top of a scrolled page.
+ *
+ * It reaches 46 px past the bar and uses three stops, because a two-stop gradient
+ * ending level with the bar's own edge drew a visible horizontal line across
+ * every 3D chapter — the eye finds a linear ramp's endpoint immediately. The peak
+ * alpha is low enough to leave the creature readable through it and high enough
+ * that 13.5 px navigation over a jellyfish bell still has contrast.
+ */
+.site-header::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 0 0 -46px;
+  pointer-events: none;
+  background: linear-gradient(180deg,
+    rgba(251, 248, 244, 0.72) 0%,
+    rgba(251, 248, 244, 0.40) 42%,
+    rgba(251, 248, 244, 0.12) 76%,
+    rgba(251, 248, 244, 0) 100%);
+  transition: opacity 260ms ease;
 }
 
 .site-header.is-scrolled {
-  background: rgba(255, 253, 249, 0.84);
-  box-shadow: 0 18px 56px rgba(87, 62, 43, 0.12);
+  border-bottom-color: var(--color-border-hair);
+  background: rgba(255, 253, 249, 0.82);
+  box-shadow: 0 10px 34px rgba(87, 62, 43, 0.06);
+  backdrop-filter: blur(20px) saturate(1.25);
+  -webkit-backdrop-filter: blur(20px) saturate(1.25);
+}
+.site-header.is-scrolled::before { opacity: 0; }
+
+/* The shell. `min-width: 0` on the middle track is what lets the nav shrink
+   rather than push the CTA off the right edge at intermediate widths. */
+.site-header-inner {
+  display: grid;
+  width: var(--shell);
+  height: 100%;
+  margin-inline: auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: clamp(16px, 2vw, 40px);
 }
 
 .desktop-nav {
   display: flex;
+  min-width: 0;
   align-items: center;
   justify-content: center;
-  gap: clamp(10px, 1.3vw, 20px);
-  font-size: 12.5px;
+  gap: clamp(13px, 1.7vw, 30px);
+  font-size: 13.5px;
   font-weight: 550;
   letter-spacing: -0.005em;
 }
 
 .desktop-nav a {
-  padding: 6px 2px;
+  position: relative;
+  padding: 6px 0;
   color: var(--ink-2);
+  white-space: nowrap;
   transition: color 170ms ease;
 }
+/* A 1 px rule that grows from the centre, rather than a colour change alone: at
+   13.5 px the hover state has to be visible without being a second weight. */
+.desktop-nav a::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: 2px;
+  left: 0;
+  height: 1px;
+  background: var(--brand-accent);
+  transform: scaleX(0);
+  transition: transform 200ms var(--ease-reveal);
+}
 .desktop-nav a:hover { color: var(--brand); }
+.desktop-nav a:hover::after { transform: scaleX(1); }
 
 .header-cta {
   justify-self: end;
   display: inline-flex;
   align-items: center;
   gap: 14px;
-  min-height: 44px;
+  min-height: 40px;
   padding: 0 18px;
-  border-radius: 13px;
+  border-radius: 11px;
   color: #fff;
   background: var(--brand);
-  font-size: 12.5px;
-  font-weight: 600;
-  box-shadow: 0 10px 26px rgba(180, 88, 70, 0.24);
+  font-size: 13px;
+  font-weight: 620;
+  white-space: nowrap;
+  box-shadow: 0 8px 22px rgba(180, 88, 70, 0.22);
   transition: background 180ms ease, transform 180ms ease;
 }
 .header-cta:hover { background: var(--brand-deep); transform: translateY(-1px); }
 .header-cta span { color: var(--brand-soft); }
 
+.brand-wordmark { font-size: 20px; }
+
 .menu-toggle, .mobile-nav { display: none; }
 
 /* ------------------------------------------------------------------- hero --- */
+/*
+ * The hero is a story panel like the other three, so it gets the same shell grid
+ * and no padding of its own beyond the reserved header band. Its copy column now
+ * starts on the same alignment line as the YooStudio heading, the Library head
+ * band and the footer — the `max(6.5vw, 26px)` it used before was a fourth
+ * horizontal system nobody else on the page shared.
+ */
 .hero {
   position: relative;
-  display: flex;
   min-height: 100svh;
-  align-items: center;
   overflow: hidden;
-  padding: 122px max(6.5vw, 26px) 76px;
   isolation: isolate;
 }
 
@@ -275,6 +443,37 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 .explore-canvas[data-ready='true'] .visual-loader { opacity: 0; }
 .explore-canvas[data-ready='true'][data-scene-pending='true'] .visual-loader { opacity: 1; }
 
+/*
+ * The flower valley.
+ *
+ * One transparent canvas between the bee's WebGL frame (`-4`) and the hero grain
+ * (`-2`), so the page's own ivory still paints the hero and the field composites
+ * over it. `pointer-events: none` is what makes the brief's "must never interfere
+ * with nav, CTA or Bee interaction" structural rather than a tuning promise — the
+ * layer cannot receive a click, and its pointer response comes from a passive
+ * `pointermove` on `window`.
+ *
+ * `opacity` is written by the renderer from the Explore scroll position and is the
+ * only property that animates here, which keeps the fade on the compositor.
+ */
+.flower-valley {
+  position: absolute;
+  z-index: -3;
+  inset: 0;
+  pointer-events: none;
+  contain: strict;
+}
+
+.flower-valley-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  /* No transition: the renderer already damps its own presence against a damped
+     scroll value, and a CSS transition on top of that reads as lag on a fast
+     wheel flick. */
+  transform: translateZ(0);
+}
+
 .hero-noise {
   position: absolute;
   z-index: -2;
@@ -285,7 +484,9 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   mix-blend-mode: soft-light;
 }
 
-.hero-copy { width: min(680px, 54vw); margin-left: clamp(0px, 2vw, 34px); }
+/* Cols 1–6: the bee sits at x = +1.62 in the hero shot, which is the right half
+   of the frame, so the proposition takes the left half and nothing crosses. */
+.hero-copy { grid-column: 1 / span 6; grid-row: 1 / -1; align-self: center; max-width: 42rem; }
 
 .eyebrow {
   display: flex;
@@ -309,13 +510,15 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 
 .hero h1 {
   /* The proposition is a full sentence, not a mood line, so it is sized to fit
-     three lines inside the copy column instead of being maximally large. */
-  max-width: 24ch;
+     three lines inside the copy column instead of being maximally large. Capped
+     by viewport height as well as width, for the same reason every other display
+     heading on the page is: a 1366×768 laptop is wide and short. */
+  max-width: 22ch;
   margin: 0;
   text-wrap: balance;
-  font-size: clamp(38px, 4.1vw, 62px);
-  font-weight: 680;
-  line-height: 1.02;
+  font-size: clamp(36px, min(3.9vw, 6.4vh), 60px);
+  font-weight: 700;
+  line-height: 1.04;
   letter-spacing: -0.042em;
 }
 
@@ -382,14 +585,17 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   font-size: 8px;
 }
 
+/* The specimen card is a grid child now rather than a `right: 4.5vw` absolute:
+   it lines up with the right edge of the shell, which is the same right edge the
+   header CTA and the Library's live count use. */
 .hero-spec {
-  position: absolute;
-  right: 4.5vw;
-  bottom: 13vh;
+  grid-column: 11 / span 2;
+  grid-row: 3;
+  align-self: end;
   display: flex;
-  width: 190px;
   flex-direction: column;
   gap: 5px;
+  margin-bottom: clamp(24px, 9vh, 96px);
   padding-left: 18px;
   border-left: 1px solid rgba(45, 36, 32, 0.16);
 }
@@ -454,18 +660,42 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 
 .story-content, .story-panel a, .story-panel button { pointer-events: auto; }
 
-.story-copy {
-  position: absolute;
-  top: 50%;
-  left: max(6.5vw, 26px);
-  width: min(500px, 40vw);
-  transform: translateY(-50%);
+/*
+ * The Explore composition, as a 12-column grid inside the page shell.
+ *
+ * Before this the copy blocks were `position: absolute; left: max(6.5vw, 26px)`
+ * with a `min(500px, 40vw)` width, and the creature was placed by the camera —
+ * two independent systems that had no way of knowing about each other. The result
+ * was a fish whose tail printed straight through its own headline and a chapter
+ * with an empty column down one side. Both halves now speak in twelfths: the copy
+ * takes named columns here, and each shot in `ExploreCanvas` places its creature
+ * in the columns the copy leaves.
+ *
+ * The grid reserves the header band and centres its content in what is left, so a
+ * chapter arrived at by anchor navigation and one arrived at by scrolling compose
+ * identically.
+ */
+.story-grid {
+  display: grid;
+  width: var(--shell);
+  height: 100%;
+  min-height: 100svh;
+  margin-inline: auto;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  /* Three equal rows, so an annotation placed in row 1 / 2 / 3 lands at the top,
+     middle and bottom of the usable height rather than at thirds of whatever the
+     copy block happens to measure. */
+  grid-template-rows: repeat(3, minmax(0, 1fr));
+  gap: 0 clamp(16px, 1.6vw, 28px);
+  padding-top: calc(var(--header-h) + var(--section-gap));
+  padding-bottom: var(--section-gap);
 }
 
-.story-copy--right { right: max(6.5vw, 26px); left: auto; }
+.story-copy { grid-column: 1 / span 5; grid-row: 1 / -1; align-self: center; }
+.story-copy--right { grid-column: 8 / span 5; }
 
 .section-kicker {
-  margin: 0 0 20px;
+  margin: 0 0 clamp(12px, 1.8vh, 20px);
   color: var(--brand);
   font-size: 10.5px;
   font-weight: 700;
@@ -483,13 +713,32 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 }
 .section-kicker--light { color: var(--brand); }
 
+/*
+ * The display size is capped by viewport HEIGHT as well as width.
+ *
+ * `clamp(42px, 4.6vw, 70px)` alone reads the wrong dimension for the shape of
+ * screen this site is actually used on. A 1366×768 laptop is wide and short: the
+ * width term resolved to 63 px, two lines of it at `line-height: 1` came to
+ * 126 px, and with the kicker and the section padding the heading alone was
+ * taking a fifth of the visible page before the thing the section exists to
+ * show had started. Every section below then landed looking half cut off.
+ *
+ * `min(4.6vw, 6.6vh)` keeps the same type on a 1920×1080 or a 1512×982 display —
+ * where the width term is the binding one — and pulls the heading back to about
+ * 51 px on a short laptop, which is where the composition starts to fit again.
+ */
 .story-copy h2, .section-heading h2, .education-intro h2, .start-heading h2, .final-cta h2 {
   margin: 0;
   text-wrap: balance;
   color: var(--ink);
-  font-size: clamp(42px, 4.6vw, 70px);
-  font-weight: 680;
-  line-height: 1.0;
+  /* One restrained step down from the previous 70 px ceiling. At 70 px the
+     three-line Vietnamese section headings ("Thực hành những điều khó thực hiện
+     trong lớp học.") were 210 px of a 768 px screen — more than a quarter of the
+     page spent before the section's subject appeared — and on a wide display they
+     were reaching up into the header band. */
+  font-size: clamp(32px, min(4.1vw, 5.7vh), 60px);
+  font-weight: 700;
+  line-height: 1.02;
   letter-spacing: -0.045em;
 }
 
@@ -520,19 +769,46 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 }
 .study-readout dd { margin: 0; color: var(--ink); font-size: 13.5px; font-weight: 500; text-align: right; }
 
+/*
+ * Annotations belong to the creature, so they live in the creature's half.
+ *
+ * They were positioned in viewport percentages that took no account of which side
+ * the copy was on: on the bee chapter all three sat at `right: 8–17%`, which is
+ * the copy column, so "Ngực — trung tâm cơ bay" printed straight through the
+ * readout and "Cánh gắn vào ngực" through the headline. Three text-on-text
+ * collisions in one screen.
+ *
+ * They are grid children now, in the columns the creature occupies, and the
+ * `--flip` variant puts the leader line on the label's right so an annotation on
+ * the left of the frame still points inwards at the subject.
+ */
 .annotation {
-  position: absolute;
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   gap: 8px;
-  color: rgba(45, 36, 32, 0.5);
+  color: rgba(45, 36, 32, 0.64);
   font-size: 9.5px;
   font-weight: 620;
   letter-spacing: 0.06em;
+  /*
+   * A halo, not a pill.
+   *
+   * These labels sit over the creature by design, and a 9.5 px uppercase line at
+   * 50% ink disappeared into the bee's thorax and the fish's fins. A pill would
+   * fix the contrast and turn a technical callout into a chip; two stacked
+   * text-shadows in the page's own ground colour lift the letterforms off
+   * whatever is behind them and leave the composition unboxed, which is what a
+   * drawing annotation should look like.
+   */
+  text-shadow:
+    0 0 3px rgba(251, 248, 244, 0.95),
+    0 0 9px rgba(251, 248, 244, 0.85);
   text-transform: uppercase;
 }
 
-.annotation i { display: block; width: 36px; height: 1px; background: rgba(45, 36, 32, 0.3); }
+.annotation i { display: block; width: 36px; height: 1px; flex: none; background: rgba(45, 36, 32, 0.3); }
 .annotation i::before {
   content: '';
   display: block;
@@ -542,13 +818,41 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   border: 1px solid rgba(45, 36, 32, 0.4);
   border-radius: 50%;
 }
-.annotation--jelly-a { top: 32%; left: 25%; }
-.annotation--jelly-b { bottom: 27%; left: 17%; }
-.annotation--fish-a { top: 32%; left: 23%; }
-.annotation--fish-b { bottom: 25%; left: 17%; }
-.annotation--bee-a { top: 27%; right: 14%; }
-.annotation--bee-b { top: 47%; right: 8%; }
-.annotation--bee-c { bottom: 24%; right: 17%; }
+/* Reversed: label then line, with the anchor dot moved to the far end of the
+   line so it still marks the point being called out. */
+.annotation--flip { flex-direction: row-reverse; }
+.annotation--flip i::before { transform: translateX(30px); }
+
+/*
+ * Each annotation is placed on the grid row it belongs to. `grid-row` is what
+ * spreads them vertically: the grid has one implicit row per child, and giving
+ * three annotations rows 1 / 2 / 3 next to a copy block spanning all three puts
+ * them at the top, middle and bottom of the creature's half without a single
+ * absolute offset.
+ */
+/* Row 1 *start*, not end: at `end` this label landed on the abdomen, which is
+   the darkest, densest part of the creature, and no amount of halo makes 9.5 px
+   uppercase readable there. The top of the model band is clear ground. */
+.annotation--bee-a { grid-column: 3 / span 4; grid-row: 1; justify-self: end; align-self: start; }
+.annotation--bee-b { grid-column: 1 / span 3; grid-row: 2; justify-self: start; align-self: center; }
+.annotation--bee-c { grid-column: 3 / span 3; grid-row: 3; justify-self: end; align-self: start; }
+
+/* Both at the panel's vertical extremes: the fish now fills six of twelve
+   columns, so the only clear ground on its side of the frame is above its dorsal
+   fin and below its tail. At `align-self: end` on row 1 the first label printed
+   across the fish's face. */
+.annotation--fish-a { grid-column: 1 / span 3; grid-row: 1; justify-self: start; align-self: start; }
+.annotation--fish-b { grid-column: 1 / span 3; grid-row: 3; justify-self: start; align-self: end; }
+
+/* The jellyfish reaches the right edge of the shell, so these two sit over the
+   animal rather than beside it and need a longer leader to put the anchor dot on
+   the bell and on a tentacle instead of in the margin next to them. */
+.annotation--jelly-a { grid-column: 8 / span 5; grid-row: 1; align-self: end; justify-self: end; }
+.annotation--jelly-b { grid-column: 8 / span 5; grid-row: 3; align-self: start; justify-self: end; }
+.annotation--jelly-a i,
+.annotation--jelly-b i { width: 84px; }
+.annotation--jelly-a i::before,
+.annotation--jelly-b i::before { transform: none; }
 
 .bee-modes {
   display: inline-flex;
@@ -623,8 +927,11 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
 [data-stagger] > *:nth-child(6) { --reveal-delay: 350ms; }
 [data-stagger] > *:nth-child(n+7) { --reveal-delay: 420ms; }
 
-/* Anchors land below the fixed header instead of under it. */
-[id] { scroll-margin-top: 96px; }
+/* The anchor scroll margin used to be declared here as a bare 96 px as well as
+   in the safe-area block at the bottom of this file. Two declarations of the
+   same rule is how a token silently stops being the source of truth: editing
+   `--safe-top` moved nothing until the later rule happened to win the cascade.
+   There is now exactly one, next to the token it derives from. */
 
 /* ---------------------------------------------------------------- layout --- */
 /*
@@ -642,10 +949,38 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
  * 12-column grid below is shared by all three.
  */
 .shell-cinematic { width: 100%; margin-inline: auto; }
-.shell-wide { width: var(--shell-wide); margin-inline: auto; }
+/*
+ * One width, four names.
+ *
+ * `.shell` is the canonical one. The three regime names are aliases so the
+ * existing markup keeps working, and they resolve to exactly the same box — which
+ * is the point: the header, the YooStudio heading, the workspace, the Library
+ * head band, the Practice grid, Education, Proof and the footer all now share one
+ * pair of alignment lines down the page.
+ */
+.shell,
+.shell-wide,
 .shell-editorial,
-.section-shell { width: var(--shell-editorial); margin-inline: auto; }
-.shell-narrow { width: var(--shell-narrow); margin-inline: auto; }
+.shell-narrow,
+.section-shell {
+  width: var(--shell);
+  margin-inline: auto;
+}
+
+/*
+ * Every major section reserves the header band itself.
+ *
+ * `.section-frame` is the vertical half of the shell contract: reserve the band
+ * the fixed header covers, keep one gap of air below the content, and switch the
+ * global anchor margin off because this padding already is the reservation.
+ * Anchor navigation and ordinary scrolling then land a section identically.
+ */
+.section-frame {
+  position: relative;
+  padding-top: calc(var(--header-h) + var(--section-gap));
+  padding-bottom: var(--section-gap);
+  scroll-margin-top: 0;
+}
 
 .grid-12 {
   display: grid;
@@ -653,19 +988,28 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
   gap: clamp(16px, 1.6vw, 28px);
 }
 
+/*
+ * Heading on the left, one clause on the right, both ending on the same baseline.
+ *
+ * The right column is capped rather than proportional: on the 1760 px shell a
+ * `0.7fr` track is 600 px wide, and a 44ch paragraph in a 600 px column leaves
+ * 200 px of nothing between the two halves of one thought. The `gap` scales with
+ * the viewport for the same reason — a flat 80 px is right at 1920 and is a
+ * quarter of the usable width at 1024.
+ */
 .section-heading--split {
   display: grid;
-  grid-template-columns: minmax(0, 1.3fr) minmax(280px, 0.7fr);
-  gap: 80px;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 30rem);
+  gap: clamp(28px, 4vw, 76px);
   align-items: end;
 }
 
 .section-heading--split > p, .tool-heading-copy > p {
-  max-width: 44ch;
-  margin: 0 0 6px;
+  max-width: 46ch;
+  margin: 0 0 4px;
   color: var(--ink-2);
   font-size: 15px;
-  line-height: 1.7;
+  line-height: 1.68;
 }
 
 /* ------------------------------------------------------------ tool / studio --- */
@@ -684,16 +1028,43 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
   position: relative;
   z-index: 4;
   overflow: hidden;
-  padding: 118px 0 104px;
+  padding: calc(var(--header-h) + var(--section-gap)) 0 clamp(48px, 7vh, 92px);
+  scroll-margin-top: 0;
   color: var(--ink);
   background: linear-gradient(180deg, var(--color-bg) 0%, var(--color-surface-raised) 38%, var(--color-bg) 100%);
 }
 
-/* The heading sits in the editorial regime and the workspace in the wide one,
-   so the gap between them belongs to the section, not to either shell. */
-.tool-section .shell-wide { margin-top: 44px; }
-.tool-section .shell-editorial + .shell-wide { margin-top: 44px; }
-.tool-section .shell-wide + .shell-editorial { margin-top: 8px; }
+/*
+ * The editor takes what the heading leaves. Measured, not guessed.
+ *
+ * Every previous version of this subtracted an *estimate* of the heading band's
+ * height from the viewport — `--tool-head` — and every viewport where the
+ * estimate was wrong pushed the bottom of the editor past the fold. It was wrong
+ * by 24 px on a 1366 laptop and by 53 px on a 768-wide tablet, where the heading
+ * wraps to a third line; the timeline's last track was cut on every desktop size.
+ *
+ * A flex column removes the estimate. The stage is one screen tall, the heading
+ * band takes its content height, and the workspace is the `flex: 1` row — so the
+ * arithmetic is done by the layout engine against the real heading, at every
+ * width, with no token to keep in sync. The feature row below stays outside the
+ * stage, past the fold on purpose, which is what still invites the scroll.
+ */
+.tool-stage {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(20px, 2.8vh, 34px);
+  /* The 12 px is breathing room below the editor, so its bottom border is never
+     flush with the fold. */
+  height: calc(100svh - var(--header-h) - var(--section-gap) - 12px);
+  /* Floor: where the four-panel editor stops being usable. Ceiling: where a
+     1440-tall display would turn a workspace into a wall. */
+  min-height: 480px;
+  max-height: 940px;
+}
+
+.tool-workspace { display: flex; flex: 1; min-height: 0; }
+
+.tool-section > .shell:last-child { margin-top: clamp(26px, 3.6vh, 48px); }
 
 .tool-heading h2 { color: var(--ink); }
 .tool-heading-copy > p { color: var(--ink-2); }
@@ -701,16 +1072,36 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
   display: inline-flex;
   align-items: center;
   gap: 22px;
-  margin-top: 16px;
+  margin-top: 14px;
   color: var(--brand);
   font-size: 12.5px;
-  font-weight: 600;
+  font-weight: 620;
 }
 .tool-heading-copy a span { color: var(--brand-accent); }
 
+/*
+ * The editor is laid out, not scaled.
+ *
+ * It fills the `flex: 1` row `.tool-stage` gives it, and the three rows inside
+ * own their own overflow — so at 1366×768 this is a real four-panel editor at
+ * real control sizes, not a 1600 px screenshot squeezed into a box.
+ *
+ * The old version was `height: clamp(408px, …)` against a 396 px chrome
+ * allowance: a 768 px laptop got the 408 px floor, and a 60 px topbar plus a
+ * 180 px timeline left the *body* — the four panels that are the product — with
+ * 168 px. The timeline was taller than the editor. Now the body is the flexible
+ * row and the timeline has a ceiling, so the body always gets two to four times
+ * what the timeline does; on a 1366×768 laptop that is a 52 px topbar, a 115 px
+ * timeline and about 350 px of four-panel editor.
+ */
 .studio {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   overflow: hidden;
-  margin-top: 56px;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  margin-top: 0;
   border: 1px solid var(--line);
   border-radius: 22px;
   background: #fff;
@@ -722,7 +1113,7 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
   gap: 16px;
-  height: 60px;
+  height: 52px;
   padding: 0 16px;
   border-bottom: 1px solid var(--line);
   background: var(--panel-2);
@@ -778,13 +1169,49 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
 }
 .studio-actions button.is-primary { border-color: transparent; color: #3a1108; background: var(--brand-accent); font-weight: 620; }
 
-.studio-body { display: grid; grid-template-columns: 92px 208px minmax(0, 1fr) 254px; height: 560px; }
+/* `min-height: 0` is what lets this row shrink inside the shell's `1fr`; without
+   it the grid item takes its content's min-content height and the timeline gets
+   pushed out of the rounded box. */
+/*
+ * Four panels whose side columns grow with the shell.
+ *
+ * At the old fixed `92 208 1fr 254` the whole extra width of a 1920 display went
+ * to the viewport while the object tree stayed at the width it needed on a
+ * laptop. The `clamp(floor, %, ceiling)` tracks give each panel its readable
+ * minimum on a 1366 and let them breathe on a wide screen, without ever letting
+ * a side panel take more than its share from the stage.
+ */
+.studio-body {
+  display: grid;
+  grid-template-columns:
+    92px
+    clamp(196px, 13.5%, 244px)
+    minmax(0, 1fr)
+    clamp(240px, 16.5%, 312px);
+  min-height: 0;
+}
 .studio-rail, .studio-tree, .studio-properties {
+  /* Grid items default to `min-height: auto`, which is the content's min-content
+     height — enough to stop these three from shrinking inside the shell's
+     flexible row and to make their own `overflow-y: auto` never engage. */
+  min-height: 0;
   border-right: 1px solid var(--line);
   background: var(--panel);
 }
 .studio-properties { border-right: 0; border-left: 1px solid var(--line); padding: 14px 16px; overflow-y: auto; }
 
+/*
+ * Nine tools in a rail that is roughly a third of that tall, so it scrolls — as
+ * the rail in any real editor does. The mask is what makes that legible: without
+ * it the ninth tool is simply cut in half by the bottom edge and reads as a
+ * rendering fault rather than as "there is more below". Same treatment as the
+ * Library's asset rail, for the same reason.
+ */
+.studio-rail,
+.studio-tree {
+  -webkit-mask-image: linear-gradient(180deg, #000 0, #000 calc(100% - 22px), transparent 100%);
+  mask-image: linear-gradient(180deg, #000 0, #000 calc(100% - 22px), transparent 100%);
+}
 .studio-rail { display: flex; flex-direction: column; gap: 4px; padding: 12px 8px; overflow-y: auto; }
 .studio-rail button {
   display: flex;
@@ -864,7 +1291,7 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
 .studio-swatch--group { border-radius: 3px; background: linear-gradient(140deg, var(--color-accent-soft), var(--color-accent-strong)); }
 .studio-swatch--note { border-radius: 50%; background: #2b7fff; }
 
-.studio-viewport { display: flex; min-width: 0; flex-direction: column; background: #f4efe8; }
+.studio-viewport { display: flex; min-width: 0; min-height: 0; flex-direction: column; background: #f4efe8; }
 .studio-viewport-bar {
   display: flex;
   align-items: center;
@@ -1013,12 +1440,28 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
   font-weight: 560;
 }
 
-.studio-timeline { border-top: 1px solid var(--line); background: var(--panel-2); }
+/*
+ * The timeline gets a budget it may not exceed.
+ *
+ * Four tracks at their natural height plus a 40 px head came to about 180 px,
+ * which on a short laptop was more of the editor than the four panels above it
+ * got. It is a secondary surface: it has to prove that a lesson has a running
+ * order, not be readable to the frame. So it takes at most a fifth of a short
+ * viewport, and the lanes inside compress to fit rather than pushing the body up.
+ */
+.studio-timeline {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  max-height: clamp(96px, 15svh, 150px);
+  overflow: hidden;
+  border-top: 1px solid var(--line);
+  background: var(--panel-2);
+}
 .studio-timeline-head {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 9px 16px;
+  padding: 7px 16px;
   border-bottom: 1px solid var(--line);
 }
 .studio-play {
@@ -1035,13 +1478,25 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
 .studio-timeline-head b { color: var(--ink); font-family: var(--font-mono); font-size: 11px; }
 .studio-timeline-head small { color: var(--ink-4); font-family: var(--font-mono); font-size: 10px; }
 
-.studio-timeline-tracks { padding: 6px 0 10px; }
-.studio-track { display: grid; grid-template-columns: 152px minmax(0, 1fr); align-items: center; gap: 12px; padding: 0 16px; }
+.studio-timeline-tracks {
+  display: grid;
+  grid-template-rows: repeat(4, minmax(0, 1fr));
+  min-height: 0;
+  padding: 4px 0 6px;
+}
+.studio-track {
+  display: grid;
+  min-height: 0;
+  grid-template-columns: clamp(112px, 11%, 168px) minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+}
 .studio-track-name {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 30px;
+  min-height: 24px;
   border: 0;
   color: var(--ink-3);
   background: transparent;
@@ -1053,7 +1508,7 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
 
 .studio-track-lane {
   position: relative;
-  height: 22px;
+  height: clamp(15px, 2.1svh, 22px);
   border-radius: 6px;
   background: rgba(117, 91, 70, 0.05);
   cursor: ew-resize;
@@ -1078,10 +1533,9 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
 .tool-features {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  margin-top: 54px;
   border-top: 1px solid var(--line);
 }
-.tool-features article { padding: 26px 26px 0; border-right: 1px solid var(--line); }
+.tool-features article { padding: 24px clamp(20px, 2vw, 34px) 0; border-right: 1px solid var(--line); }
 .tool-features article:first-child { padding-left: 0; }
 .tool-features article:last-child { border-right: 0; }
 .tool-features span { color: var(--brand-accent); font-size: 9.5px; font-weight: 700; }
@@ -1232,24 +1686,43 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
 .formula-drive-controls { display: none; }
 
 /* ------------------------------------------------------------ cta / foot --- */
+/*
+ * A conclusion, not another blank page.
+ *
+ * It was `min-height: clamp(520px, 78svh, 760px)` with 96 px of padding on top of
+ * that — on a 1080 display, 843 px of section holding a heading, one sentence and
+ * two links, most of it air. It is now sized to the content plus one screen's
+ * worth of breathing room at most, and the ceiling is what stops a tall display
+ * from ending the page on emptiness.
+ */
 .final-cta {
   position: relative;
   display: flex;
-  min-height: 620px;
+  min-height: clamp(400px, 58svh, 580px);
   flex-direction: column;
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  padding: 96px 24px;
+  padding: clamp(56px, 8vh, 92px) max(var(--page-gutter), calc((100% - var(--page-max)) / 2));
+  scroll-margin-top: 0;
   text-align: center;
   color: var(--ink);
   background:
     radial-gradient(circle at 50% 104%, rgba(232, 120, 104, 0.15), transparent 48%),
     linear-gradient(180deg, var(--color-bg) 0%, #f8efe2 100%);
 }
-.final-cta h2 { position: relative; z-index: 2; color: var(--ink); font-size: clamp(44px, 5.2vw, 80px); }
-.final-cta > p:not(.section-kicker) { position: relative; z-index: 2; max-width: 52ch; margin: 22px 0 0; color: var(--ink-2); font-size: 14.5px; line-height: 1.65; }
-.final-cta > div:last-child { position: relative; z-index: 2; display: flex; align-items: center; gap: 28px; margin-top: 32px; flex-wrap: wrap; justify-content: center; }
+.final-cta h2 {
+  position: relative;
+  z-index: 2;
+  color: var(--ink);
+  /* Same height cap as the other display headings: the closing statement is the
+     largest type on the page, and unguarded `5.2vw` put it at 71 px on a 1366
+     laptop where two lines then left no room for the copy and the two actions
+     under it. */
+  font-size: clamp(34px, min(4.6vw, 6.6vh), 70px);
+}
+.final-cta > p:not(.section-kicker) { position: relative; z-index: 2; max-width: 52ch; margin: 18px 0 0; color: var(--ink-2); font-size: 14.5px; line-height: 1.65; }
+.final-cta > div:last-child { position: relative; z-index: 2; display: flex; align-items: center; gap: 28px; margin-top: clamp(22px, 3vh, 32px); flex-wrap: wrap; justify-content: center; }
 .final-cta > div:last-child > a:not(.cta-main) { color: var(--ink-2); font-size: 12px; font-weight: 560; }
 .cta-main {
   display: inline-flex;
@@ -1265,17 +1738,58 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
   box-shadow: 0 16px 38px rgba(201, 95, 82, 0.22);
 }
 .cta-main span { color: #3a1108; font-size: 15px; }
-/* Two very faint tints, not two glowing orbs. On a light ground a saturated
-   radial reads as a bruise; at this opacity it only warms the corners. */
-.cta-orb { position: absolute; border-radius: 50%; filter: blur(2px); opacity: 0.20; }
-.cta-orb--one { top: -150px; left: -110px; width: 420px; height: 420px; background: radial-gradient(circle at 35% 30%, #f6b79f, transparent 62%); }
-.cta-orb--two { right: -150px; bottom: -180px; width: 520px; height: 520px; background: radial-gradient(circle at 40% 36%, #cbb4ea, transparent 64%); }
+/*
+ * Two very faint tints, not two glowing orbs. On a light ground a saturated
+ * radial reads as a bruise; at this alpha it only warms the corners.
+ *
+ * The stops are rgba rather than a colour fading to `transparent`. Fading to the
+ * keyword interpolates towards transparent *black*, which on this ground drew a
+ * visible grey disc edge — clearest on the lavender one, which read as a
+ * two-tone circle sitting behind the call to action. Fading a colour to its own
+ * zero-alpha self has no edge at any opacity.
+ */
+.cta-orb { position: absolute; border-radius: 50%; }
+.cta-orb--one {
+  top: -170px;
+  left: -130px;
+  width: 520px;
+  height: 520px;
+  background: radial-gradient(circle at 50% 50%,
+    rgba(246, 183, 159, 0.30) 0%, rgba(246, 183, 159, 0.11) 44%, rgba(246, 183, 159, 0) 72%);
+}
+.cta-orb--two {
+  right: -190px;
+  bottom: -220px;
+  width: 640px;
+  height: 640px;
+  background: radial-gradient(circle at 50% 50%,
+    rgba(203, 180, 234, 0.26) 0%, rgba(203, 180, 234, 0.09) 44%, rgba(203, 180, 234, 0) 72%);
+}
 
+/*
+ * The footer is on the shell too.
+ *
+ * `max(6.5vw, 26px)` was the last independent horizontal system on the page: at
+ * 1920 it put the wordmark 125 px from the edge while every section above it
+ * started at 80. The grid lives in a shell-width wrapper via `width` +
+ * `margin-inline`, so the closing alignment line is the same as the opening one.
+ */
 .site-footer {
   display: grid;
-  grid-template-columns: 0.8fr 1.2fr;
-  gap: 60px;
-  padding: 72px max(6.5vw, 26px) 26px;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: clamp(32px, 4vw, 72px);
+  /*
+   * Full-bleed ground, shell-aligned content, and no extra wrapper element.
+   *
+   * `max(gutter, (100% - page-max) / 2)` is the shell expressed as padding: below
+   * the cap the gutter wins and the content is `100% - 2 * gutter`; above it the
+   * second term wins and the content is exactly `--page-max`, centred. Same box
+   * as `.shell`, on an element that also has to paint edge to edge.
+   */
+  padding:
+    clamp(48px, 7vh, 76px)
+    max(var(--page-gutter), calc((100% - var(--page-max)) / 2))
+    24px;
   color: var(--ink-2);
   border-top: 1px solid var(--line);
   background: #f8efe2;
@@ -1310,86 +1824,122 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
 /* ============================================================== bridge ===
    The hinge between the creature world and the product.
 
-   It takes over the `-100svh` pull that used to live on `.tool-section`, so it
-   is the element that rises over the last sticky Explore stage. Its top edge is
-   transparent on purpose — the bee is still visible through it — and its bottom
-   edge dissolves into the exact background colour of the YooStudio slab below,
-   which is what makes wonder -> product read as one move.
+   It keeps the `-100svh` pull that lifts it over the tail of the Explore stage —
+   that tail is not decoration, it is what keeps the sticky creature canvas stuck
+   through the whole of the last chapter, and the bridge reclaims it rather than
+   leaving 100svh of empty page.
+
+   What changed is where the bridge's *content* starts inside that reclaimed
+   region. It used to be `padding: 30svh 0 168px`, which on a 768 px laptop put the
+   headline 230 px down a section whose background had already gone fully opaque
+   about 90 px in — so the handoff from the jellyfish was a hard horizontal cut
+   followed by 220 px of empty ground, and then a headline. That was the blank
+   region between the jellyfish and "Bạn vừa khám phá một bài học trong YooLab."
+
+   The fix is at the cause and in three parts: the content starts one
+   header-plus-gap down like every other section, the wash is a soft 150 px rather
+   than a third of a very tall box, and the whole section is sized so headline and
+   both frames compose in one viewport.
    ======================================================================== */
 .bridge {
   position: relative;
   z-index: 4;
   overflow: hidden;
   margin-top: -100svh;
-  padding: 30svh 0 168px;
+  padding: calc(var(--header-h) + var(--section-gap)) 0 var(--section-gap);
+  scroll-margin-top: 0;
   background: linear-gradient(180deg,
     rgba(251, 248, 244, 0) 0%,
-    rgba(251, 248, 244, 0.30) 11%,
-    rgba(251, 248, 244, 0.84) 22%,
-    var(--surface) 33%,
+    rgba(251, 248, 244, 0.55) 54px,
+    rgba(251, 248, 244, 0.94) 118px,
+    var(--surface) 168px,
     var(--surface) 100%);
 }
 
+/*
+ * `inset: 0`, not `inset: 24% 0 0`.
+ *
+ * The veil's box top was cutting both radials mid-falloff, which drew a hard
+ * horizontal line a third of the way down the section — the one seam left in the
+ * jellyfish-to-bridge handoff after the padding was fixed. The gradients are
+ * re-centred lower so they land in the same place on the page with no boundary to
+ * cut them, and the stops are spelled out in rgba so the falloff interpolates in
+ * alpha rather than towards `transparent`'s undefined colour.
+ */
 .bridge-veil {
   position: absolute;
   z-index: 0;
-  inset: 24% 0 0;
+  inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(circle at 18% 24%, rgba(168, 145, 255, 0.09), transparent 46%),
-    radial-gradient(circle at 84% 36%, rgba(115, 211, 206, 0.08), transparent 44%);
-}
-
-.bridge::after {
-  content: '';
-  position: absolute;
-  z-index: 0;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  height: 150px;
-  pointer-events: none;
-  background: linear-gradient(180deg, rgba(251, 248, 244, 0) 0%, var(--surface) 100%);
+    radial-gradient(circle at 18% 62%, rgba(168, 145, 255, 0.10) 0%, rgba(168, 145, 255, 0) 52%),
+    radial-gradient(circle at 84% 70%, rgba(115, 211, 206, 0.09) 0%, rgba(115, 211, 206, 0) 50%);
 }
 
 .bridge-inner { position: relative; z-index: 1; }
 /* px, not ch: `ch` on this div resolves against the 16px body font, not the
-   50px display font the heading actually uses. */
-.bridge-copy { max-width: 880px; margin: 0 auto; text-align: center; }
+   display font the heading actually uses. */
+.bridge-copy { max-width: 940px; margin: 0 auto; text-align: center; }
 .bridge-copy h2 {
   margin: 0;
   text-wrap: balance;
   color: var(--ink);
   font-family: var(--font-display);
-  font-size: clamp(32px, 3.3vw, 50px);
-  font-weight: 680;
-  line-height: 1.08;
+  /* Capped by height as well as width, like every other display heading: two
+     lines of this at 50 px is 108 px of a 768 px screen before the diagram the
+     section exists to show has started. */
+  font-size: clamp(27px, min(3.1vw, 4.6vh), 46px);
+  font-weight: 700;
+  line-height: 1.1;
   letter-spacing: -0.042em;
 }
 
+/*
+ * Two states and an arrow, at a size where they read as products.
+ *
+ * The frames were pinned at 268 px inside a section that was 920 px tall, with a
+ * 136 px arrow column between them — a small diagram floating in a large empty
+ * slab. They now take whatever height the viewport can give them after the
+ * headline, and the arrow column is a third of what it was, so the two states sit
+ * close enough to read as one sentence.
+ */
 .bridge-flow {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 136px minmax(0, 1.24fr);
-  align-items: center;
-  margin-top: 62px;
+  grid-template-columns: minmax(0, 1fr) clamp(64px, 6vw, 104px) minmax(0, 1.12fr);
+  align-items: stretch;
+  margin-top: clamp(22px, 3.4vh, 46px);
 }
 
-.bridge-frame { margin: 0; }
+/* Three rows, so the tag, the frame and the caption sit on the same three
+   baselines in both halves. One figure has a bordered stage and the other a
+   shadowed editor, and centring them independently put their top edges four
+   pixels apart — small, and exactly the kind of thing that reads as "two
+   different pictures" rather than "one before and after". */
+.bridge-frame {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  margin: 0;
+}
 .bridge-tag {
   display: block;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
   color: var(--ink-3);
   font-size: 9.5px;
   font-weight: 650;
   letter-spacing: 0.11em;
   text-transform: uppercase;
 }
-.bridge-frame figcaption { margin-top: 14px; color: var(--ink-3); font-size: 11.5px; line-height: 1.6; }
+.bridge-frame figcaption { margin-top: 12px; color: var(--ink-3); font-size: 11.5px; line-height: 1.6; }
+
+/* One height for both frames, derived from the viewport rather than fixed. The
+   floor is where the editor mock's three columns stop being legible; the ceiling
+   stops a 1440-tall display from turning a diagram into a billboard. */
+.bridge-stage,
+.bridge-editor { height: clamp(212px, calc(100svh - 402px), 404px); }
 
 .bridge-stage {
   position: relative;
   overflow: hidden;
-  height: 268px;
   border: 1px solid rgba(255, 255, 255, 0.7);
   border-radius: var(--radius-lg);
   background: linear-gradient(160deg, #f8ecf4, #e5dffb);
@@ -1417,7 +1967,7 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
 .bridge-pin--b { top: 11%; right: 9%; }
 .bridge-pin--c { bottom: 19%; right: 13%; }
 
-.bridge-arrow { display: grid; justify-items: center; gap: 11px; padding: 0 18px; }
+.bridge-arrow { display: grid; justify-items: center; gap: 11px; padding: 0 12px; }
 .bridge-arrow i {
   position: relative;
   display: block;
@@ -1448,8 +1998,7 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
 .bridge-editor {
   display: grid;
   overflow: hidden;
-  height: 268px;
-  grid-template-columns: 34px minmax(0, 1fr) 98px;
+  grid-template-columns: 34px minmax(0, 1fr) clamp(98px, 11%, 132px);
   grid-template-rows: minmax(0, 1fr) auto;
   gap: 8px;
   padding: 10px;
@@ -1492,7 +2041,7 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
 /* The workflow as one line. It bridges the editor and the Library, so it is a
    hairline strip rather than a section: no padding of its own beyond the rule
    above and below it. */
-.workflow-ribbon { padding: 8px 0 0; background: var(--color-bg); }
+.workflow-ribbon { padding: 0; background: var(--color-bg); }
 
 .ribbon {
   display: flex;
@@ -1515,7 +2064,7 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
   grid-template-rows: auto auto;
   align-content: center;
   gap: 2px 12px;
-  padding: 24px 8px 24px 0;
+  padding: clamp(16px, 2.4vh, 26px) 8px clamp(16px, 2.4vh, 26px) 0;
   transition: background 200ms ease;
 }
 
@@ -1569,1453 +2118,204 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
   transform: rotate(45deg);
 }
 
-/* =============================================================== library === */
-/*
- * The Library is an application, not a section, so it gets the wide regime and
- * a real workspace grid: rail | viewer | knowledge. The centre column is
- * `minmax(0, 1fr)` and the two panels are fixed, which is what guarantees the
- * specimen always takes the slack on a big screen instead of the panels growing.
- */
-.library {
-  position: relative;
-  padding: 104px 0 108px;
-  background:
-    linear-gradient(180deg, var(--color-bg) 0%, var(--color-bg-deep) 42%, var(--color-bg) 100%);
-}
-
-.library-intro { margin-bottom: 40px; }
-
-.library-app {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-card);
-  overflow: hidden;
-}
-
-/* -------------------------------------------------------- subject switcher --- */
-.library-subjects {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 18px;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-surface-2);
-}
-
-.library-subjects-rail {
-  display: flex;
-  min-width: 0;
-  gap: 6px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  padding-bottom: 2px;
-}
-.library-subjects-rail::-webkit-scrollbar { display: none; }
-
-.library-subject {
-  display: grid;
-  flex: none;
-  gap: 1px;
-  padding: 9px 14px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
-  text-align: left;
-  background: transparent;
-  transition: background 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
-}
-.library-subject b {
-  color: var(--color-ink);
-  font-family: var(--font-display);
-  font-size: 13.5px;
-  font-weight: 620;
-  letter-spacing: -0.02em;
-  white-space: nowrap;
-}
-.library-subject small { color: var(--color-muted); font-size: 10px; white-space: nowrap; }
-.library-subject i {
-  margin-top: 3px;
-  color: var(--color-muted-2);
-  font-size: 9px;
-  font-style: normal;
-  font-weight: 620;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-}
-.library-subject:hover { border-color: var(--color-border); background: var(--color-surface); }
-.library-subject.is-active {
-  border-color: var(--color-border);
-  background: var(--color-surface-raised);
-  box-shadow: 0 6px 18px rgba(87, 62, 43, 0.07);
-}
-/* The subject's own accent, as a 2px underline rather than a fill: seven filled
-   chips in seven colours would be the loudest thing on the page. */
-.library-subject.is-active b { box-shadow: 0 12px 0 -10px var(--subject-tint, var(--color-accent-strong)); }
-.library-subject.is-empty b { color: var(--color-muted); }
-.library-subject.is-empty i { color: var(--color-pending); }
-
-.library-search {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  width: clamp(190px, 20vw, 280px);
-  padding: 0 12px;
-  min-height: 40px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  color: var(--color-muted);
-  background: var(--color-surface-raised);
-  font-size: 12.5px;
-}
-.library-search span { font-size: 15px; }
-.library-search input {
-  width: 100%;
-  min-width: 0;
-  border: 0;
-  outline: 0;
-  color: var(--color-ink);
-  background: transparent;
-  font: inherit;
-}
-.library-search input::placeholder { color: var(--color-muted-2); }
-.library-search:focus-within { border-color: var(--color-accent-line); }
-.library-search kbd {
-  flex: none;
-  padding: 2px 5px;
-  border: 1px solid var(--color-border);
-  border-radius: 5px;
-  color: var(--color-muted-2);
-  font-family: var(--font-mono);
-  font-size: 9px;
-}
-
-/* ------------------------------------------------------------- workspace --- */
-/*
- * A definite height, not a min-height.
- *
- * This matters for more than proportion. The viewer canvas is sized in CSS with
- * `height: 100%`, and a percentage height against an `auto`-height ancestor
- * resolves to `auto` — at which point the canvas falls back to its own intrinsic
- * aspect ratio, the row grows to fit it, the ResizeObserver resizes the drawing
- * buffer to the new box, and the two chase each other until they converge
- * somewhere arbitrary. Pinning the row ends that loop and gives the workspace the
- * proportions of an application rather than of a document.
- */
-.library-body {
-  display: grid;
-  grid-template-columns: 274px minmax(0, 1fr) 328px;
-  height: clamp(580px, 76vh, 880px);
-}
-
-.library-rail {
-  display: flex;
-  min-height: 0;
-  flex-direction: column;
-  border-right: 1px solid var(--color-border);
-  background: var(--color-surface);
-}
-
-.library-rail-head,
-.library-viewer-bar,
-.library-knowledge > header {
-  border-bottom: 1px solid var(--color-border);
-}
-
-.library-rail-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  padding: 14px 18px;
-  color: var(--color-muted);
-  font-size: 9.5px;
-  font-weight: 650;
-  letter-spacing: 0.11em;
-  text-transform: uppercase;
-}
-.library-rail-head b { color: var(--color-ink); font-size: 12px; letter-spacing: 0; }
-
-.library-rail-list {
-  flex: 1;
-  min-height: 0;
-  margin: 0;
-  padding: 6px;
-  list-style: none;
-  overflow-y: auto;
-}
-
-.library-asset {
-  display: grid;
-  width: 100%;
-  gap: 3px;
-  padding: 11px 12px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  text-align: left;
-  background: transparent;
-  transition: background 170ms ease, border-color 170ms ease;
-}
-.library-asset-kind {
-  color: var(--color-muted-2);
-  font-size: 9px;
-  font-weight: 650;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-.library-asset b {
-  color: var(--color-ink);
-  font-family: var(--font-editorial);
-  font-size: 18px;
-  font-weight: 400;
-  letter-spacing: -0.01em;
-  line-height: 1.15;
-}
-.library-asset small { color: var(--color-muted); font-size: 11px; line-height: 1.5; }
-.library-asset em {
-  justify-self: start;
-  margin-top: 4px;
-  padding: 2px 7px;
-  border-radius: 999px;
-  color: var(--color-pending);
-  background: rgba(176, 138, 74, 0.11);
-  font-size: 9px;
-  font-style: normal;
-  font-weight: 620;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-.library-asset:hover { background: var(--color-surface-2); }
-.library-asset.is-active {
-  border-color: var(--color-accent-line);
-  background: var(--color-accent-wash);
-}
-.library-asset.is-active b { color: var(--color-accent-deep); }
-
-.library-rail-empty,
-.library-rail-foot {
-  margin: 0;
-  padding: 16px 18px;
-  color: var(--color-muted);
-  font-size: 11.5px;
-  line-height: 1.6;
-}
-.library-rail-foot { border-top: 1px solid var(--color-border-hair); }
-
-/* ---------------------------------------------------------------- viewer --- */
-.library-viewer {
-  display: grid;
-  min-width: 0;
-  min-height: 0;
-  grid-template-rows: auto minmax(0, 1fr);
-  background: var(--color-surface-raised);
-}
-
-.library-viewer-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  padding: 13px 22px;
-}
-.library-viewer-title { display: flex; align-items: baseline; gap: 12px; min-width: 0; }
-.library-viewer-title b {
-  font-family: var(--font-editorial);
-  font-size: 25px;
-  font-weight: 400;
-  letter-spacing: -0.01em;
-}
-.library-viewer-title span { color: var(--color-muted); font-size: 11.5px; }
-
-.library-viewer-tags { display: flex; flex: none; gap: 6px; }
-.library-viewer-tags span {
-  padding: 4px 9px;
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  color: var(--color-muted);
-  font-size: 9.5px;
-  font-weight: 620;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-.library-viewer-tags .is-ready { border-color: transparent; color: #2f5f33; background: rgba(118, 157, 116, 0.17); }
-.library-viewer-tags .is-planned { border-color: transparent; color: var(--color-pending); background: rgba(176, 138, 74, 0.13); }
-
-.library-viewer-stage {
-  position: relative;
-  min-height: 0;
-  /* The specimen sits in the room, not on a card: a very soft radial so the
-     object has somewhere to cast into, and nothing else. */
-  background:
-    radial-gradient(120% 90% at 50% 42%, #ffffff 0%, var(--color-surface) 58%, var(--color-surface-2) 100%);
-}
-
-.library-sheet-toggle { display: none; }
-
-/* ------------------------------------------------------------- knowledge --- */
-.library-knowledge {
-  display: flex;
-  min-height: 0;
-  flex-direction: column;
-  border-left: 1px solid var(--color-border);
-  background: var(--color-surface);
-  overflow-y: auto;
-}
-
-.library-knowledge > header { padding: 20px 22px 22px; }
-.library-knowledge > header > span {
-  color: var(--color-accent-strong);
-  font-size: 9.5px;
-  font-weight: 680;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
-}
-.library-knowledge > header h3 {
-  margin: 9px 0 10px;
-  font-family: var(--font-editorial);
-  font-size: 28px;
-  font-weight: 400;
-  line-height: 1.1;
-  letter-spacing: -0.015em;
-}
-.library-knowledge > header p { margin: 0; color: var(--color-ink-2); font-size: 12.5px; line-height: 1.68; }
-
-.library-knowledge section { padding: 18px 22px; border-bottom: 1px solid var(--color-border-hair); }
-.library-knowledge h4 {
-  margin: 0 0 12px;
-  color: var(--color-muted);
-  font-size: 9.5px;
-  font-weight: 660;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.knowledge-parts { margin: 0; }
-.knowledge-parts div { padding: 7px 0; border-bottom: 1px solid var(--color-border-hair); }
-.knowledge-parts div:last-child { border-bottom: 0; }
-.knowledge-parts dt { color: var(--color-ink); font-size: 12px; font-weight: 620; }
-.knowledge-parts dd { margin: 2px 0 0; color: var(--color-muted); font-size: 11.5px; line-height: 1.55; }
-
-.knowledge-goals { margin: 0; padding: 0; list-style: none; }
-.knowledge-goals li {
-  position: relative;
-  padding: 5px 0 5px 18px;
-  color: var(--color-ink-2);
-  font-size: 12px;
-  line-height: 1.6;
-}
-.knowledge-goals li::before {
-  content: '';
-  position: absolute;
-  top: 12px;
-  left: 2px;
-  width: 6px;
-  height: 6px;
-  border: 1px solid var(--color-accent-strong);
-  border-radius: 50%;
-}
-
-.knowledge-facts { margin: 0; }
-.knowledge-facts div {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 6px 0;
-}
-.knowledge-facts dt { color: var(--color-muted); font-size: 11px; }
-.knowledge-facts dd { margin: 0; color: var(--color-ink); font-size: 11.5px; font-weight: 560; text-align: right; }
-
-.knowledge-actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 18px 22px; }
-.knowledge-actions > * {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 40px;
-  padding: 0 15px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  color: var(--color-ink-2);
-  background: var(--color-surface-raised);
-  font-size: 12px;
-  font-weight: 580;
-  transition: border-color 180ms ease, color 180ms ease;
-}
-.knowledge-actions > *:hover { border-color: var(--color-accent-line); color: var(--color-accent-deep); }
-.knowledge-actions .is-primary {
-  border-color: transparent;
-  color: #fff;
-  background: var(--color-accent-strong);
-}
-.knowledge-actions .is-primary:hover { color: #fff; background: var(--color-accent-deep); }
-
-.knowledge-credits { margin-top: auto; padding: 16px 22px 20px; border-top: 1px solid var(--color-border); }
-.knowledge-credits p { display: grid; gap: 2px; margin: 0 0 12px; }
-.knowledge-credits p:last-child { margin-bottom: 0; }
-.knowledge-credits b { color: var(--color-ink-2); font-size: 11px; font-weight: 620; }
-.knowledge-credits span { color: var(--color-accent-deep); font-size: 10px; font-weight: 600; }
-.knowledge-credits small { color: var(--color-muted); font-size: 10px; line-height: 1.55; }
-
-/* ------------------------------------------------------------------ foot --- */
-.library-foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 28px;
-  padding: 15px 22px;
-  border-top: 1px solid var(--color-border);
-  background: var(--color-surface-2);
-}
-.library-foot p { max-width: 76ch; margin: 0; color: var(--color-muted); font-size: 11.5px; line-height: 1.6; }
-.library-foot-links { display: flex; flex: none; gap: 18px; }
-.library-foot-links a { color: var(--color-accent-deep); font-size: 11.5px; font-weight: 600; }
-.library-foot-links a:hover { color: var(--color-accent-strong); }
-
-/* ========================================================== model stage === */
-.model-stage,
-.cell-stage,
-.globe-stage,
-.atom-stage { position: relative; width: 100%; height: 100%; overflow: hidden; touch-action: none; }
-.model-stage { cursor: grab; }
-.model-stage[data-grabbing] { cursor: grabbing; }
-/*
- * Absolutely positioned, always.
- *
- * A `<canvas>` has an intrinsic size from its width/height attributes, and the
- * renderer sets those to box × devicePixelRatio. In flow that intrinsic size
- * becomes the element's min-content contribution, so the canvas widens its own
- * column, the ResizeObserver enlarges the drawing buffer to match, and the two
- * grow together — at 768 px the viewer had inflated itself to 1092. Taking the
- * canvas out of flow means it can only ever be the size of the box it is in.
- */
-.model-stage-canvas {
-  position: absolute;
-  inset: 0;
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-
-.model-stage-status,
-.model-stage-hint {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  margin: 0;
-  color: var(--color-muted);
-  font-size: 11px;
-  font-weight: 560;
-  letter-spacing: 0.03em;
-  pointer-events: none;
-}
-.model-stage-status { top: 50%; transform: translate(-50%, -50%); }
-.model-stage-status.is-error { color: #b4483c; }
-.model-stage-hint {
-  bottom: 14px;
-  padding: 5px 11px;
-  border-radius: 999px;
-  background: rgba(255, 253, 249, 0.82);
-  font-size: 10px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.viewer-poster { position: relative; width: 100%; height: 100%; }
-.viewer-poster img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.viewer-poster-open {
-  position: absolute;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 46px;
-  padding: 0 22px;
-  border: 0;
-  border-radius: var(--radius-md);
-  color: #fff;
-  background: var(--color-accent-strong);
-  box-shadow: 0 14px 34px rgba(180, 88, 70, 0.3);
-  font-size: 13px;
-  font-weight: 620;
-  transition: transform 200ms ease;
-}
-.viewer-poster-open:hover { transform: translate(-50%, -2px); }
-
-.viewer-empty {
-  display: grid;
-  height: 100%;
-  place-content: center;
-  justify-items: center;
-  gap: 22px;
-  padding: 40px 32px;
-  text-align: center;
-}
-.viewer-empty-art { width: min(240px, 46%); color: var(--color-muted-2); }
-.viewer-empty p { max-width: 52ch; margin: 0; color: var(--color-muted); font-size: 13px; line-height: 1.75; }
-
-/* ============================================================ cell studio === */
-.cell-studio { display: flex; height: 100%; flex-direction: column; }
-.cell-stage { flex: 1; min-height: 0; cursor: grab; }
-
-.cell-controls {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 12px;
-  padding: 10px 18px;
-  border-top: 1px solid var(--color-border-hair);
-}
-.cell-organelles { display: flex; flex-wrap: wrap; gap: 5px; }
-.cell-organelles button {
-  padding: 6px 11px;
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  color: var(--color-ink-2);
-  background: var(--color-surface-raised);
-  font-size: 11px;
-  font-weight: 560;
-  transition: border-color 170ms ease, color 170ms ease, background 170ms ease;
-}
-.cell-organelles button:hover { border-color: var(--color-border-strong); }
-.cell-organelles button.is-active {
-  border-color: transparent;
-  color: #fff;
-  background: var(--color-accent-strong);
-}
-
-.cell-isolate {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--color-muted);
-  font-size: 11px;
-  font-weight: 560;
-}
-.cell-isolate.is-on { color: var(--color-accent-deep); }
-.cell-isolate input { accent-color: var(--color-accent-strong); }
-.cell-isolate:has(input:disabled) { opacity: 0.45; }
-
-.cell-readout {
-  margin: 0;
-  padding: 11px 18px 15px;
-  color: var(--color-muted);
-  font-size: 12px;
-  line-height: 1.6;
-}
-.cell-readout b { color: var(--color-ink); font-weight: 620; }
-
-/* ========================================================= periodic table === */
-.periodic { display: flex; height: 100%; flex-direction: column; padding: 14px 16px 12px; }
-
-.periodic-legend { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 12px; }
-.periodic-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 9px;
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  color: var(--color-muted);
-  background: var(--color-surface-raised);
-  font-size: 10px;
-  font-weight: 580;
-  transition: border-color 160ms ease, color 160ms ease;
-}
-.periodic-chip i { width: 8px; height: 8px; border-radius: 2px; }
-.periodic-chip:hover { border-color: var(--color-border-strong); color: var(--color-ink-2); }
-.periodic-chip.is-active { border-color: var(--color-accent-line); color: var(--color-ink); background: var(--color-accent-wash); }
-
-.periodic-grid {
-  display: grid;
-  flex: 1;
-  grid-template-columns: repeat(var(--pt-cols), minmax(0, 1fr));
-  grid-template-rows: repeat(var(--pt-rows), minmax(0, 1fr));
-  gap: 3px;
-  min-height: 0;
-}
-
-.periodic-cell {
-  display: grid;
-  align-content: center;
-  justify-items: start;
-  gap: 0;
-  min-width: 0;
-  padding: 4px 5px;
-  border: 1px solid var(--color-border-hair);
-  border-left-width: 2.5px;
-  border-radius: 4px;
-  overflow: hidden;
-  background: var(--color-surface-raised);
-  transition: transform 160ms ease, box-shadow 160ms ease, opacity 200ms ease;
-}
-.periodic-cell small { color: var(--color-muted-2); font-size: 8px; line-height: 1.1; }
-.periodic-cell b {
-  color: var(--color-ink);
-  font-family: var(--font-display);
-  font-size: clamp(11px, 0.95vw, 15px);
-  font-weight: 640;
-  line-height: 1.05;
-  letter-spacing: -0.02em;
-}
-.periodic-cell span {
-  width: 100%;
-  color: var(--color-muted);
-  font-size: 7.5px;
-  line-height: 1.15;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.periodic-cell:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 18px rgba(87, 62, 43, 0.12);
-}
-.periodic-cell.is-dim { opacity: 0.28; }
-
-.periodic-note {
-  display: grid;
-  place-content: center;
-  color: var(--color-muted-2);
-  font-size: 9px;
-  font-weight: 600;
-}
-
-.periodic-hint {
-  margin: 10px 0 0;
-  color: var(--color-muted);
-  font-size: 10.5px;
-  letter-spacing: 0.04em;
-  text-align: center;
-}
-
-/* ------------------------------------------------------------ atom view --- */
-.atom-view { display: grid; height: 100%; grid-template-rows: auto minmax(0, 1fr) auto; }
-
-.atom-head {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  padding: 12px 18px;
-  border-bottom: 1px solid var(--color-border-hair);
-}
-.atom-back {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 6px 11px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  color: var(--color-ink-2);
-  background: var(--color-surface-raised);
-  font-size: 11.5px;
-  font-weight: 560;
-}
-.atom-back:hover { border-color: var(--color-accent-line); color: var(--color-accent-deep); }
-.atom-title { display: flex; align-items: baseline; gap: 10px; }
-.atom-title i { width: 9px; height: 9px; border-radius: 2px; align-self: center; }
-.atom-title b { font-family: var(--font-display); font-size: 26px; font-weight: 660; letter-spacing: -0.03em; }
-.atom-title span { color: var(--color-muted); font-size: 12px; }
-
-.atom-stage { min-height: 0; }
-
-.atom-facts {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 0;
-  margin: 0;
-  border-top: 1px solid var(--color-border-hair);
-}
-.atom-facts div {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 8px 16px;
-  border-right: 1px solid var(--color-border-hair);
-  border-bottom: 1px solid var(--color-border-hair);
-}
-.atom-facts dt { color: var(--color-muted); font-size: 10px; }
-.atom-facts dd { margin: 0; color: var(--color-ink); font-size: 11px; font-weight: 560; text-align: right; }
-
-/* ============================================================ simulation === */
-.sim {
-  display: grid;
-  height: 100%;
-  grid-template-rows: minmax(0, 1fr) auto auto;
-  --sim-ink: var(--color-ink);
-  --sim-accent: #e87868;
-  --sim-line: rgba(117, 91, 70, 0.2);
-  --sim-muted: #706a73;
-}
-.sim-stage { position: relative; min-height: 0; padding: 8px 10px 0; }
-.sim-canvas { display: block; width: 100%; height: 100%; }
-.sim-axis-label {
-  position: absolute;
-  color: var(--color-muted-2);
-  font-size: 9px;
-  font-weight: 620;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-}
-.sim-axis-label--x { right: 16px; bottom: 4px; }
-.sim-axis-label--y { top: 12px; left: 10px; }
-
-.sim-readout {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  margin: 0;
-  border-top: 1px solid var(--color-border-hair);
-  border-bottom: 1px solid var(--color-border-hair);
-}
-.sim-readout div { padding: 9px 16px; border-right: 1px solid var(--color-border-hair); }
-.sim-readout dt {
-  color: var(--color-muted);
-  font-size: 9px;
-  font-weight: 650;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-.sim-readout dd {
-  margin: 3px 0 0;
-  color: var(--color-ink);
-  font-family: var(--font-display);
-  font-size: 17px;
-  font-weight: 620;
-  letter-spacing: -0.02em;
-}
-
-.sim-controls {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  align-items: end;
-  gap: 12px 20px;
-  padding: 14px 18px 18px;
-}
-.sim-slider { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; }
-.sim-slider span { color: var(--color-muted); font-size: 10.5px; font-weight: 560; }
-.sim-slider b { color: var(--color-ink); font-size: 11px; font-weight: 620; text-align: right; }
-.sim-slider input { grid-column: 1 / -1; width: 100%; accent-color: var(--color-accent-strong); }
-
-.sim-presets { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; }
-.sim-presets > span {
-  width: 100%;
-  color: var(--color-muted);
-  font-size: 10.5px;
-  font-weight: 560;
-}
-.sim-presets button {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 5px;
-  padding: 5px 9px;
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  color: var(--color-ink-2);
-  background: var(--color-surface-raised);
-  font-size: 10.5px;
-  font-weight: 560;
-}
-.sim-presets button i { color: var(--color-muted-2); font-size: 9px; font-style: normal; }
-.sim-presets button.is-active { border-color: transparent; color: #fff; background: var(--color-accent-strong); }
-.sim-presets button.is-active i { color: rgba(255, 255, 255, 0.75); }
-
-.sim-fire {
-  justify-self: start;
-  display: inline-flex;
-  align-items: center;
-  gap: 9px;
-  min-height: 40px;
-  padding: 0 18px;
-  border: 0;
-  border-radius: var(--radius-sm);
-  color: #fff;
-  background: var(--color-accent-strong);
-  font-size: 12px;
-  font-weight: 620;
-}
-.sim-fire:hover { background: var(--color-accent-deep); }
-
-/* ================================================================= globe === */
-.globe { display: grid; height: 100%; grid-template-columns: minmax(0, 1fr) 246px; }
-.globe-stage { min-width: 0; cursor: grab; }
-
-.globe-side {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 14px;
-  border-left: 1px solid var(--color-border-hair);
-  overflow-y: auto;
-}
-
-.globe-layers { display: flex; gap: 4px; padding: 3px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); }
-.globe-layers button {
-  flex: 1;
-  padding: 7px 4px;
-  border: 0;
-  border-radius: 6px;
-  color: var(--color-muted);
-  background: transparent;
-  font-size: 11px;
-  font-weight: 580;
-}
-.globe-layers button.is-active { color: #fff; background: var(--color-accent-strong); }
-
-.globe-search input {
-  width: 100%;
-  min-height: 36px;
-  padding: 0 11px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  color: var(--color-ink);
-  background: var(--color-surface-raised);
-  font: inherit;
-  font-size: 12px;
-}
-.globe-search input:focus-visible { border-color: var(--color-accent-line); outline: 0; }
-
-.globe-list { flex: 1; margin: 0; padding: 0; list-style: none; overflow-y: auto; min-height: 90px; }
-.globe-list button {
-  display: grid;
-  width: 100%;
-  gap: 1px;
-  padding: 6px 8px;
-  border: 0;
-  border-radius: 6px;
-  text-align: left;
-  background: transparent;
-}
-.globe-list button b { color: var(--color-ink); font-size: 12px; font-weight: 580; }
-.globe-list button small { color: var(--color-muted-2); font-size: 10px; }
-.globe-list button:hover { background: var(--color-surface-2); }
-.globe-list button.is-active { background: var(--color-accent-wash); }
-.globe-list button.is-active b { color: var(--color-accent-deep); }
-.globe-list-empty { padding: 8px; color: var(--color-muted); font-size: 11px; }
-
-.globe-facts { margin: 0; padding-top: 10px; border-top: 1px solid var(--color-border-hair); }
-.globe-facts div { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; }
-.globe-facts dt { color: var(--color-muted); font-size: 10px; }
-.globe-facts dd { margin: 0; color: var(--color-ink); font-size: 11px; font-weight: 560; text-align: right; }
-.globe-empty { margin: 0; color: var(--color-muted); font-size: 11px; line-height: 1.6; }
-
-/* ============================================================== practice === */
-.practice {
-  padding: 108px 0;
-  /* The lavender note in the section chain: ivory -> a breath of lavender-ivory
-     -> ivory. It is four units of value; the point is that the eye never meets
-     an edge, not that anyone can name the colour. */
-  background: linear-gradient(180deg, var(--color-bg) 0%, #f7f2f4 48%, var(--color-bg) 100%);
-}
-
-.practice-grid {
-  display: grid;
-  grid-template-columns: 1.18fr 0.82fr;
-  gap: 26px;
-  margin-top: 52px;
-}
-
-.practice-live,
-.practice-pending {
-  display: flex;
-  flex-direction: column;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  background: var(--color-surface);
-}
-
-.practice-visual { position: relative; min-height: 320px; background: var(--color-surface-2); }
-.practice-visual img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.practice-open {
-  position: absolute;
-  bottom: 20px;
-  left: 22px;
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 46px;
-  padding: 0 22px;
-  border: 0;
-  border-radius: var(--radius-md);
-  color: #fff;
-  background: var(--color-accent-strong);
-  box-shadow: 0 14px 34px rgba(180, 88, 70, 0.32);
-  font-size: 13px;
-  font-weight: 620;
-  transition: transform 200ms ease;
-}
-.practice-open:hover { transform: translateY(-2px); }
-
-.practice-body { padding: 24px 26px 28px; }
-.practice-pending-body { padding: 4px 26px 28px; }
-
-.practice-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  color: #2f5f33;
-  background: rgba(118, 157, 116, 0.16);
-  font-size: 9.5px;
-  font-weight: 660;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-}
-.practice-tag--pending { color: var(--color-pending); background: rgba(176, 138, 74, 0.14); }
-
-.practice-live h3,
-.practice-pending h3 {
-  margin: 14px 0 10px;
-  font-family: var(--font-display);
-  font-size: 27px;
-  font-weight: 640;
-  letter-spacing: -0.035em;
-}
-.practice-live p,
-.practice-pending p { margin: 0; color: var(--color-ink-2); font-size: 13px; line-height: 1.7; }
-
-.practice-modes { margin: 18px 0 0; padding: 0; border-top: 1px solid var(--color-border-hair); list-style: none; }
-.practice-modes li {
-  display: grid;
-  grid-template-columns: 78px minmax(0, 1fr);
-  gap: 14px;
-  padding: 11px 0;
-  border-bottom: 1px solid var(--color-border-hair);
-}
-.practice-modes b {
-  color: var(--color-accent-deep);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 620;
-  letter-spacing: 0.06em;
-}
-.practice-modes span { color: var(--color-muted); font-size: 12px; line-height: 1.5; }
-
-.practice-art {
-  width: 100%;
-  height: auto;
-  max-height: 260px;
-  padding: 26px 26px 4px;
-  color: var(--color-muted-2);
-}
-.practice-pending { background: var(--color-surface-2); }
-.practice-pending-note { margin-top: 12px !important; color: var(--color-muted) !important; font-size: 12px !important; }
-.practice-pending-note a,
-.practice-pending-note button {
-  padding: 0;
-  border: 0;
-  border-bottom: 1px solid var(--color-accent-line);
-  color: var(--color-accent-deep);
-  background: transparent;
-  font: inherit;
-  font-weight: 600;
-}
-
-/* ============================================================= education === */
-.education { padding: 108px 0; background: linear-gradient(180deg, var(--color-bg) 0%, #fdf7f2 50%, var(--color-bg) 100%); }
-
-.education-tabs {
-  display: inline-flex;
-  gap: 4px;
-  margin-top: 46px;
-  padding: 5px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-}
-.education-tabs button {
-  min-height: 42px;
-  padding: 0 22px;
-  border: 0;
-  border-radius: var(--radius-sm);
-  color: var(--color-ink-2);
-  background: transparent;
-  font-size: 13px;
-  font-weight: 580;
-  transition: color 180ms ease, background 180ms ease, box-shadow 180ms ease;
-}
-.education-tabs button.is-active {
-  color: #fff;
-  background: var(--color-accent-strong);
-  box-shadow: 0 9px 22px rgba(180, 88, 70, 0.24);
-}
-
-/* Asymmetric on purpose: the role's own story gets the wider half, and the
-   product shot sits beside it rather than above a wall of bullets. */
-.education-panel {
-  display: grid;
-  grid-template-columns: 0.92fr 1.08fr;
-  gap: 56px;
-  align-items: start;
-  margin-top: 34px;
-}
-
-.education-kicker {
-  margin: 0;
-  color: var(--color-accent-strong);
-  font-size: 10px;
-  font-weight: 680;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-.education-copy h3 {
-  margin: 14px 0 0;
-  font-family: var(--font-display);
-  font-size: clamp(28px, 2.6vw, 40px);
-  font-weight: 660;
-  line-height: 1.08;
-  letter-spacing: -0.04em;
-  text-wrap: balance;
-}
-.education-lede { max-width: 46ch; margin: 18px 0 0; color: var(--color-ink-2); font-size: 14.5px; line-height: 1.7; }
-
-.education-points { margin: 28px 0 0; padding: 0; border-top: 1px solid var(--color-border); list-style: none; }
-.education-points li {
-  display: grid;
-  grid-template-columns: 30px minmax(0, 150px) minmax(0, 1fr);
-  align-items: baseline;
-  gap: 4px 16px;
-  padding: 12px 0;
-  border-bottom: 1px solid var(--color-border-hair);
-}
-.education-points span { color: var(--color-muted-2); font-family: var(--font-mono); font-size: 10px; }
-.education-points b { color: var(--color-ink); font-size: 13px; font-weight: 600; }
-.education-points small { color: var(--color-muted); font-size: 12px; line-height: 1.5; }
-
-.education-cta {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 48px;
-  margin-top: 26px;
-  padding: 0 22px;
-  border-radius: var(--radius-md);
-  color: #fff;
-  background: var(--color-accent-strong);
-  box-shadow: 0 14px 32px rgba(180, 88, 70, 0.24);
-  font-size: 13px;
-  font-weight: 620;
-  transition: transform 200ms ease;
-}
-.education-cta:hover { transform: translateY(-2px); }
-
-.education-visual {
-  position: relative;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  background: var(--color-surface);
-  box-shadow: var(--shadow-card);
-}
-
-/* teacher */
-.edu-compose { display: grid; grid-template-rows: minmax(0, 1fr) auto; min-height: 460px; }
-.edu-compose-frame { display: grid; grid-template-columns: 46px minmax(0, 1fr) 150px; min-height: 0; }
-.edu-rail { display: flex; flex-direction: column; gap: 8px; padding: 12px 0; border-right: 1px solid var(--color-border-hair); align-items: center; }
-.edu-rail i { width: 20px; height: 20px; border: 1px solid var(--color-border); border-radius: 6px; background: var(--color-surface-raised); }
-.edu-stage { position: relative; display: grid; place-items: center; min-width: 0; background: radial-gradient(90% 80% at 50% 40%, #fff, var(--color-surface-2)); }
-.edu-stage .model-thumbnail { width: 100%; height: 100%; }
-.edu-marker {
-  position: absolute;
-  top: 26%;
-  left: 22%;
-  padding: 4px 9px;
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  color: var(--color-ink-2);
-  background: rgba(255, 253, 249, 0.9);
-  font-size: 9.5px;
-  font-weight: 600;
-}
-.edu-layers { display: flex; flex-direction: column; gap: 7px; padding: 12px 14px; border-left: 1px solid var(--color-border-hair); }
-.edu-layers b { color: var(--color-muted); font-size: 9px; font-weight: 660; letter-spacing: 0.11em; text-transform: uppercase; }
-.edu-layers i { color: var(--color-ink-2); font-size: 11px; font-style: normal; }
-.edu-timeline { display: flex; gap: 5px; padding: 10px 12px; border-top: 1px solid var(--color-border-hair); }
-.edu-timeline span {
-  flex: 1;
-  padding: 5px 8px;
-  border-radius: 5px;
-  color: #fff;
-  font-size: 9px;
-  font-weight: 620;
-  opacity: 0.86;
-}
-
-/* student */
-.edu-explore { position: relative; min-height: 460px; background: radial-gradient(90% 80% at 50% 40%, #fff, var(--color-surface-2)); }
-.edu-explore .model-thumbnail { width: 100%; height: 100%; }
-.edu-pin {
-  position: absolute;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  color: var(--color-ink-2);
-  font-size: 9.5px;
-  font-weight: 620;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-.edu-pin i { display: block; width: 26px; height: 1px; background: var(--color-border-strong); }
-.edu-pin--a { top: 26%; left: 12%; }
-.edu-pin--b { top: 44%; right: 12%; flex-direction: row-reverse; }
-.edu-pin--c { bottom: 30%; left: 16%; }
-.edu-hint {
-  position: absolute;
-  bottom: 62px;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 5px 12px;
-  border-radius: 999px;
-  color: var(--color-muted);
-  background: rgba(255, 253, 249, 0.88);
-  font-size: 9.5px;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-.edu-steps {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  display: flex;
-  gap: 5px;
-  padding: 11px 14px;
-  border-top: 1px solid var(--color-border-hair);
-  background: var(--color-surface);
-}
-.edu-steps span {
-  flex: 1;
-  padding: 6px 8px;
-  border: 1px solid var(--color-border-hair);
-  border-radius: 6px;
-  color: var(--color-muted-2);
-  font-size: 9.5px;
-  font-weight: 600;
-  text-align: center;
-}
-.edu-steps .is-done { color: var(--color-ink-2); background: var(--color-surface-2); }
-.edu-steps .is-active { border-color: transparent; color: #fff; background: var(--color-accent-strong); }
-
-/* school */
-.edu-deploy {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1px;
-  min-height: 460px;
-  background: var(--color-border-hair);
-}
-.edu-deploy > * { background: var(--color-surface); }
-.edu-deploy .model-thumbnail { width: 100%; height: 100%; min-height: 200px; }
-.edu-tile { display: flex; flex-direction: column; justify-content: center; gap: 6px; padding: 22px; }
-.edu-tile b { font-family: var(--font-display); font-size: 16px; font-weight: 620; letter-spacing: -0.02em; }
-.edu-tile small { color: var(--color-muted); font-size: 11.5px; line-height: 1.5; }
-
-/* ================================================================= proof === */
-.proof { padding: 104px 0 108px; background: linear-gradient(180deg, var(--color-bg) 0%, var(--color-surface) 62%, var(--color-bg) 100%); }
-
-.proof-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(224px, 1fr));
-  gap: 18px;
-  margin-top: 52px;
-}
-
-.proof-card {
-  display: flex;
-  flex-direction: column;
-  padding: 0 0 20px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  background: var(--color-surface);
-  transition: transform 220ms ease, box-shadow 220ms ease;
-}
-.proof-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lift); }
-
-.proof-visual {
-  position: relative;
-  height: 168px;
-  display: grid;
-  place-items: center;
-  background: linear-gradient(160deg, #fdf3ea, #f8e4da);
-}
-.proof-visual img,
-.proof-visual .model-thumbnail { width: 100%; height: 100%; }
-.proof-visual img { object-fit: cover; }
-.proof-glyph {
-  color: var(--color-accent-deep);
-  font-family: var(--font-display);
-  font-size: 46px;
-  font-weight: 640;
-  letter-spacing: -0.04em;
-}
-
-.proof-subject {
-  margin: 18px 20px 0;
-  color: var(--color-muted-2);
-  font-size: 9.5px;
-  font-weight: 650;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-.proof-card h3 {
-  margin: 8px 20px 0;
-  font-family: var(--font-editorial);
-  font-size: 22px;
-  font-weight: 400;
-  letter-spacing: -0.01em;
-}
-.proof-card > p { margin: 8px 20px 0; color: var(--color-muted); font-size: 12px; line-height: 1.6; }
-
-.proof-action {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin: 16px 20px 0;
-  padding: 0;
-  border: 0;
-  color: var(--color-accent-deep);
-  background: transparent;
-  font-size: 12px;
-  font-weight: 620;
-}
-.proof-action:hover { color: var(--color-accent-strong); }
-
-.proof-note { max-width: 74ch; margin: 34px 0 0; color: var(--color-muted); font-size: 11.5px; line-height: 1.7; }
-
-.study-readout--compact div { padding: 9px 0; }
-
 /* ============================================================ responsive === */
 /*
- * The Library collapses in three stages rather than reflowing the same three
- * columns into narrower three columns:
+ * Page chrome and the sections that live in this file only.
  *
- *   ≤1440  the knowledge panel narrows, the rail narrows.
- *   ≤1180  the knowledge panel leaves the grid and becomes a sheet under the
- *          viewer, opened by a button. The viewer keeps the whole width.
- *   ≤820   the rail becomes a horizontal scroller above the viewer, so the
- *          order on a phone is viewer first, then assets, then detail — the
- *          specimen is the point and it should not be the third thing you see.
+ * The Library, the editorial sections and each built experience carry their own
+ * breakpoints inside their own partial, next to the rules they override. A
+ * single shared responsive block a thousand lines away from the layout it
+ * modifies is how the previous build ended up with three different ideas about
+ * what happens at 820 px.
+ *
+ * Four widths for the whole page: 1180 (the fourth editor panel and the Library
+ * knowledge column leave), 1000 (the desktop nav becomes a menu, and the Explore
+ * chapters stop being two columns), 860 (single column everywhere) and 700 (the
+ * phone regime, where fitted sections stop being fitted).
  */
-@media (max-width: 1440px) {
-  .library-body { grid-template-columns: 248px minmax(0, 1fr) 296px; }
-  .education-panel { gap: 40px; }
-}
-
-@media (max-width: 1240px) {
-  .desktop-nav { gap: 12px; font-size: 12px; }
-  .practice-grid { grid-template-columns: 1fr; }
-  .globe { grid-template-columns: minmax(0, 1fr) 220px; }
+@media (max-width: 1380px) {
+  /* The copy column takes one more twelfth back from the creature: below this
+     width a 5-column measure is under 40 characters and every heading wraps. */
+  .story-copy { grid-column: 1 / span 6; }
+  .story-copy--right { grid-column: 7 / span 6; }
+  .hero-copy { grid-column: 1 / span 7; }
 }
 
 @media (max-width: 1180px) {
-  .library-body { grid-template-columns: 240px minmax(0, 1fr); height: auto; }
-  .library-viewer-stage { min-height: clamp(420px, 58vh, 620px); }
-  .library-rail { max-height: 620px; }
-  /*
-   * The knowledge panel becomes a sheet under the viewer, and it toggles with
-   * `display` rather than animating `max-height` to a fixed number.
-   *
-   * The magic number was the problem: the bee's panel is ~880 px of content, so
-   * a 640 px cap turned it into a nested scroller inside the page scroller —
-   * the worst reading experience on a phone. Toggling display gives the panel
-   * its natural height, and the visitor scrolls the page as normal.
-   */
-  .library-knowledge {
-    display: none;
-    grid-column: 1 / -1;
-    border-top: 1px solid var(--color-border);
-    border-left: 0;
-    overflow: visible;
+  .studio-body {
+    grid-template-columns: 88px clamp(180px, 17%, 216px) minmax(0, 1fr) clamp(228px, 22%, 268px);
   }
-  .library-knowledge.is-open { display: flex; }
-  .library-sheet-toggle {
-    display: block;
-    width: 100%;
-    padding: 12px;
-    border: 0;
-    border-top: 1px solid var(--color-border);
-    color: var(--color-accent-deep);
-    background: var(--color-surface-2);
-    font-size: 12px;
-    font-weight: 620;
-  }
-  .education-panel { grid-template-columns: 1fr; gap: 34px; }
 }
 
-@media (max-width: 1080px) {
-  .site-header { grid-template-columns: auto 1fr auto; }
+@media (max-width: 1000px) {
   .desktop-nav { display: none; }
-  .studio-body { grid-template-columns: 84px minmax(0, 1fr) 234px; }
+  .studio-body { grid-template-columns: 84px minmax(0, 1fr) clamp(228px, 26%, 264px); }
   .studio-tree { display: none; }
   .tool-features { grid-template-columns: repeat(2, 1fr); }
-  .tool-features article:nth-child(2) { border-right: 0; }
+  .tool-features article { padding-inline: 0 clamp(18px, 3vw, 28px); }
+  .tool-features article:nth-child(2) { border-right: 0; padding-right: 0; }
+  .tool-features article:nth-child(3) { padding-left: 0; }
   .tool-features article:nth-child(n+3) { border-top: 1px solid var(--line); }
   .ribbon { flex-wrap: wrap; }
   .ribbon > li { flex: 1 1 46%; }
   .ribbon-arrow { display: none; }
-}
 
-@media (max-width: 900px) {
-  .header-cta { display: none; }
+  /*
+   * The Explore chapters go one column: the creature keeps the frame and the copy
+   * sits over it at the bottom, which is the only composition that works when the
+   * usable width is narrower than a readable measure plus a specimen.
+   */
+  .story-grid { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
+  .hero-copy,
+  .story-copy,
+  .story-copy--right {
+    position: relative;
+    grid-column: 1;
+    grid-row: 2;
+    align-self: end;
+    max-width: 46rem;
+  }
+  /*
+   * A legibility plate, sized to the copy rather than to the panel.
+   *
+   * One column means the creature is *behind* the words, not beside them, and a
+   * single section-wide wash could not solve that: at the alpha needed to make a
+   * 9.5 px uppercase kicker readable over a fish it also greyed out the creature
+   * that is the point of the chapter. This is a local gradient that starts fully
+   * transparent at the top of the copy block and is nearly solid by its second
+   * line, so the specimen stays vivid above the text and the text is always on
+   * ground of its own. It bleeds past the copy on all four sides so its own top
+   * edge is never a visible line.
+   */
+  .hero-copy::before,
+  .story-copy::before {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    inset: -74px calc(var(--page-gutter) * -1) -120px;
+    pointer-events: none;
+    /* Solid by the first line of type, not by the third: the kicker sits 20 px
+       into this box and at 0.62 alpha a fish's tail fin was still legible
+       through a 9.5 px uppercase label. */
+    background: linear-gradient(180deg,
+      rgba(251, 248, 244, 0) 0%,
+      rgba(251, 248, 244, 0.68) 13%,
+      rgba(251, 248, 244, 0.93) 26%,
+      rgba(251, 248, 244, 0.97) 100%);
+  }
+  .hero-spec { grid-column: 1; grid-row: 1; justify-self: end; align-self: end; margin-bottom: 22px; }
+  .annotation { display: none; }
+  .section-heading--split { grid-template-columns: minmax(0, 1fr); gap: 22px; align-items: start; }
+  .section-heading--split > p, .tool-heading-copy > p { max-width: 52ch; }
+
+  /*
+   * The hamburger appears with the desktop nav disappearance, not 180 px later.
+   *
+   * `.desktop-nav` used to go away at 1080 and `.menu-toggle` only arrived at
+   * 900, so between those two widths — which is every 1024-wide tablet in a
+   * school — the header had a logo, a button, and no way to reach any section.
+   */
+  .site-header-inner { grid-template-columns: auto minmax(0, 1fr) auto auto; }
   .menu-toggle {
     display: flex;
     justify-self: end;
-    width: 42px;
-    height: 42px;
+    width: 40px;
+    height: 40px;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 6px;
     border: 0;
-    border-radius: 12px;
+    border-radius: 11px;
     background: var(--brand);
   }
   .menu-toggle i { width: 17px; height: 1px; background: #fff; transition: transform 0.2s; }
   .site-header.is-open .menu-toggle i:first-child { transform: translateY(3.5px) rotate(45deg); }
   .site-header.is-open .menu-toggle i:last-child { transform: translateY(-3.5px) rotate(-45deg); }
+  /*
+   * The sheet hangs off the bottom of the bar and is shell-aligned like the bar
+   * itself, so opening the menu does not introduce a fifth left edge.
+   */
   .mobile-nav {
     position: absolute;
-    top: 68px;
-    left: 0;
-    right: 0;
+    top: var(--header-h);
+    left: max(var(--page-gutter), calc((100% - var(--page-max)) / 2));
+    right: max(var(--page-gutter), calc((100% - var(--page-max)) / 2));
     display: flex;
     max-height: 0;
     flex-direction: column;
     overflow: hidden;
     border: 1px solid transparent;
-    border-radius: 20px;
-    background: rgba(255, 253, 249, 0.95);
+    border-radius: 0 0 18px 18px;
+    background: rgba(255, 253, 249, 0.96);
     opacity: 0;
     box-shadow: 0 24px 55px rgba(87, 62, 43, 0.16);
     backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
     transition: max-height 0.3s ease, opacity 0.2s;
   }
-  .site-header.is-open .mobile-nav { max-height: 560px; padding: 12px; border-color: rgba(255, 255, 255, 0.7); opacity: 1; }
+  .site-header.is-open .mobile-nav {
+    max-height: 560px;
+    padding: 10px 14px 14px;
+    border-color: var(--color-border-hair);
+    border-top-color: transparent;
+    opacity: 1;
+  }
   .mobile-nav > a {
     display: flex;
     align-items: center;
     gap: 15px;
-    padding: 13px 12px;
+    padding: 13px 4px;
     border-bottom: 1px solid var(--line);
-    font-size: 13.5px;
+    font-size: 14px;
     font-weight: 540;
   }
   .mobile-nav > a span { color: var(--ink-4); font-size: 9px; }
   .mobile-nav .mobile-nav-cta {
     justify-content: center;
-    margin-top: 8px;
+    margin-top: 10px;
     border: 0;
-    border-radius: 12px;
+    border-radius: 11px;
     color: #fff;
     background: var(--brand);
-    font-weight: 600;
+    font-weight: 620;
   }
-  .story-copy { width: min(430px, 48vw); }
-  .annotation { display: none; }
-  .section-heading--split { grid-template-columns: 1fr; gap: 28px; }
-  .studio-body { grid-template-columns: 76px minmax(0, 1fr); height: 500px; }
-  .studio-properties { display: none; }
-  .studio-track { grid-template-columns: 110px minmax(0, 1fr); }
-  .site-footer { grid-template-columns: 1fr; }
-  .footer-links { margin-top: 20px; }
-  .globe { grid-template-columns: 1fr; grid-template-rows: minmax(280px, 1fr) auto; }
-  .globe-side { border-left: 0; border-top: 1px solid var(--color-border-hair); }
-  .globe-list { max-height: 160px; }
-  .atom-facts { grid-template-columns: repeat(2, 1fr); }
 }
 
-@media (max-width: 820px) {
-  /* Viewer first. The rail becomes a horizontal rail above it and the panels
-     stack under, which is the only order that keeps the specimen the subject. */
-  .library { padding: 76px 0 80px; }
-  .library-app { border-radius: var(--radius-md); }
-  .library-subjects { grid-template-columns: 1fr; gap: 10px; }
-  .library-search { width: 100%; }
-  .library-body { grid-template-columns: minmax(0, 1fr); height: auto; }
-  .library-viewer { order: 1; }
-  .library-rail { order: 2; border-right: 0; border-top: 1px solid var(--color-border); }
-  .library-rail-list {
-    display: flex;
-    max-height: none;
-    gap: 8px;
-    overflow-x: auto;
-    padding: 10px;
-    scrollbar-width: none;
-  }
-  .library-rail-list::-webkit-scrollbar { display: none; }
-  .library-rail-list > li { flex: none; width: 208px; }
-  .library-asset { height: 100%; border-color: var(--color-border); }
-  .library-rail-foot { display: none; }
-  .library-knowledge { order: 3; }
-  .library-sheet-toggle { order: 3; }
-  /* The specimen still has to be the largest thing on the screen. */
-  .library-viewer-stage { min-height: clamp(340px, 52vh, 520px); }
-  .library-viewer-bar { flex-wrap: wrap; gap: 10px; padding: 12px 16px; }
-  .library-viewer-title b { font-size: 21px; }
-  .library-foot { flex-direction: column; align-items: flex-start; gap: 12px; }
-  .periodic-grid { min-width: 620px; }
-  .periodic { overflow-x: auto; }
-  .sim-controls { grid-template-columns: 1fr 1fr; }
-  .practice-visual { min-height: 240px; }
-  .education-tabs { width: 100%; }
-  .education-tabs button { flex: 1; padding: 0 10px; font-size: 12.5px; }
-  .education-points li { grid-template-columns: 26px minmax(0, 1fr); }
-  .education-points small { grid-column: 2; }
+@media (max-width: 860px) {
+  .header-cta { display: none; }
+  .site-header-inner { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .studio-body { grid-template-columns: 76px minmax(0, 1fr); }
+  .studio-properties { display: none; }
+  .studio-track { grid-template-columns: 104px minmax(0, 1fr); }
+  .site-footer { grid-template-columns: 1fr; }
+  .footer-links { margin-top: 20px; }
+  .bridge-flow { grid-template-columns: minmax(0, 1fr) 72px minmax(0, 1fr); }
 }
 
 @media (max-width: 700px) {
   .story-panel { min-height: 820px; }
+  .story-grid { min-height: 820px; padding-bottom: 66px; }
   .explore-stage { height: 820px; }
   .explore-story { padding-bottom: 820px; }
   .explore-story > .story-panel:first-of-type { margin-top: -820px; }
+  .bridge { margin-top: -820px; }
   .tool-section { margin-top: 0; }
-  .hero { align-items: flex-end; min-height: 820px; padding: 110px 22px 88px; }
-  .hero::after {
-    content: '';
-    position: absolute;
-    z-index: -1;
-    inset: 38% 0 0;
-    pointer-events: none;
-    background: linear-gradient(rgba(251, 248, 244, 0) 0%, rgba(251, 248, 244, 0.58) 42%, rgba(251, 248, 244, 0.88) 100%);
-  }
-  .hero-copy { position: relative; width: 100%; margin: 0; }
-  .hero h1 { font-size: clamp(32px, 9vw, 44px); }
+  .hero { min-height: 820px; }
+  .hero-copy { max-width: none; }
+  .hero h1 { font-size: clamp(31px, 8.6vw, 42px); }
   .hero-lede { font-size: 15px; }
   .hero-spec { display: none; }
   .scroll-cue { display: none; }
-  .story-copy {
-    position: relative;
-    top: auto;
-    left: auto;
-    right: auto;
-    width: 100%;
-    padding: 0 22px;
-    transform: none;
-  }
-  .story-panel { display: flex; align-items: flex-end; padding-bottom: 74px; }
-  .story-copy h2, .section-heading h2, .final-cta h2 { font-size: clamp(30px, 8.4vw, 42px); }
+  .story-copy h2, .section-heading h2, .final-cta h2 { font-size: clamp(27px, 7.2vw, 36px); }
   .bee-modes { flex-wrap: wrap; }
-  .proof-grid { grid-template-columns: 1fr; }
-  .cell-controls { flex-direction: column; align-items: flex-start; }
-  .sim-controls { grid-template-columns: 1fr; }
-  .sim-readout { grid-template-columns: repeat(2, 1fr); }
-  .atom-facts { grid-template-columns: 1fr; }
-  .practice, .education, .proof, .library { padding: 72px 0; }
-  .edu-compose, .edu-explore, .edu-deploy { min-height: 380px; }
-  .edu-deploy { grid-template-columns: 1fr; }
-  .edu-deploy .model-thumbnail { min-height: 160px; }
+  .tool-features { grid-template-columns: minmax(0, 1fr); }
+  .tool-features article { border-right: 0; padding-inline: 0; }
+  .tool-features article:nth-child(n+2) { border-top: 1px solid var(--line); }
 }
 
 @media (max-width: 560px) {
   .ribbon > li { flex: 1 1 100%; }
-  .library-viewer-tags span:nth-child(2) { display: none; }
-  .periodic-legend { max-height: 60px; overflow-y: auto; }
 }
 
 /* ------------------------------------------------------- narrow overrides --- */
@@ -3023,22 +2323,131 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
  * Two things genuinely did not fit below ~700 px and were being clipped by an
  * `overflow: hidden` rather than reflowing:
  *
- *   - the bridge's editor mock, whose right-hand layer list ran past the frame.
+ *   - the bridge editor mock, whose right-hand layer list ran past the frame.
  *     It drops to the rail + stage and keeps the timeline, which is the part
  *     that carries the claim.
  *   - the YooStudio tool row, five labelled buttons on one line. It becomes a
  *     horizontal scroller rather than being cut in half.
  */
 @media (max-width: 720px) {
-  .bridge-flow { grid-template-columns: 1fr; gap: 26px; margin-top: 40px; }
-  .bridge-arrow { justify-self: center; padding: 0; }
-  .bridge-arrow i { transform: rotate(90deg); }
-  .bridge-editor { grid-template-columns: 30px minmax(0, 1fr); height: 240px; }
+  .bridge-flow { grid-template-columns: minmax(0, 1fr); gap: 22px; }
+  /*
+   * A real vertical line, not a rotated horizontal one.
+   *
+   * `transform: rotate(90deg)` kept the element's 1 px-tall layout box, so the
+   * 200 px line it drew reached 100 px above and below that box and printed
+   * straight through the "MỞ TRONG YOOSTUDIO" label underneath it. Rebuilding it
+   * as a 44 px column with the chevron on its bottom edge means the label sits
+   * below the arrow instead of inside it.
+   */
+  .bridge-arrow {
+    justify-self: center;
+    grid-template-rows: 44px auto;
+    gap: 10px;
+    width: auto;
+    padding: 4px 0;
+  }
+  .bridge-arrow i {
+    width: 1px;
+    height: 100%;
+    transform: none;
+    background: linear-gradient(180deg, transparent, var(--line-strong) 40%, var(--brand-accent));
+  }
+  .bridge-arrow i::after {
+    top: auto;
+    right: auto;
+    bottom: 0;
+    left: -3px;
+    border-top: 7px solid var(--brand-accent);
+    border-right: 3.5px solid transparent;
+    border-bottom: 0;
+    border-left: 3.5px solid transparent;
+  }
+  .bridge-editor { grid-template-columns: 30px minmax(0, 1fr); }
+  .bridge-stage, .bridge-editor { height: clamp(200px, 34svh, 300px); }
   .bridge-editor-side { display: none; }
   .studio-viewport-bar { gap: 8px; padding: 8px; }
   .studio-tools { overflow-x: auto; scrollbar-width: none; }
   .studio-tools::-webkit-scrollbar { display: none; }
   .studio-tools button { flex: none; }
   .studio-viewport-meta { display: none; }
-  .studio-topbar { flex-wrap: wrap; }
+  /*
+   * Document name and actions only.
+   *
+   * Three groups in a 52 px bar at 390 px wide overflowed into each other: the
+   * "Đã lưu" badge printed straight through "Space 1: Sứa", and the two action
+   * buttons wrapped to two lines each and pushed past the bar's own height. The
+   * space switcher is the one secondary control of the three — the editor still
+   * shows which space is open in its object tree — so it is what leaves, and the
+   * buttons are told not to wrap.
+   */
+  .studio-topbar { grid-template-columns: minmax(0, 1fr) auto; padding: 0 10px; }
+  .studio-steps { display: none; }
+  .studio-actions button { padding: 0 10px; white-space: nowrap; }
+  .studio-doc small { display: none; }
+}
+
+/* ============================================================ safe area === */
+/*
+ * The default anchor margin, for everything that is not a major section.
+ *
+ * Story panels, the workflow ribbon and any future anchor land with their own top
+ * edge at `--header-h`, so nothing ever begins behind the bar. The seven major
+ * sections do not use this: each reserves the band inside its own `padding-top`
+ * because each subtracts it from a viewport height budget, and each declares
+ * `scroll-margin-top: 0` to say so.
+ *
+ * `:where()` is what makes that override possible and is the whole reason this
+ * works. A bare `[id]` has the same specificity as a class and this rule is at
+ * the end of the file, so on the previous build it won the tie on source order
+ * and reserved the band a *second* time — on a 1512×982 screen the Library
+ * workspace was pushed 48 px past the bottom of the viewport and its knowledge
+ * panel was cut off. `:where()` has zero specificity, so a site-wide default
+ * behaves like a default.
+ */
+:where([id]) { scroll-margin-top: calc(var(--header-h) + var(--section-gap)); }
+
+/*
+ * …except the two that reserve the band themselves.
+ *
+ * `.story-grid` carries `padding-top: header + gap` so an Explore chapter can
+ * centre its composition in the usable area, and `.explore-story` is only a
+ * wrapper around four of those. Both would otherwise reserve the band twice and
+ * land a chapter a full header lower than it composes for.
+ */
+.explore-story,
+.story-panel { scroll-margin-top: 0; }
+
+/*
+ * A section that must be understood without scrolling.
+ *
+ * `min-height` rather than `height`: if the content genuinely needs more room
+ * (a long knowledge panel on a 1366×768 laptop) it takes it instead of being
+ * clipped. The padding reserves the header band on the first screen of the
+ * section, and the content is centred in what is left, so the composition sits
+ * in the middle of the visible area rather than at the top of a taller box.
+ */
+.section-fit {
+  display: flex;
+  min-height: 100svh;
+  flex-direction: column;
+  justify-content: center;
+  padding-top: calc(var(--header-h) + var(--section-gap));
+  padding-bottom: var(--section-gap);
+  scroll-margin-top: 0;
+}
+
+/*
+ * The header is a shade shorter on a phone, where 64 px of chrome over an 844 px
+ * screen is a larger share of the page than it is over a laptop.
+ */
+@media (max-width: 700px) {
+  :root {
+    --header-h: 58px;
+    --stage-h: clamp(400px, calc(100svh - var(--header-h) - 150px), 700px);
+  }
+  /* Below the laptop regime a fitted section stops being fitted: a phone screen
+     cannot hold a heading, a workspace and a readout at once, and squeezing
+     them in produces 9 px type. It scrolls instead. */
+  .section-fit { min-height: 0; }
 }

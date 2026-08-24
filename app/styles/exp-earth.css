@@ -1,0 +1,243 @@
+/* ================================================================= globe === */
+.globe { display: grid; height: 100%; grid-template-columns: minmax(0, 1fr) 246px; }
+.globe-stage { min-width: 0; cursor: grab; }
+
+.globe-side {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border-left: 1px solid var(--color-border-hair);
+  overflow-y: auto;
+}
+
+.globe-layers { display: flex; gap: 4px; padding: 3px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); }
+.globe-layers button {
+  flex: 1;
+  padding: 7px 4px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--color-muted);
+  background: transparent;
+  font-size: 11px;
+  font-weight: 580;
+}
+.globe-layers button.is-active { color: #fff; background: var(--color-accent-strong); }
+
+.globe-search input {
+  width: 100%;
+  min-height: 36px;
+  padding: 0 11px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-ink);
+  background: var(--color-surface-raised);
+  font: inherit;
+  font-size: 12px;
+}
+.globe-search input:focus-visible { border-color: var(--color-accent-line); outline: 0; }
+
+.globe-list { flex: 1; margin: 0; padding: 0; list-style: none; overflow-y: auto; min-height: 90px; }
+.globe-list button {
+  display: grid;
+  width: 100%;
+  gap: 1px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 6px;
+  text-align: left;
+  background: transparent;
+}
+.globe-list button b { color: var(--color-ink); font-size: 12px; font-weight: 580; }
+.globe-list button small { color: var(--color-muted-2); font-size: 10px; }
+.globe-list button:hover { background: var(--color-surface-2); }
+.globe-list button.is-active { background: var(--color-accent-wash); }
+.globe-list button.is-active b { color: var(--color-accent-deep); }
+.globe-list-empty { padding: 8px; color: var(--color-muted); font-size: 11px; }
+
+.globe-facts { margin: 0; padding-top: 10px; border-top: 1px solid var(--color-border-hair); }
+.globe-facts div { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; }
+.globe-facts dt { color: var(--color-muted); font-size: 10px; }
+.globe-facts dd { margin: 0; color: var(--color-ink); font-size: 11px; font-weight: 560; text-align: right; }
+.globe-empty { margin: 0; color: var(--color-muted); font-size: 11px; line-height: 1.6; }
+
+/* ======================================================= earth cross-section === */
+/*
+ * Same left-instrument / right-readout split as the globe, and the same 246 px
+ * panel. The two Earth experiences sit next to each other in one subject rail, so
+ * they have to feel like two views of one instrument rather than two pages.
+ */
+.earth { display: grid; height: 100%; grid-template-columns: minmax(0, 1fr) 246px; }
+.earth-stage { position: relative; min-width: 0; overflow: hidden; }
+.earth-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+/* The probe readout. Fixed at the top-left so the number does not follow the
+   pointer around — a value that moves is a value you cannot read. */
+.earth-probe {
+  position: absolute;
+  top: 14px;
+  left: 16px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-height: 26px;
+  padding: 4px 11px;
+  border: 1px solid var(--color-border-hair);
+  border-radius: 999px;
+  color: var(--color-muted);
+  background: rgba(255, 253, 249, 0.84);
+  font-size: 10px;
+  font-weight: 560;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  pointer-events: none;
+}
+.earth-probe b {
+  color: var(--color-ink);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+.earth-probe span { color: var(--color-muted); font-size: 10px; }
+
+.earth-scale {
+  position: absolute;
+  right: 16px;
+  bottom: 14px;
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: rgba(255, 253, 249, 0.84);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.earth-scale button {
+  padding: 5px 12px;
+  border: 0;
+  border-radius: 999px;
+  color: var(--color-muted);
+  background: transparent;
+  font-size: 10.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.earth-scale button:hover { color: var(--color-ink-2); }
+.earth-scale button.is-active { color: #fff; background: var(--color-accent-strong); }
+
+.earth-side {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-height: 0;
+  border-left: 1px solid var(--color-border-hair);
+}
+
+.earth-list { margin: 0; padding: 12px 12px 10px; border-bottom: 1px solid var(--color-border-hair); list-style: none; }
+.earth-row {
+  display: grid;
+  width: 100%;
+  grid-template-columns: 12px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--radius-xs);
+  text-align: left;
+  background: transparent;
+  transition: background 150ms ease;
+}
+.earth-row i { width: 12px; height: 12px; border-radius: 3px; }
+.earth-row b {
+  color: var(--color-ink);
+  font-size: 11.5px;
+  font-weight: 580;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.earth-row small { color: var(--color-muted-2); font-family: var(--font-mono); font-size: 9.5px; }
+.earth-row:hover { background: var(--color-surface-2); }
+.earth-row.is-active { background: var(--color-accent-wash); }
+.earth-row.is-active b { color: var(--color-accent-deep); }
+
+.earth-detail { min-height: 0; padding: 13px 14px; overflow-y: auto; }
+.earth-detail-kind {
+  margin: 0;
+  color: var(--color-muted-2);
+  font-size: 8.5px;
+  font-weight: 650;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+.earth-detail h4 {
+  margin: 4px 0 10px;
+  color: var(--color-ink);
+  font-size: 16px;
+  font-weight: 660;
+  letter-spacing: -0.02em;
+}
+.earth-facts { margin: 0 0 11px; }
+.earth-facts div { display: grid; gap: 1px; padding: 5px 0; border-bottom: 1px solid var(--color-border-hair); }
+.earth-facts div:last-child { border-bottom: 0; }
+.earth-facts dt {
+  color: var(--color-muted);
+  font-size: 8.5px;
+  font-weight: 650;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.earth-facts dd { margin: 0; color: var(--color-ink-2); font-size: 11px; line-height: 1.5; }
+.earth-note { margin: 0; color: var(--color-muted); font-size: 11px; line-height: 1.68; }
+
+.earth-foot {
+  margin: 0;
+  padding: 10px 14px 13px;
+  border-top: 1px solid var(--color-border-hair);
+  color: var(--color-muted-2);
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+/* ------------------------------------------------------------ responsive --- */
+@media (max-width: 1240px) {
+  .globe { grid-template-columns: minmax(0, 1fr) 220px; }
+  .earth { grid-template-columns: minmax(0, 1fr) 218px; }
+}
+@media (max-width: 900px) {
+  .globe { grid-template-columns: 1fr; grid-template-rows: minmax(280px, 1fr) auto; }
+  .globe-side { border-left: 0; border-top: 1px solid var(--color-border-hair); }
+  .globe-list { max-height: 160px; }
+  .earth { grid-template-columns: 1fr; grid-template-rows: minmax(260px, 1fr) auto; }
+  .earth-side {
+    grid-template-rows: auto auto auto;
+    border-left: 0;
+    border-top: 1px solid var(--color-border-hair);
+  }
+  .earth-list { display: flex; flex-wrap: wrap; gap: 3px; padding: 10px; }
+  .earth-list li { flex: 1 1 auto; }
+  .earth-row { grid-template-columns: 10px auto; padding: 5px 9px; border: 1px solid var(--color-border-hair); }
+  .earth-row small { display: none; }
+  .earth-detail { max-height: 168px; }
+}
+
+/*
+ * Phone: the globe gives up height so its country list survives.
+ *
+ * At 390 px the viewer box is about 310 px tall and the stage's 280 px minimum
+ * ate all of it, squeezing the list — the half of this experience that carries
+ * the data — down to a sliver. A 190 px globe is still a globe; a list with no
+ * rows in it is not a list.
+ */
+@media (max-width: 620px) {
+  .globe { grid-template-rows: minmax(190px, 1fr) auto; }
+  .globe-list { max-height: 132px; }
+  .earth { grid-template-rows: minmax(180px, 1fr) auto; }
+}

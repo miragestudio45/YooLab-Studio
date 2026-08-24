@@ -1,0 +1,1372 @@
+/* =============================================================== library === */
+/*
+ * The Library is an application, not a section.
+ *
+ * Two structural decisions carry most of the look:
+ *
+ *   1. Three separate cards, not one bordered box with internal dividers. A
+ *      divider says "these are paragraphs of one document"; a 14 px gutter
+ *      between three bordered, shadowed cards says "these are instruments". The
+ *      gap is doing more work here than any amount of styling inside the panels.
+ *
+ *   2. The whole workspace fits the first screen. The head band is one row and
+ *      the app height is derived from it, so landing on `#thu-vien` on a
+ *      1366×768 laptop shows the entire application instead of a large headline
+ *      and the top edge of one. The related strip is deliberately below that
+ *      fold, which is what still invites the scroll.
+ */
+
+.library {
+  /*
+   * The height budget, in one place.
+   *
+   * `--library-head` is the measured height of the head band (its own padding
+   * included), so the app can subtract it without measuring anything at
+   * runtime. The trailing 14 px leaves a sliver of the strip below the fold: at
+   * exactly 100svh the section looks like it ends there, and nobody scrolls.
+   *
+   * `scroll-margin-top: 0` overrides the site-wide `[id]` rule on purpose. This
+   * section already reserves the header band in its own `padding-top`, so the
+   * global scroll margin would reserve it twice — a whole header band of the
+   * budget spent pushing the workspace off the bottom of the screen.
+   */
+  /* The measured content, not a round number: kicker, one line of heading, and
+     the band's own padding. At 96 px the band was 30 px taller than what it
+     holds, and because it is bottom-aligned that slack appeared as dead air
+     between the section's top edge and its own kicker. */
+  --library-head: clamp(72px, 9.5vh, 104px);
+  --library-chrome: calc(var(--header-h) + var(--section-gap) * 2 + var(--library-head) + 14px);
+  position: relative;
+  padding: calc(var(--header-h) + var(--section-gap)) 0 clamp(48px, 7vh, 88px);
+  scroll-margin-top: 0;
+  background:
+    linear-gradient(180deg, var(--color-bg) 0%, var(--color-bg-deep) 46%, var(--color-bg) 100%);
+}
+
+/* ---------------------------------------------------------------- head band --- */
+/*
+ * One row: identity, one clause, the count. The heading was two lines of 80 px
+ * with a paragraph beside it, which together were taller than the workspace —
+ * a section whose job is to *show* was spending its first screen telling.
+ */
+.library-head {
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 10px clamp(24px, 3vw, 56px);
+  min-height: var(--library-head);
+  padding-bottom: clamp(14px, 2vh, 22px);
+}
+
+.library-head-copy .section-kicker { margin: 0 0 9px; }
+
+.library-head h2 {
+  margin: 0;
+  color: var(--color-ink);
+  font-family: var(--font-display);
+  font-size: clamp(25px, min(2.4vw, 3.5vh), 38px);
+  font-weight: 700;
+  letter-spacing: -0.038em;
+  line-height: 1.04;
+}
+.library-head h2 em {
+  color: transparent;
+  background: linear-gradient(100deg, var(--color-accent-deep) 4%, var(--color-accent-strong) 46%, var(--color-lavender) 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 500;
+  letter-spacing: -0.05em;
+}
+
+.library-head-lede {
+  max-width: 38ch;
+  margin: 0 0 3px;
+  color: var(--color-ink-2);
+  font-size: 13px;
+  line-height: 1.62;
+}
+
+.library-head-count {
+  display: flex;
+  flex: none;
+  align-items: baseline;
+  gap: 18px;
+  margin: 0 0 3px;
+  color: var(--color-muted);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.library-head-count span + span { border-left: 1px solid var(--color-border); padding-left: 18px; }
+.library-head-count b {
+  margin-right: 5px;
+  color: var(--color-ink);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+/* --------------------------------------------------------------- app shell --- */
+/*
+ * A definite height, not a min-height.
+ *
+ * This matters for more than proportion. The viewer canvas is sized in CSS with
+ * `height: 100%`, and a percentage height against an `auto`-height ancestor
+ * resolves to `auto` — at which point the canvas falls back to its own intrinsic
+ * aspect ratio, the row grows to fit it, the ResizeObserver resizes the drawing
+ * buffer to the new box, and the two chase each other until they converge
+ * somewhere arbitrary. Pinning the height ends that loop and gives the workspace
+ * the proportions of an application rather than of a document.
+ */
+.library-app {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 14px;
+  /*
+   * A real application height. The floor is where the three panels stop being
+   * usable side by side; the ceiling stops a 1440-tall display from turning a
+   * workspace into a wall. Between them the height is the screen less what the
+   * section reserves above it, so no external page scrolling is ever needed to
+   * see the bottom of the workspace.
+   */
+  height: clamp(468px, calc(100svh - var(--library-chrome)), 940px);
+}
+
+/* ---------------------------------------------------------------- chrome --- */
+/* Borderless band, not a fourth card: the subject switcher is how you drive the
+   three cards, so it must not read as a peer of them. */
+.library-chrome {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 0 2px;
+}
+
+.library-subjects {
+  display: flex;
+  min-width: 0;
+  gap: 5px;
+  overflow-x: auto;
+  padding: 2px;
+  scrollbar-width: none;
+}
+.library-subjects::-webkit-scrollbar { display: none; }
+
+.library-subject {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 9px;
+  min-height: 38px;
+  padding: 0 13px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  transition: background 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+.library-subject b {
+  color: var(--color-ink-2);
+  font-family: var(--font-display);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  white-space: nowrap;
+}
+.library-subject i {
+  color: var(--color-muted-2);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 500;
+}
+.library-subject:hover { border-color: var(--color-border-hair); background: var(--color-surface); }
+.library-subject.is-active {
+  border-color: var(--color-border);
+  background: var(--color-surface-raised);
+  box-shadow: 0 5px 14px rgba(87, 62, 43, 0.07);
+}
+/* The subject's own accent as a 2 px underline rather than a fill: seven filled
+   chips in seven colours would be the loudest thing on the page. */
+.library-subject.is-active b {
+  color: var(--color-ink);
+  box-shadow: 0 11px 0 -10px var(--subject-tint, var(--color-accent-strong));
+}
+.library-subject.is-active i { color: var(--color-accent-deep); }
+.library-subject.is-empty b { color: var(--color-muted); }
+.library-subject.is-empty i { color: var(--color-pending); }
+
+.library-search {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 9px;
+  width: clamp(180px, 19vw, 268px);
+  min-height: 38px;
+  padding: 0 11px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-muted);
+  background: var(--color-surface-raised);
+  font-size: 12.5px;
+}
+.library-search svg { flex: none; width: 14px; height: 14px; }
+.library-search input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  color: var(--color-ink);
+  background: transparent;
+  font: inherit;
+}
+.library-search input::placeholder { color: var(--color-muted-2); }
+.library-search:focus-within { border-color: var(--color-accent-line); }
+.library-search kbd {
+  flex: none;
+  padding: 2px 5px;
+  border: 1px solid var(--color-border);
+  border-radius: 5px;
+  color: var(--color-muted-2);
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+
+/* ------------------------------------------------------------ three cards --- */
+/*
+ * `grid-template-rows: minmax(0, 1fr)` is load-bearing, not tidiness. The row is
+ * implicit otherwise, an implicit row is `auto`, and `auto` sizes to the tallest
+ * card's content — so a subject with twelve entries made the rail taller than
+ * the workspace, the card clipped it, and the internal scrollers never engaged
+ * because their own height had already grown past the box.
+ */
+/*
+ * The centre gets the space, at every width.
+ *
+ * Fixed 300 / 340 side panels meant every extra pixel of a wide display went to
+ * the viewer — right, in principle — but also that on a 1760 px shell the asset
+ * rail was still the width it needed on a laptop while the specimen had 1100 px.
+ * Proportional tracks with real floors and ceilings give each panel its readable
+ * minimum on a 1366 and let both breathe on a 1920, and the middle track is
+ * always the largest region on the row.
+ */
+.library-body {
+  display: grid;
+  grid-template-columns:
+    clamp(268px, 17.5%, 336px)
+    minmax(0, 1fr)
+    clamp(310px, 20.5%, 396px);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 14px;
+  min-height: 0;
+}
+
+.library-rail,
+.library-viewer,
+.library-knowledge {
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+/* ------------------------------------------------------------- asset rail --- */
+.library-rail {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.library-rail-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--color-border-hair);
+  color: var(--color-muted);
+  font-size: 9.5px;
+  font-weight: 650;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+.library-rail-head svg { width: 15px; height: 15px; color: var(--color-muted-2); }
+.library-rail-head b {
+  color: var(--color-ink);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.library-rail-list {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  min-height: 0;
+  margin: 0;
+  padding: 7px;
+  list-style: none;
+  overflow-y: auto;
+  /* A cut-off row at either edge should read as "more below", not as a bug. */
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 12px, #000 calc(100% - 16px), transparent 100%);
+  mask-image: linear-gradient(180deg, transparent 0, #000 12px, #000 calc(100% - 16px), transparent 100%);
+}
+
+/* ---- the row, and the reason the rail stopped looking like a menu ---- */
+.library-asset {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 9px 11px 9px 9px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  text-align: left;
+  background: transparent;
+  transition: background 170ms ease, border-color 170ms ease, box-shadow 170ms ease;
+}
+.library-asset-copy { display: grid; gap: 2px; min-width: 0; }
+.library-asset-kind {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-muted-2);
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.library-asset-kind em {
+  color: var(--rail-tint, var(--color-accent-strong));
+  font-style: normal;
+  font-weight: 620;
+}
+.library-asset-kind em::before { content: '· '; color: var(--color-muted-2); }
+/*
+ * The specimen name, in the one family.
+ *
+ * This was Instrument Serif at 17.5 px / 400 — a scientific-catalogue accent that
+ * in practice read as a different website from the application around it. The
+ * catalogued feeling was never the serif: it was the tight tracking and the size
+ * step over the label above. Both survive at 650 in Plus Jakarta Sans, one step
+ * smaller because a sans at the same size is optically larger than a serif.
+ */
+.library-asset b {
+  color: var(--color-ink);
+  font-size: 15.5px;
+  font-weight: 650;
+  letter-spacing: -0.028em;
+  line-height: 1.18;
+}
+.library-asset small {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: var(--color-muted);
+  font-size: 10.5px;
+  line-height: 1.48;
+}
+.library-asset-flag {
+  justify-self: start;
+  margin-top: 3px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  color: var(--color-pending);
+  background: rgba(176, 138, 74, 0.12);
+  font-size: 9px;
+  font-weight: 620;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.library-asset:hover { background: var(--color-surface-2); }
+/* Inset shadow rather than `border-left`, so selecting a row cannot shift its
+   text by two pixels. */
+.library-asset.is-active {
+  border-color: var(--color-accent-line);
+  background: var(--color-accent-wash);
+  box-shadow: inset 2px 0 0 var(--color-accent-strong);
+}
+.library-asset.is-active b { color: var(--color-accent-deep); }
+.library-asset.is-planned b { color: var(--color-ink-2); }
+.library-asset.is-planned .rail-visual { opacity: 0.62; }
+
+.library-rail-empty {
+  margin: 0;
+  padding: 14px 12px;
+  color: var(--color-muted);
+  font-size: 11.5px;
+  line-height: 1.6;
+}
+
+.library-rail-foot {
+  display: grid;
+  gap: 3px;
+  padding: 13px 16px 15px;
+  border-top: 1px solid var(--color-border-hair);
+  background: var(--color-surface-2);
+}
+.library-rail-foot b {
+  color: var(--color-muted);
+  font-size: 9.5px;
+  font-weight: 660;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.library-rail-foot span { color: var(--color-muted); font-size: 11px; line-height: 1.55; }
+
+/* ---------------------------------------------------------- rail visuals --- */
+/*
+ * One slot, three contents: a baked render of a mesh, a static photograph, or a
+ * drawn mark. The tint arrives as `--rail-tint` from the row and becomes both
+ * the wash and `currentColor`, which is what lets nineteen hand-drawn marks read
+ * as one set that happens to be colour-coded by subject.
+ */
+.rail-visual {
+  position: relative;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  color: var(--rail-tint, var(--color-accent-strong));
+  background: radial-gradient(120% 120% at 30% 22%, var(--color-surface-raised) 0%, var(--color-surface-2) 100%);
+  box-shadow: inset 0 0 0 1px var(--color-border-hair);
+}
+.rail-visual::before {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  background: currentColor;
+  opacity: 0.07;
+}
+.rail-visual > * { position: relative; z-index: 1; }
+.rail-visual .library-mark { width: 78%; height: 78%; }
+.rail-visual .model-thumbnail { width: 100%; height: 100%; }
+/* The baker's status line is written for a card. In a 56 px slot the tinted
+   ground is the placeholder. */
+.rail-visual .model-thumbnail-status { display: none; }
+/*
+ * …and while the bake is in flight, that ground breathes.
+ *
+ * The baker serialises its queue so a grid of rows never competes for the GPU,
+ * which means the fourth mesh in a rail of ten arrives a second or two after the
+ * first. At 0.07 opacity the waiting slot read as an empty white hole — three
+ * blank circles next to seven drawn ones look like three broken rows rather than
+ * three rows still loading.
+ */
+.rail-visual .model-thumbnail:not(:has(img)) {
+  width: 100%;
+  height: 100%;
+  background: currentColor;
+  opacity: 0.16;
+  animation: rail-pending 1500ms ease-in-out infinite;
+}
+@keyframes rail-pending { 50% { opacity: 0.3; } }
+.rail-visual-photo { width: 100%; height: 100%; object-fit: cover; }
+
+.library-asset .rail-visual { width: 56px; height: 56px; border-radius: 16px; }
+
+/* ------------------------------------------------------------ viewer card --- */
+/*
+ * `grid-template-columns: minmax(0, 1fr)` is load-bearing, and its absence was a
+ * real defect rather than untidiness.
+ *
+ * Without it the single column is implicit, an implicit column is `auto`, and
+ * `auto` takes the max-content width of the widest thing in it. The circuit
+ * simulation's control grid is `repeat(auto-fit, minmax(180px, 1fr))` over four
+ * controls, so its max-content is about 720 px — which made the whole column
+ * 720 px inside a 678 px panel. The *stage* clipped harmlessly, but the title bar
+ * shares that column, so it became 720 px too and the card's `overflow: hidden`
+ * cut "Mở được ngay" in half. A panel 40 px narrower than its own bar, caused by
+ * a simulation two rows below it.
+ *
+ * `minmax(0, 1fr)` makes the column exactly the panel's width, which is what lets
+ * the simulations inside reflow rather than push.
+ */
+.library-viewer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  background: var(--color-surface-raised);
+}
+
+.library-viewer-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--color-border-hair);
+}
+.library-viewer-title { display: flex; align-items: baseline; gap: 11px; min-width: 0; }
+.library-viewer-title b {
+  color: var(--color-ink);
+  font-size: 20px;
+  font-weight: 680;
+  letter-spacing: -0.032em;
+  white-space: nowrap;
+}
+/*
+ * `min-width: 0` is what makes the ellipsis work, and its absence is why
+ * "Mở được ngay" was being clipped off the right edge of this bar.
+ *
+ * A flex item's default `min-width: auto` is its min-content width, and for
+ * `white-space: nowrap` text that is the *entire string* — so this subtitle
+ * refused to shrink, the bar overflowed its panel, and the card's own
+ * `overflow: hidden` cut the last status tag in half. The three declarations
+ * below only *look* like they truncate; without this one they never engage.
+ * Visible at 1366, where the viewer panel is 678 px wide.
+ */
+.library-viewer-title span {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-muted);
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.library-viewer-tags { display: flex; flex: none; gap: 6px; }
+.library-viewer-tags span {
+  padding: 4px 9px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  color: var(--color-muted);
+  font-size: 9.5px;
+  font-weight: 620;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.library-viewer-tags .is-ready { border-color: transparent; color: #2f5f33; background: rgba(118, 157, 116, 0.17); }
+.library-viewer-tags .is-planned { border-color: transparent; color: var(--color-pending); background: rgba(176, 138, 74, 0.13); }
+
+/* The specimen sits in a room, not on a card: a very soft dome so the object has
+   somewhere to sit into, and nothing else. */
+.library-viewer-stage {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(112% 82% at 50% 40%, #ffffff 0%, var(--color-surface) 54%, var(--color-surface-2) 100%);
+}
+
+.library-sheet-toggle { display: none; }
+
+/* ========================================================== stage chrome === */
+/*
+ * The shared contract between this file and every 3D stage in the Library. A
+ * stage emits the markup; the styling lives here once, so a new experience gets
+ * the same floating rail, the same caption and the same switch for free.
+ */
+.stage,
+.model-stage,
+.cell-stage,
+.globe-stage,
+.atom-stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  touch-action: none;
+  /* A query container, because the three things pinned along the bottom of a
+     stage — caption, hint, spin switch — fit side by side in an 840 px panel
+     and do not fit in a 595 px one. The page's own breakpoints cannot see that:
+     the molecule viewer gives its stage two thirds of the width at every
+     viewport, so at 1512 px its caption was already running under its hint. */
+  container-type: inline-size;
+}
+.stage[data-grabbing],
+.model-stage[data-grabbing] { cursor: grabbing; }
+.stage { cursor: grab; }
+.model-stage { cursor: grab; }
+
+/*
+ * Absolutely positioned, always.
+ *
+ * A `<canvas>` has an intrinsic size from its width/height attributes, and the
+ * renderer sets those to box × devicePixelRatio. In flow that intrinsic size
+ * becomes the element's min-content contribution, so the canvas widens its own
+ * column, the ResizeObserver enlarges the drawing buffer to match, and the two
+ * grow together — at 768 px the viewer had inflated itself to 1092. Taking the
+ * canvas out of flow means it can only ever be the size of the box it is in.
+ */
+.stage-canvas,
+.model-stage-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ---- the floating tool rail, inside the stage ---- */
+/*
+ * 58 px, not 46.
+ *
+ * The bee carries seven controls — orbit, two zooms, reset and its three flight
+ * states — and at 46 px every Vietnamese label wrapped: "PHÓNG TO" over two
+ * lines, "BAY TẠI CHỖ" over three, which turned a control rail into a paragraph
+ * and made the whole column 300 px tall down the left of the specimen. The
+ * labels are single-line now and the cells are shorter, so seven of them are
+ * still less than half the panel height.
+ */
+.stage-tools {
+  position: absolute;
+  z-index: 3;
+  top: 14px;
+  left: 14px;
+  display: flex;
+  width: 58px;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: rgba(255, 253, 249, 0.82);
+  box-shadow: 0 10px 26px rgba(87, 62, 43, 0.1);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.stage-tool {
+  display: grid;
+  width: 50px;
+  height: 37px;
+  place-items: center;
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-xs);
+  color: var(--color-muted);
+  background: transparent;
+  transition: color 160ms ease, background 160ms ease;
+}
+.stage-tool svg { width: 15px; height: 15px; }
+.stage-tool span {
+  font-size: 7.5px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.stage-tool:hover { color: var(--color-ink-2); background: var(--color-surface-2); }
+.stage-tool.is-active { color: var(--color-accent-deep); background: var(--color-accent-wash); }
+
+/* ---- caption, bottom-left ---- */
+.stage-caption {
+  position: absolute;
+  z-index: 2;
+  bottom: 18px;
+  left: 18px;
+  display: grid;
+  gap: 3px;
+  max-width: 52%;
+  pointer-events: none;
+}
+.stage-caption b {
+  color: var(--color-muted-2);
+  font-size: 8.5px;
+  font-weight: 650;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+.stage-caption span {
+  color: var(--color-ink-2);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+}
+
+/* ---- auto-rotate switch, bottom-right ---- */
+.stage-spin {
+  position: absolute;
+  z-index: 3;
+  right: 18px;
+  bottom: 18px;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 30px;
+  padding: 0 9px 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  color: var(--color-muted);
+  background: rgba(255, 253, 249, 0.8);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: color 180ms ease, border-color 180ms ease;
+}
+/* The track and its knob are one background: a 26×15 pill plus a radial the
+   size of the knob, moved by `background-position` when the switch is on. */
+.stage-spin::after {
+  content: '';
+  width: 26px;
+  height: 15px;
+  border-radius: 999px;
+  background-color: var(--color-border-strong);
+  background-image: radial-gradient(circle 5.4px at 7.5px 7.5px, #fffdf9 0 99%, transparent 100%);
+  background-position: 0 0;
+  background-repeat: no-repeat;
+  transition: background-color 200ms ease, background-position 200ms var(--ease-reveal);
+}
+.stage-spin[aria-pressed='true'] { color: var(--color-accent-deep); border-color: var(--color-accent-line); }
+.stage-spin[aria-pressed='true']::after {
+  background-color: var(--color-accent-strong);
+  background-position: 11px 0;
+}
+
+/* ---- one line of interaction help, bottom-centre ---- */
+.stage-hint,
+.model-stage-hint {
+  position: absolute;
+  z-index: 2;
+  bottom: 16px;
+  left: 50%;
+  margin: 0;
+  color: var(--color-muted-2);
+  font-size: 10px;
+  font-weight: 560;
+  letter-spacing: 0.05em;
+  pointer-events: none;
+  transform: translateX(-50%);
+  transition: opacity 420ms ease;
+}
+/* The stage flags the hint as spent once the visitor has touched the model. */
+.stage-hint[data-dismissed='true'],
+.stage-hint.is-hidden { opacity: 0; }
+
+/* Narrow stage: the hint takes a line of its own above the caption and the
+   switch instead of printing through the caption's second line. */
+@container (max-width: 780px) {
+  .stage-hint,
+  .model-stage-hint { bottom: 58px; }
+  .stage-caption { max-width: 62%; }
+}
+
+/* ---- centred loading / error block ---- */
+.stage-status {
+  position: absolute;
+  z-index: 4;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 11px;
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 11.5px;
+  font-weight: 560;
+  letter-spacing: 0.03em;
+  pointer-events: none;
+}
+.stage-status i {
+  width: 15px;
+  height: 15px;
+  border: 1.6px solid var(--color-border-strong);
+  border-top-color: var(--color-accent-strong);
+  border-radius: 50%;
+  animation: stage-ring 760ms linear infinite;
+}
+.stage-status.is-error { color: #b4483c; }
+.stage-status.is-error i {
+  border-color: rgba(180, 72, 60, 0.28);
+  border-top-color: #b4483c;
+  animation: none;
+}
+@keyframes stage-ring { to { transform: rotate(360deg); } }
+
+.model-stage-status {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 560;
+  letter-spacing: 0.03em;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+.model-stage-status.is-error { color: #b4483c; }
+
+/* ------------------------------------------------------- poster / empty --- */
+.viewer-poster { position: relative; width: 100%; height: 100%; }
+.viewer-poster img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.viewer-poster-open {
+  position: absolute;
+  bottom: 22px;
+  left: 50%;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 22px;
+  border: 0;
+  border-radius: var(--radius-md);
+  color: #fff;
+  background: var(--color-accent-strong);
+  box-shadow: 0 14px 34px rgba(180, 88, 70, 0.3);
+  font-size: 13px;
+  font-weight: 620;
+  transform: translateX(-50%);
+  transition: transform 200ms ease;
+}
+.viewer-poster-open:hover { transform: translate(-50%, -2px); }
+
+/* ------------------------------------------------- live Formula preview --- */
+/*
+ * The poster underneath is not a fallback that got left in — it is the first
+ * frame. The card shows the pre-rendered photograph immediately, the WebGL canvas
+ * fades in over it once the car and its textures have arrived, and on reduced
+ * data or a narrow viewport the photograph is simply all there is. So the panel
+ * is never empty and never shows a spinner over nothing.
+ */
+.formula-preview { position: relative; width: 100%; height: 100%; overflow: hidden; }
+.formula-preview-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.formula-preview-poster {
+  position: absolute;
+  inset: 0;
+  transition: opacity 620ms var(--ease-reveal);
+}
+.formula-preview-poster img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.formula-preview-poster.is-hidden { opacity: 0; }
+
+.formula-preview-status {
+  position: absolute;
+  z-index: 2;
+  bottom: 74px;
+  left: 50%;
+  padding: 5px 13px;
+  border-radius: 999px;
+  color: var(--color-muted);
+  background: rgba(255, 253, 249, 0.86);
+  font-size: 10.5px;
+  font-weight: 580;
+  letter-spacing: 0.04em;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.formula-preview-open {
+  position: absolute;
+  z-index: 3;
+  bottom: 22px;
+  left: 50%;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 22px;
+  border: 0;
+  border-radius: var(--radius-md);
+  color: #fff;
+  background: var(--color-accent-strong);
+  box-shadow: 0 14px 34px rgba(180, 88, 70, 0.3);
+  font-size: 13px;
+  font-weight: 620;
+  transform: translateX(-50%);
+  transition: transform 200ms ease, background 200ms ease;
+}
+.formula-preview-open:hover {
+  background: var(--color-accent-deep);
+  transform: translate(-50%, -2px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .formula-preview-poster { transition: none; }
+  .formula-preview-open:hover { transform: translateX(-50%); }
+}
+
+.viewer-empty {
+  display: grid;
+  height: 100%;
+  place-content: center;
+  justify-items: center;
+  gap: 22px;
+  padding: 40px 32px;
+  text-align: center;
+}
+.viewer-empty-art { width: min(240px, 46%); color: var(--color-muted-2); }
+.viewer-empty h3 {
+  margin: 0;
+  font-size: 23px;
+  font-weight: 670;
+  letter-spacing: -0.034em;
+}
+.viewer-empty p { max-width: 52ch; margin: 0; color: var(--color-muted); font-size: 12.5px; line-height: 1.75; }
+.viewer-empty-jump {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  color: var(--color-accent-deep);
+  background: var(--color-surface);
+  font-size: 12px;
+  font-weight: 600;
+  transition: border-color 180ms ease, background 180ms ease;
+}
+.viewer-empty-jump:hover { border-color: var(--color-accent-line); background: var(--color-accent-wash); }
+
+/*
+ * A subject with no learning material collapses the workspace to one column.
+ * The rail would be an empty box and the knowledge panel would repeat the
+ * viewer's own sentence word for word.
+ */
+.library-body.is-empty { grid-template-columns: minmax(0, 1fr); }
+.library-body.is-empty .library-rail,
+.library-body.is-empty .library-knowledge,
+.library-body.is-empty .library-sheet-toggle { display: none; }
+.library-body.is-empty .viewer-empty { gap: 16px; }
+
+/* =========================================================== knowledge === */
+.library-knowledge { display: grid; grid-template-rows: minmax(0, 1fr); }
+
+.library-knowledge-scroll {
+  min-height: 0;
+  overflow-y: auto;
+  /* Masked at both edges so a half-cut line reads as "more below" rather than
+     as a rendering fault. The mask is on the scroller, not on the card, so the
+     card's border and radius stay crisp. */
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 14px, #000 calc(100% - 30px), transparent 100%);
+  mask-image: linear-gradient(180deg, transparent 0, #000 14px, #000 calc(100% - 30px), transparent 100%);
+}
+
+.knowledge-head { padding: 18px 20px 20px; border-bottom: 1px solid var(--color-border-hair); }
+.knowledge-head::after { content: ''; display: block; clear: both; }
+
+.knowledge-topic {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 10px;
+  color: var(--color-muted);
+  font-size: 9.5px;
+  font-weight: 660;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.knowledge-topic i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--rail-tint, var(--color-accent-strong));
+}
+
+/* Floated, not gridded: the title should wrap *under* the thumbnail on the
+   third line rather than being permanently narrowed by it. */
+.knowledge-thumb {
+  float: right;
+  width: 44px;
+  height: 44px;
+  margin: 1px 0 8px 13px;
+  border-radius: 50%;
+}
+.knowledge-thumb .library-mark { width: 74%; height: 74%; }
+
+.knowledge-head h3 {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.036em;
+  line-height: 1.1;
+}
+/* The Latin binomial keeps its italic — that is a scientific convention, not a
+   typographic flourish — in the same family at a lighter weight. */
+.knowledge-epithet {
+  margin: 5px 0 0;
+  color: var(--color-muted);
+  font-size: 12.5px;
+  font-style: italic;
+  font-weight: 450;
+  letter-spacing: -0.005em;
+}
+.knowledge-body { margin: 12px 0 0; color: var(--color-ink-2); font-size: 12.5px; line-height: 1.68; }
+
+.library-knowledge section { padding: 16px 20px; border-bottom: 1px solid var(--color-border-hair); }
+.library-knowledge h4 {
+  margin: 0 0 11px;
+  color: var(--color-muted);
+  font-size: 9.5px;
+  font-weight: 660;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.knowledge-parts { margin: 0; }
+.knowledge-parts div { padding: 7px 0; border-bottom: 1px solid var(--color-border-hair); }
+.knowledge-parts div:last-child { border-bottom: 0; padding-bottom: 0; }
+.knowledge-parts dt { color: var(--color-ink); font-size: 12px; font-weight: 620; }
+.knowledge-parts dd { margin: 2px 0 0; color: var(--color-muted); font-size: 11.5px; line-height: 1.55; }
+
+.knowledge-goals { margin: 0; padding: 0; list-style: none; }
+.knowledge-goals li {
+  position: relative;
+  padding: 5px 0 5px 18px;
+  color: var(--color-ink-2);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.knowledge-goals li::before {
+  content: '';
+  position: absolute;
+  top: 12px;
+  left: 2px;
+  width: 6px;
+  height: 6px;
+  border: 1px solid var(--color-accent-strong);
+  border-radius: 50%;
+}
+
+/* Numbers in mono, right-aligned, each row led by a small accent tick: a
+   readout, not a paragraph of statistics. */
+.knowledge-facts { margin: 0; }
+.knowledge-facts div {
+  display: grid;
+  /* The label keeps its line, the value takes the rest and wraps into it. An
+     `auto` value track had no upper bound, so a long one — "Natural Earth
+     1:110m · Public Domain" on the globe — overran the label instead of
+     wrapping, and the two texts printed on top of each other. */
+  grid-template-columns: 9px auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: 9px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--color-border-hair);
+}
+.knowledge-facts div:last-child { border-bottom: 0; }
+.knowledge-facts div::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 1px;
+  background: var(--color-accent-soft);
+  transform: translateY(-1px) rotate(45deg);
+}
+.knowledge-facts dt { color: var(--color-muted); font-size: 11px; }
+.knowledge-facts dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--color-ink);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1.5;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.knowledge-notes {
+  display: grid;
+  gap: 8px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--color-border-hair);
+}
+.knowledge-note {
+  padding: 11px 13px;
+  border-radius: var(--radius-sm);
+  background: var(--color-accent-wash);
+}
+.knowledge-note h4 {
+  margin: 0 0 5px;
+  color: var(--color-accent-deep);
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+}
+.knowledge-note p { margin: 0; color: var(--color-ink-2); font-size: 11.5px; line-height: 1.6; }
+
+/* -------------------------------------------------------------- actions --- */
+.knowledge-actions { display: grid; gap: 8px; padding: 16px 20px; }
+.knowledge-actions-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 8px; }
+.knowledge-actions a,
+.knowledge-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-ink-2);
+  background: var(--color-surface-raised);
+  font-size: 11.5px;
+  font-weight: 580;
+  text-align: center;
+  transition: border-color 180ms ease, color 180ms ease, background 180ms ease;
+}
+.knowledge-actions a:hover,
+.knowledge-actions button:hover { border-color: var(--color-accent-line); color: var(--color-accent-deep); }
+.knowledge-actions .knowledge-primary {
+  min-height: 42px;
+  border-color: transparent;
+  color: #fff;
+  background: var(--color-accent-strong);
+  font-size: 12.5px;
+  font-weight: 620;
+}
+.knowledge-actions .knowledge-primary:hover { color: #fff; background: var(--color-accent-deep); }
+
+.knowledge-credits { padding: 0 20px 22px; }
+.knowledge-credits summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-top: 1px solid var(--color-border-hair);
+  color: var(--color-muted);
+  cursor: pointer;
+  font-size: 9.5px;
+  font-weight: 660;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  list-style: none;
+}
+.knowledge-credits summary::-webkit-details-marker { display: none; }
+.knowledge-credits summary::after {
+  content: '+';
+  color: var(--color-muted-2);
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+.knowledge-credits[open] summary { color: var(--color-accent-deep); }
+.knowledge-credits[open] summary::after { content: '–'; }
+.knowledge-credit { display: grid; gap: 2px; padding: 0 0 12px; }
+.knowledge-credit:last-child { padding-bottom: 0; }
+.knowledge-credit b { color: var(--color-ink-2); font-size: 11px; font-weight: 620; }
+.knowledge-credit em {
+  color: var(--color-accent-deep);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 600;
+}
+.knowledge-credit a,
+.knowledge-credit span {
+  overflow: hidden;
+  color: var(--color-muted-2);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.knowledge-credit a:hover { color: var(--color-accent-strong); }
+.knowledge-credit small { margin-top: 3px; color: var(--color-muted); font-size: 10px; line-height: 1.55; }
+
+/* ============================================== the strip below the fold === */
+.library-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 20px;
+}
+
+.library-strip-card {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  gap: 10px;
+  padding: 15px 15px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+.library-strip-kind {
+  margin: 0;
+  color: var(--color-lavender);
+  font-size: 9.5px;
+  font-weight: 650;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+.library-strip-card h3 {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: -0.028em;
+  line-height: 1.16;
+}
+.library-strip-visual { height: 76px; border-radius: var(--radius-sm); }
+.library-strip-visual .library-mark { width: 56%; height: 84%; }
+.library-strip-card button {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-ink-2);
+  background: var(--color-surface-raised);
+  font-size: 11px;
+  font-weight: 600;
+  transition: border-color 180ms ease, color 180ms ease;
+}
+.library-strip-card button:hover { border-color: var(--color-accent-line); color: var(--color-accent-deep); }
+
+.library-strip-note { grid-template-rows: auto minmax(0, 1fr) auto; background: var(--color-surface-2); }
+.library-strip-note .library-strip-kind { color: var(--color-muted); font-style: normal; }
+.library-strip-note p:not(.library-strip-kind) {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 11.5px;
+  line-height: 1.62;
+}
+.library-strip-links { display: grid; gap: 6px; }
+.library-strip-links a {
+  color: var(--color-accent-deep);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.library-strip-links a:hover { color: var(--color-accent-strong); }
+
+/* ============================================================ breakpoints === */
+/* 1440-class laptops: the panels give back 36 px and 30 px, all of it to the
+   specimen. */
+@media (max-width: 1440px) {
+  .knowledge-head h3 { font-size: 22px; }
+  .library-asset { padding: 8px 10px 8px 8px; }
+}
+
+/*
+ * Below the three-column regime the knowledge panel leaves the grid and becomes
+ * a bottom sheet. `visibility` rather than `display` so the closed sheet keeps
+ * its transition and stays out of the tab order at the same time.
+ */
+@media (max-width: 1180px) {
+  .library-body { grid-template-columns: clamp(236px, 25%, 280px) minmax(0, 1fr); }
+  .library-body.is-empty { grid-template-columns: minmax(0, 1fr); }
+  .library-viewer { grid-template-rows: auto minmax(0, 1fr) auto; }
+  .library-sheet-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 40px;
+    border: 0;
+    border-top: 1px solid var(--color-border-hair);
+    color: var(--color-accent-deep);
+    background: var(--color-surface-2);
+    font-size: 11.5px;
+    font-weight: 600;
+  }
+  .library-knowledge {
+    position: fixed;
+    z-index: 60;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: min(74svh, 620px);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    box-shadow: 0 -22px 60px rgba(87, 62, 43, 0.2);
+    visibility: hidden;
+    transform: translateY(100%);
+    transition: transform 320ms var(--ease-reveal), visibility 320ms;
+  }
+  .library-knowledge.is-open { visibility: visible; transform: none; }
+  .library-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* One column, and the rail turns into a horizontal shelf above the viewer: a
+   400 px vertical list would push the specimen off the screen entirely. */
+@media (max-width: 860px) {
+  .library { --library-head: auto; }
+  .library-head {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: 10px;
+    min-height: 0;
+    padding-bottom: 18px;
+  }
+  /* The lede repeats what the heading and the live count already say, and on a
+     phone it is 42 px of the height budget the workspace needs. */
+  .library-head-lede { display: none; }
+  .library-head-count { margin-top: 2px; }
+  /*
+   * Same budget as the desktop rule, spelled out because `--library-head` is
+   * `auto` here and `calc()` cannot take an `auto`.
+   *
+   * 132 px is the one-column head band (kicker + heading + counts + its own
+   * padding) plus the sliver of the strip that has to stay visible below the
+   * fold — measured, not guessed, and re-checked by `reference-audit/measure.mjs`
+   * at 768 and 390.
+   */
+  .library-app {
+    height: clamp(460px, calc(100svh - var(--header-h) - var(--section-gap) - 132px), 780px);
+  }
+  .library-chrome { grid-template-columns: minmax(0, 1fr); }
+  .library-search { width: 100%; }
+  .library-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .library-rail { grid-template-rows: minmax(0, 1fr); border-radius: var(--radius-md); }
+  .library-rail-head,
+  .library-rail-foot { display: none; }
+  .library-rail-list {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 10px, #000 calc(100% - 14px), transparent 100%);
+    mask-image: linear-gradient(90deg, transparent 0, #000 10px, #000 calc(100% - 14px), transparent 100%);
+  }
+  .library-rail-list > li { flex: none; }
+  .library-asset { width: 226px; grid-template-columns: 44px minmax(0, 1fr); gap: 10px; }
+  .library-asset .rail-visual { width: 44px; height: 44px; border-radius: 13px; }
+  .library-asset b { font-size: 14.5px; }
+  .library-asset small { -webkit-line-clamp: 1; }
+  .library-viewer-title b { font-size: 18px; }
+  .library-viewer-tags span:nth-child(2) { display: none; }
+  /* The rail moves along the bottom so it never covers the specimen's head. */
+  .stage-tools {
+    top: auto;
+    bottom: 12px;
+    left: 50%;
+    width: auto;
+    max-width: calc(100% - 28px);
+    flex-direction: row;
+    overflow-x: auto;
+    transform: translateX(-50%);
+  }
+  .stage-caption { bottom: 74px; }
+  .stage-spin { bottom: 74px; }
+  .stage-hint { bottom: 60px; }
+}
+
+@media (max-width: 620px) {
+  .library { padding-bottom: 64px; }
+  .library-head h2 { font-size: 25px; }
+  .library-viewer-tags { display: none; }
+  .library-strip { grid-template-columns: minmax(0, 1fr); }
+  .library-knowledge { height: min(82svh, 620px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stage-status i { animation: none; }
+  .library-knowledge,
+  .stage-spin::after,
+  .library-asset,
+  .library-subject { transition: none; }
+}

@@ -1,0 +1,131 @@
+/* ============================================================ cell studio === */
+/*
+ * Three rows: the specimen, the organelle picker, the readout.
+ *
+ * The picker is a horizontal band rather than a side panel, unlike the molecule
+ * viewer and the globe. A cell is round and wants the width; a molecule is small
+ * and its readout is a table. Same family, different proportion — which is why
+ * the row heights below are `auto` and only the stage is `1fr`: the cell keeps
+ * whatever the other two do not need.
+ */
+.cell-studio { display: grid; height: 100%; grid-template-rows: minmax(0, 1fr) auto auto; }
+.cell-stage { min-height: 0; cursor: grab; }
+.cell-stage[data-grabbing] { cursor: grabbing; }
+
+/* Nhân thực or nhân sơ, in the corner of the stage — the one classification the
+   viewer bar above does not already carry. */
+.cell-badge {
+  position: absolute;
+  z-index: 2;
+  top: 14px;
+  left: 16px;
+  padding: 4px 11px;
+  border: 1px solid var(--color-border-hair);
+  border-radius: 999px;
+  color: var(--color-muted);
+  background: rgba(255, 253, 249, 0.8);
+  font-size: 8.5px;
+  font-weight: 650;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  pointer-events: none;
+}
+
+.cell-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  padding: 10px 18px;
+  border-top: 1px solid var(--color-border-hair);
+}
+.cell-organelles { display: flex; flex-wrap: wrap; gap: 5px; }
+.cell-organelles button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 11px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  color: var(--color-ink-2);
+  background: var(--color-surface-raised);
+  font-size: 11px;
+  font-weight: 560;
+  transition: border-color 170ms ease, color 170ms ease, background 170ms ease;
+}
+/* The colour swatch is the same value the 3D material uses, so a chip and the
+   thing it selects are recognisably the same object. */
+.cell-organelles button i { width: 9px; height: 9px; border-radius: 50%; }
+.cell-organelles button:hover { border-color: var(--color-border-strong); }
+.cell-organelles button.is-active {
+  border-color: transparent;
+  color: #fff;
+  background: var(--color-accent-strong);
+}
+.cell-organelles button.is-active i { box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.7); }
+
+.cell-isolate {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 560;
+  white-space: nowrap;
+}
+.cell-isolate.is-on { color: var(--color-accent-deep); }
+.cell-isolate input { accent-color: var(--color-accent-strong); }
+.cell-isolate:has(input:disabled) { opacity: 0.45; }
+
+/* ---- the readout band ---- */
+/*
+ * One sentence, then the measurements, then the paragraph. That order is the
+ * order a student needs them in: what it does, how big it is, why it matters.
+ * The measurements are a horizontal strip rather than a list so the band stays
+ * three lines tall whatever organelle is selected — a readout that changes height
+ * makes the whole workspace jump every time a chip is pressed.
+ */
+.cell-readout {
+  display: grid;
+  gap: 7px;
+  padding: 11px 18px 15px;
+  border-top: 1px solid var(--color-border-hair);
+}
+.cell-readout-lead { margin: 0; color: var(--color-muted); font-size: 12px; line-height: 1.6; }
+.cell-readout-lead b { margin-right: 7px; color: var(--color-ink); font-weight: 620; }
+
+.cell-readout-facts { display: flex; flex-wrap: wrap; gap: 6px 20px; margin: 0; }
+.cell-readout-facts div { display: flex; align-items: baseline; gap: 6px; }
+.cell-readout-facts dt {
+  color: var(--color-muted-2);
+  font-size: 8.5px;
+  font-weight: 650;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.cell-readout-facts dd { margin: 0; color: var(--color-ink-2); font-family: var(--font-mono); font-size: 11px; }
+
+.cell-readout-note { margin: 0; color: var(--color-muted); font-size: 11px; line-height: 1.68; }
+
+/* ------------------------------------------------------------ responsive --- */
+@media (max-width: 900px) {
+  .cell-badge { top: 12px; left: 12px; padding: 5px 10px; }
+}
+@media (max-width: 700px) {
+  .cell-controls { flex-direction: column; align-items: flex-start; }
+  /* Organelle names run long in Vietnamese; on a phone the picker scrolls
+     sideways rather than wrapping into four rows of chips. */
+  .cell-organelles {
+    flex-wrap: nowrap;
+    width: 100%;
+    padding-bottom: 3px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .cell-organelles::-webkit-scrollbar { display: none; }
+  .cell-organelles button { white-space: nowrap; }
+  .cell-readout-note { display: none; }
+}

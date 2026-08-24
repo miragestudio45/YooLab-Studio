@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, lazy } from 'react';
+import { CreatureStage } from './CreatureStage';
 import { ModelStage } from './ModelStage';
 import type { BuiltExperienceKey, ExperienceManifest } from '../../lib/library/types';
 
@@ -8,25 +9,61 @@ import type { BuiltExperienceKey, ExperienceManifest } from '../../lib/library/t
  * The centre of the workspace.
  *
  * Every built experience is behind its own `lazy`, which is the whole reason the
- * Library can carry a periodic table, a cell, a simulation and a globe without
- * the homepage paying for any of them: opening Chemistry fetches the chemistry
- * chunk and nothing else, and a visitor who never scrolls to the Library
- * downloads none of it.
+ * Library can carry a periodic table, seven molecules, six cells, four physics
+ * models, a globe and a planet cross-section without the homepage paying for any
+ * of them: opening Chemistry fetches the chemistry chunk and nothing else, and a
+ * visitor who never scrolls to the Library downloads none of it.
+ *
+ * `params` is what lets one component serve many manifest entries. Six cell
+ * types are one `CellStudio` and one chunk, not six components — and the rail
+ * still shows six specimens, because the manifest is the unit of content, not
+ * the module.
  */
+
+/** Every built experience takes the same one prop. */
+export type ExperienceProps = { params?: Record<string, string> };
+
+type LazyExperience = React.LazyExoticComponent<(props: ExperienceProps) => React.JSX.Element>;
 
 const EXPERIENCE_COMPONENTS: Record<
   Exclude<BuiltExperienceKey, 'formula-workshop'>,
-  React.LazyExoticComponent<() => React.JSX.Element>
+  LazyExperience
 > = {
   'periodic-table': lazy(() =>
     import('./experiences/PeriodicTable').then((module) => ({ default: module.PeriodicTable }))),
+  'molecule-viewer': lazy(() =>
+    import('./experiences/MoleculeViewer').then((module) => ({ default: module.MoleculeViewer }))),
   'cell-studio': lazy(() =>
     import('./experiences/CellStudio').then((module) => ({ default: module.CellStudio }))),
   'projectile-lab': lazy(() =>
     import('./experiences/ProjectileLab').then((module) => ({ default: module.ProjectileLab }))),
+  'incline-lab': lazy(() =>
+    import('./experiences/InclineLab').then((module) => ({ default: module.InclineLab }))),
+  'wave-lab': lazy(() =>
+    import('./experiences/WaveLab').then((module) => ({ default: module.WaveLab }))),
+  'circuit-lab': lazy(() =>
+    import('./experiences/CircuitLab').then((module) => ({ default: module.CircuitLab }))),
   'globe-explorer': lazy(() =>
     import('./experiences/GlobeExplorer').then((module) => ({ default: module.GlobeExplorer }))),
+  'earth-layers': lazy(() =>
+    import('./experiences/EarthLayers').then((module) => ({ default: module.EarthLayers }))),
+  'toolkit-bench': lazy(() =>
+    import('./experiences/ToolkitBench').then((module) => ({ default: module.ToolkitBench }))),
 };
+
+/**
+ * The Formula card is the one experience that opens full screen, so the viewer
+ * shows a live preview of the real car rather than a photograph of it.
+ *
+ * It is not in the map above because it takes a different prop — the callback
+ * that opens the overlay — and because it is the heaviest chunk on the site: the
+ * car model, its four texture sets and the Formula runtime. Behind its own
+ * `lazy`, none of that is fetched until a visitor actually selects the workshop
+ * in the STEM rail, and the preview itself falls back to the poster on reduced
+ * data or a narrow viewport.
+ */
+const FormulaPreview = lazy(() =>
+  import('../FormulaPreview').then((module) => ({ default: module.FormulaPreview })));
 
 export function LibraryViewer({
   item,
@@ -37,15 +74,35 @@ export function LibraryViewer({
 }) {
   const { view } = item;
 
+  /*
+   * The three creatures go through the hero's own renderer.
+   *
+   * This is the branch that fixed the worst inconsistency on the site: the bee
+   * in the Library used to be the generic GLB path with a solid ruby material
+   * over it, so the same animal that is optical glass in the hero arrived here
+   * as flat red plastic with opaque wings. Same pipeline, different camera.
+   */
+  if (view.type === 'creature') {
+    return <CreatureStage creature={view.creature} framing={view.framing} label={item.title} />;
+  }
+
   if (view.type === 'model') {
     return <ModelStage url={view.url} preset={view.preset} framing={view.framing} label={item.title} />;
+  }
+
+  if (view.type === 'experience' && view.key === 'formula-workshop') {
+    return (
+      <Suspense fallback={<div className="stage-status"><i />Đang mở xưởng mô hình…</div>}>
+        <FormulaPreview onOpen={onOpenWorkshop} />
+      </Suspense>
+    );
   }
 
   if (view.type === 'experience' && view.key !== 'formula-workshop') {
     const Experience = EXPERIENCE_COMPONENTS[view.key];
     return (
-      <Suspense fallback={<p className="model-stage-status">Đang mở trải nghiệm…</p>}>
-        <Experience />
+      <Suspense fallback={<div className="stage-status"><i />Đang mở trải nghiệm…</div>}>
+        <Experience params={view.params} />
       </Suspense>
     );
   }

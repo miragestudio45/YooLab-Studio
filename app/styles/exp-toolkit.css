@@ -1,0 +1,134 @@
+/* ============================================================ tool bench === */
+/*
+ * Eight real models, one viewer.
+ *
+ * The stage is a `ModelStage`, so it already owns the ivory room, the floating
+ * tool rail, the caption and the auto-rotate switch. Everything below is the
+ * picker and the note beside it — the part that turns eight GLB files into a
+ * lesson about the order you do things in.
+ *
+ * Same 246 px panel as the molecule viewer, the globe and the Earth cross-section.
+ * Four experiences with four different panel widths would make the Library feel
+ * assembled rather than designed.
+ */
+.toolkit { display: grid; height: 100%; grid-template-columns: minmax(0, 1fr) 246px; }
+.toolkit-stage { position: relative; min-width: 0; }
+
+.toolkit-side {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-height: 0;
+  border-left: 1px solid var(--color-border-hair);
+}
+
+.toolkit-list { padding: 12px 13px 11px; border-bottom: 1px solid var(--color-border-hair); }
+.toolkit-group + .toolkit-group { margin-top: 11px; }
+.toolkit-group-head { display: grid; gap: 1px; margin: 0 0 6px; }
+.toolkit-group-head b {
+  color: var(--color-ink);
+  font-size: 9px;
+  font-weight: 680;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+.toolkit-group-head span { color: var(--color-muted-2); font-size: 9.5px; line-height: 1.4; }
+
+.toolkit-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.toolkit-chip {
+  padding: 5px 10px;
+  border: 1px solid var(--color-border-hair);
+  border-radius: 999px;
+  color: var(--color-ink-2);
+  background: var(--color-surface-raised);
+  font-size: 10.5px;
+  font-weight: 560;
+  transition: border-color 150ms ease, color 150ms ease, background 150ms ease;
+}
+.toolkit-chip:hover { border-color: var(--color-border-strong); }
+.toolkit-chip.is-active { border-color: transparent; color: #fff; background: var(--color-accent-strong); }
+
+.toolkit-info { min-height: 0; padding: 13px 14px; overflow-y: auto; }
+.toolkit-info-kind {
+  margin: 0;
+  color: var(--color-muted-2);
+  font-size: 8.5px;
+  font-weight: 650;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+.toolkit-info h4 {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  margin: 4px 0 9px;
+  color: var(--color-ink);
+  font-size: 16px;
+  font-weight: 660;
+  letter-spacing: -0.02em;
+}
+.toolkit-info h4 em {
+  color: var(--color-muted-2);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 400;
+}
+.toolkit-info-use { margin: 0 0 8px; color: var(--color-ink-2); font-size: 11.5px; line-height: 1.6; }
+.toolkit-info-note { margin: 0; color: var(--color-muted); font-size: 11px; line-height: 1.68; }
+
+/* The safety line, when a tool has one. Tinted amber rather than red: this is a
+   craft note, not an error state. */
+.toolkit-info-care {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border-radius: var(--radius-xs);
+  background: rgba(176, 138, 74, 0.12);
+  color: var(--color-ink-2);
+  font-size: 10.5px;
+  line-height: 1.55;
+}
+.toolkit-info-care span {
+  display: grid;
+  width: 16px;
+  height: 16px;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  background: var(--color-pending);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.toolkit-foot {
+  margin: 0;
+  padding: 10px 14px 13px;
+  border-top: 1px solid var(--color-border-hair);
+  color: var(--color-muted-2);
+  font-size: 10px;
+  line-height: 1.6;
+}
+.toolkit-foot b { color: var(--color-ink-2); font-family: var(--font-mono); font-weight: 500; }
+
+/* ------------------------------------------------------------ responsive --- */
+@media (max-width: 1240px) {
+  .toolkit { grid-template-columns: minmax(0, 1fr) 218px; }
+}
+@media (max-width: 900px) {
+  .toolkit { grid-template-columns: 1fr; grid-template-rows: minmax(260px, 1fr) auto; }
+  .toolkit-side {
+    grid-template-rows: auto auto auto;
+    border-left: 0;
+    border-top: 1px solid var(--color-border-hair);
+  }
+  /* Three labelled groups become one flat row of chips: the ordering lesson is
+     worth a column of vertical space, not a third of a phone screen. */
+  .toolkit-list { display: flex; flex-wrap: wrap; gap: 4px; padding: 10px; }
+  .toolkit-group { display: contents; }
+  .toolkit-group-head { display: none; }
+  .toolkit-info { max-height: 172px; }
+}

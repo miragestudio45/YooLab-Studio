@@ -1,0 +1,459 @@
+/* ============================================================ simulation === */
+/*
+ * One control shell for every physics simulation.
+ *
+ * Four labs — projectile, inclined plane, waves, DC circuits — share this grid,
+ * this canvas band, this readout strip and these sliders. Four simulations in
+ * one subject with four different-looking control panels would read as four
+ * different products, so a lab is allowed to add a row but never to invent its
+ * own vocabulary.
+ */
+.sim {
+  display: grid;
+  height: 100%;
+  grid-template-rows: minmax(0, 1fr) auto auto;
+  /*
+   * A query container, because a lab's width is set by the Library workspace, not
+   * by the page.
+   *
+   * These panels sit in the viewer's `1fr` track between two clamped side
+   * panels: on a 1366 page the panel is 678 px, on a 1920 it is 1030. The page
+   * media queries at the bottom of this file therefore never fired where they
+   * were needed — at 1366 the control grid was still asking for four 180 px
+   * columns in 640 px of room, so "Song song" dropped to a second line and the
+   * two lamp cards sat in a three-track grid with an empty column beside them.
+   * The container queries below measure the thing that actually constrains them.
+   */
+  container-type: inline-size;
+  --sim-ink: var(--color-ink);
+  --sim-accent: #e87868;
+  --sim-line: rgba(117, 91, 70, 0.2);
+  --sim-muted: #706a73;
+}
+.sim-stage { position: relative; min-height: 0; padding: 8px 10px 0; }
+.sim-canvas { display: block; width: 100%; height: 100%; }
+.sim-axis-label {
+  position: absolute;
+  color: var(--color-muted-2);
+  font-size: 9px;
+  font-weight: 620;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.sim-axis-label--x { right: 16px; bottom: 4px; }
+.sim-axis-label--y { top: 12px; left: 10px; }
+
+.sim-readout {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  margin: 0;
+  border-top: 1px solid var(--color-border-hair);
+  border-bottom: 1px solid var(--color-border-hair);
+}
+.sim-readout div { padding: 9px 16px; border-right: 1px solid var(--color-border-hair); }
+.sim-readout dt {
+  color: var(--color-muted);
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.sim-readout dd {
+  margin: 3px 0 0;
+  color: var(--color-ink);
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 620;
+  letter-spacing: -0.02em;
+}
+
+.sim-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  align-items: end;
+  gap: 12px 20px;
+  padding: 14px 18px 18px;
+}
+.sim-slider { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; }
+.sim-slider span { color: var(--color-muted); font-size: 10.5px; font-weight: 560; }
+.sim-slider b { color: var(--color-ink); font-size: 11px; font-weight: 620; text-align: right; }
+.sim-slider input { grid-column: 1 / -1; width: 100%; accent-color: var(--color-accent-strong); }
+.sim-slider:has(input:disabled) { opacity: 0.45; }
+
+.sim-presets { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; }
+.sim-presets > span {
+  width: 100%;
+  color: var(--color-muted);
+  font-size: 10.5px;
+  font-weight: 560;
+}
+.sim-presets button {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 5px 9px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  color: var(--color-ink-2);
+  background: var(--color-surface-raised);
+  font-size: 10.5px;
+  font-weight: 560;
+}
+.sim-presets button i { color: var(--color-muted-2); font-size: 9px; font-style: normal; }
+.sim-presets button.is-active { border-color: transparent; color: #fff; background: var(--color-accent-strong); }
+.sim-presets button.is-active i { color: rgba(255, 255, 255, 0.75); }
+
+.sim-fire {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 40px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: #fff;
+  background: var(--color-accent-strong);
+  font-size: 12px;
+  font-weight: 620;
+}
+.sim-fire:hover { background: var(--color-accent-deep); }
+
+/* ====================================================== inclined plane === */
+/*
+ * Four rows, not three.
+ *
+ * The force bench adds a state strip between the canvas and the readout band: it
+ * says in words what the arrows only imply — the block is at rest, has just
+ * broken loose, or is sliding. The other three labs do not need that row, so
+ * `.sim` stays three rows and this variant adds one for itself.
+ */
+.sim.incline { grid-template-rows: minmax(0, 1fr) auto auto auto; }
+
+.incline-legend {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border-hair);
+  border-radius: var(--radius-xs);
+  background: color-mix(in srgb, var(--color-surface-raised) 88%, transparent);
+  list-style: none;
+}
+.incline-legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-muted);
+  font-size: 9.5px;
+}
+.incline-legend li b {
+  color: var(--color-ink-2);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 500;
+}
+.incline-legend li i { width: 13px; height: 2px; border-radius: 2px; }
+.incline-legend .is-weight i { background: #c95f52; }
+.incline-legend .is-normal i { background: #5fb6c4; }
+.incline-legend .is-friction i { background: #8d6bcc; }
+.incline-legend .is-push i { background: #b08a4a; }
+.incline-legend-note {
+  margin-top: 2px;
+  padding-top: 4px;
+  border-top: 1px solid var(--color-border-hair);
+  color: var(--color-muted-2);
+  font-size: 8.5px;
+}
+
+/* ------------------------------------------------------------ state strip --- */
+.incline-strip {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px 16px;
+  padding: 9px 18px;
+  border-top: 1px solid var(--color-border-hair);
+}
+.incline-state {
+  margin: 0;
+  padding: 4px 11px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 640;
+  letter-spacing: 0.03em;
+}
+.incline-state.is-rest { color: #2f5f33; background: rgba(118, 157, 116, 0.17); }
+.incline-state.is-break { color: var(--color-pending); background: rgba(176, 138, 74, 0.16); }
+.incline-state.is-sliding { color: var(--color-accent-deep); background: var(--color-accent-wash); }
+
+.incline-motion { display: flex; gap: 14px; }
+.incline-motion span { display: flex; align-items: baseline; gap: 4px; }
+.incline-motion i {
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-style: italic;
+}
+.incline-motion b {
+  color: var(--color-ink);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+.incline-motion em { color: var(--color-muted-2); font-size: 9px; font-style: normal; }
+
+.incline-hint { margin: 0; color: var(--color-muted); font-size: 10.5px; line-height: 1.55; }
+.incline-hint b { color: var(--color-ink-2); font-family: var(--font-mono); font-weight: 500; }
+.incline-note { grid-column: 3 / -1; margin: 0; color: var(--color-muted-2); font-size: 10px; }
+
+.incline-actions { display: flex; align-items: center; gap: 8px; }
+.incline-hold {
+  min-height: 32px;
+  padding: 0 13px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-ink-2);
+  background: var(--color-surface-raised);
+  font-size: 11px;
+  font-weight: 560;
+}
+.incline-hold:hover { border-color: var(--color-accent-line); color: var(--color-accent-deep); }
+.incline-actions .sim-fire { min-height: 32px; padding: 0 14px; font-size: 11px; }
+
+/* ------------------------------------------------- the nine-cell readout --- */
+/*
+ * Nine cells on one row, so every cell has to be compact: a small caps label
+ * over a mono formula, a large number and a tiny unit. At the type sizes of
+ * ProjectileLab's four-cell band, nine cells wrap to two rows and the force
+ * bench loses a slice of its canvas to a strip of text.
+ */
+.incline-readout { grid-template-columns: repeat(auto-fit, minmax(94px, 1fr)); }
+.incline-readout div { padding: 7px 12px; }
+.incline-readout dt { display: grid; gap: 1px; }
+.incline-readout dt span {
+  color: var(--color-muted);
+  font-size: 8.5px;
+  font-weight: 650;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.incline-readout dt b {
+  color: var(--color-muted-2);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.incline-readout dd {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  margin: 2px 0 0;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 500;
+}
+.incline-readout dd i { color: var(--color-muted-2); font-size: 9px; font-style: normal; }
+
+/* ================================================================ waves === */
+.sim.wave { grid-template-rows: minmax(0, 1fr) auto auto auto; }
+
+/*
+ * The band straight under the canvas: one label, one result, one sentence.
+ *
+ * This is where the simulation says what is happening at the probe — "giao thoa
+ * tăng cường", "có phách", "bậc n = 3" — instead of leaving a student to infer
+ * it from the curve. Tinted so it is not read as a caption of the canvas.
+ */
+.wave-live {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: 6px 14px;
+  padding: 9px 18px;
+  border-top: 1px solid var(--color-border-hair);
+  background: var(--color-accent-wash);
+}
+.wave-live > span {
+  color: var(--color-muted);
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.wave-live > b {
+  color: var(--color-accent-deep);
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 640;
+  letter-spacing: -0.01em;
+}
+.wave-live > p {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--color-ink-2);
+  font-size: 10.5px;
+  line-height: 1.55;
+}
+
+.wave-head {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+}
+.wave-modes {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+.wave-modes button {
+  padding: 6px 14px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--color-muted);
+  background: transparent;
+  font-size: 11.5px;
+  font-weight: 580;
+}
+.wave-modes button:hover { color: var(--color-ink-2); }
+.wave-modes button[aria-pressed="true"] { color: #fff; background: var(--color-accent-strong); }
+
+.wave-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0; padding: 0; list-style: none; }
+.wave-legend li { display: flex; align-items: center; gap: 6px; color: var(--color-muted); font-size: 10px; }
+.wave-legend i { width: 14px; height: 2.5px; border-radius: 2px; }
+.wave-legend .is-first { background: #5fb6c4; }
+.wave-legend .is-second { background: #8d6bcc; }
+.wave-legend .is-sum { height: 3px; background: #e87868; }
+.wave-legend .is-node { width: 8px; height: 8px; border-radius: 50%; background: var(--color-ink); }
+.wave-legend .is-anti { width: 8px; height: 8px; border-radius: 50%; background: #e87868; }
+
+/* ============================================================== circuits === */
+.sim.circuit { grid-template-rows: minmax(0, 1fr) auto auto auto; }
+
+.circuit-readout { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+
+.circuit-lamps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(178px, 1fr));
+  align-items: start;
+  gap: 9px 16px;
+  padding: 11px 18px;
+  border-bottom: 1px solid var(--color-border-hair);
+}
+.circuit-lamp {
+  display: grid;
+  gap: 5px;
+  padding: 8px 11px;
+  border: 1px solid var(--color-border-hair);
+  border-radius: var(--radius-xs);
+  background: var(--color-surface-raised);
+}
+.circuit-lamp-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0;
+}
+.circuit-lamp-head b { color: var(--color-ink); font-size: 11.5px; font-weight: 640; }
+.circuit-lamp-head span { color: var(--color-muted); font-family: var(--font-mono); font-size: 10px; }
+
+/* The brightness bar uses the same normalisation as the halo on the canvas, so
+   the two lamps can be compared by eye and by number at the same time. */
+.circuit-bar { height: 4px; border-radius: 999px; overflow: hidden; background: var(--color-surface-2); }
+.circuit-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #f2a83f, #ffd166);
+  transition: width 180ms ease;
+}
+
+.circuit-lamp-facts { display: flex; gap: 12px; margin: 0; }
+.circuit-lamp-facts div { display: flex; align-items: baseline; gap: 4px; }
+.circuit-lamp-facts dt {
+  color: var(--color-muted-2);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-style: italic;
+}
+.circuit-lamp-facts dd { margin: 0; color: var(--color-ink-2); font-family: var(--font-mono); font-size: 11px; }
+
+.circuit-verdict {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 10.5px;
+  line-height: 1.6;
+}
+
+.circuit-switch.is-open { background: var(--color-pending); }
+.circuit-switch.is-open:hover { background: #96702f; }
+
+/* ------------------------------------------------------------ responsive --- */
+/*
+ * Panel width first, page width second.
+ *
+ * The container queries are the ones that matter for these labs — a panel of a
+ * given width should look the same whether the page around it is 1366 or 1920.
+ * The media queries that follow stay for the phone regime, where the panel and
+ * the page are the same width anyway and other things (the incline legend, the
+ * wave mode strip) change with the whole layout rather than with this panel.
+ */
+@container (max-width: 880px) {
+  .sim-controls { grid-template-columns: 1fr 1fr; }
+  /* There are exactly two lamps. `auto-fit` fitted a third track and left it
+     empty, which reads as a missing card rather than as a two-card row. */
+  .circuit-lamps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+/* The readout strips are deliberately *not* in that block. Every row a readout
+   gains is a row the canvas loses, and at this width the four-across strip still
+   fits — folding it to two-by-two took 60 px off a circuit diagram that only had
+   110 px to begin with. A readout strip reflows when it stops fitting, which its
+   own `auto-fit` already handles. */
+
+@container (max-width: 580px) {
+  .sim-controls { grid-template-columns: 1fr; }
+  .sim-readout { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .circuit-lamps { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 1100px) {
+  .incline-strip { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .incline-hint { grid-column: 1 / -1; }
+  .incline-note { grid-column: 1 / -1; }
+}
+@media (max-width: 820px) {
+  .sim-controls { grid-template-columns: 1fr 1fr; }
+  .incline-legend {
+    position: static;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    margin: 0 0 6px;
+    padding: 6px 8px;
+  }
+  .incline-legend-note { display: none; }
+  .incline-readout { grid-template-columns: repeat(3, 1fr); }
+  .circuit-lamps { grid-template-columns: 1fr; }
+}
+@media (max-width: 700px) {
+  .sim-controls { grid-template-columns: 1fr; }
+  .sim-readout { grid-template-columns: repeat(2, 1fr); }
+  .incline-strip { grid-template-columns: 1fr; }
+  .incline-actions { justify-self: start; }
+  .incline-readout { grid-template-columns: repeat(2, 1fr); }
+  .wave-modes { width: 100%; }
+  .wave-modes button { flex: 1; padding: 6px 4px; }
+}

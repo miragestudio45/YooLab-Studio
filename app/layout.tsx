@@ -54,18 +54,30 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     // warning on <html> only; every child is still checked normally.
     <html lang="vi" suppressHydrationWarning>
       <head>
-        {/* Inter Tight for display, Inter for body, and Instrument Serif for
-            the one editorial voice on the site: specimen names in the Library.
-            The UI — navigation, buttons, labels, body — stays sans throughout;
-            the serif is a scientific-catalogue accent, not a second system.
-            The stacks in globals.css fall back to platform faces. */}
+        {/*
+            One family for the whole site: Plus Jakarta Sans, 200–800, roman and
+            italic.
+
+            The build before this one ran four faces — Inter Tight for display,
+            Inter for body, Instrument Serif for Library specimen names and
+            JetBrains Mono for readouts — and the seam showed: a serif "Ong mật"
+            in a sans application, and a monospaced number column that belonged to
+            a different site than the label beside it. Hierarchy here comes from
+            weight, size, tracking, italic and opacity instead, and the readouts
+            align through `font-variant-numeric: tabular-nums`, which Plus Jakarta
+            Sans supports at every weight.
+
+            The variable axis is loaded whole rather than as five static cuts: the
+            display headings sit at 700, the italic at 500, body at 400 and labels
+            at 650, and a variable font serves all four from one file.
+        */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         {/* eslint-disable-next-line @next/next/no-page-custom-font -- App Router
             has no _document; this layout wraps every route. */}
         <link
           rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300..800;1,300..800&family=Inter+Tight:ital,wght@0,400..800;1,400..800&family=Instrument+Serif:ital@0;1&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap"
         />
         <script dangerouslySetInnerHTML={{ __html: REVEAL_BOOTSTRAP }} />
       </head>

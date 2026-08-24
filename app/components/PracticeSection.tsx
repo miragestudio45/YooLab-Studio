@@ -13,6 +13,13 @@ import { openLibraryExperience } from '../lib/library/openExperience';
  * the one piece of furniture on this page that lies, so the lab is a stated gap
  * with an outline where the bench will go and nothing to click.
  *
+ * The composition says the same thing before a word is read. The two used to be a
+ * matching pair of cards in a `1.18fr 0.82fr` grid, which gave a section with one
+ * product and one absence the shape of a section with two products — and made the
+ * absence the second largest object on the screen. The workshop is now a wide
+ * two-part card that reads as an application, and the bench is a column beside it
+ * with no frame of its own: present, explained, obviously not a product yet.
+ *
  * Formula itself lives in the Library under KHCN & STEM, where a teacher looking
  * for content will actually find it. What it does here is prove the claim of the
  * headline.
@@ -23,10 +30,13 @@ export function PracticeSection() {
   return (
     <section className="practice" id="thuc-hanh" aria-labelledby="practice-title">
       <div className="shell-editorial">
-        <div className="section-heading section-heading--split" data-reveal>
+        {/* Two lines, not three. At the old size the third line pushed the
+            workshop below the fold on every laptop, and the section opened on a
+            headline and the top edge of a photograph. */}
+        <div className="section-heading section-heading--split practice-head" data-reveal>
           <div>
             <p className="section-kicker">Thực hành &amp; STEM</p>
-            <h2 id="practice-title">Thực hành những điều<br /><em>khó thực hiện<br />trong lớp học.</em></h2>
+            <h2 id="practice-title">Thực hành những điều<br /><em>khó thực hiện trong lớp học.</em></h2>
           </div>
           <p>
             Thiết bị đắt, thao tác nguy hiểm, hoặc quá nhỏ để nhìn thấy. Trong
@@ -63,7 +73,7 @@ export function PracticeSection() {
             </div>
           </article>
 
-          <article className="practice-pending" aria-label="Phòng thực hành 3D — đang xây dựng">
+          <aside className="practice-next" aria-label="Phòng thực hành 3D — đang xây dựng">
             <svg viewBox="0 0 260 190" aria-hidden="true" className="practice-art">
               <g fill="none" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round">
                 {/* bench */}
@@ -81,7 +91,7 @@ export function PracticeSection() {
                 <circle cx="176" cy="62" r="9" opacity="0.3" />
               </g>
             </svg>
-            <div className="practice-pending-body">
+            <div>
               <span className="practice-tag practice-tag--pending">Đang được bổ sung</span>
               <h3>Phòng thực hành 3D</h3>
               <p>
@@ -98,7 +108,7 @@ export function PracticeSection() {
                 trong thư viện.
               </p>
             </div>
-          </article>
+          </aside>
         </div>
       </div>
     </section>

@@ -38,6 +38,37 @@ the surrounding repository covered them. It does not.
 
 ---
 
+## Textures
+
+### `public/asset/valley/flowers/pool_summer.png` — 8x7 flower atlas
+
+| | |
+| --- | --- |
+| Name | `pool_summer.png`, a 1500x1312 sheet of 56 photographic plant cut-outs — four rows of blooms, two of grasses and foliage, one of dried leaves |
+| Licence | **Not stated.** See the warning below. |
+| Origin | `reference-sources/flower-valley/assets/valley/flowers/pool_summer.png`, supplied to this repository as a working reference implementation of the hero's flower valley |
+| Obtained via | Copied verbatim from that folder. `pool_winter.png` from the same folder is **not** shipped: its cells are painted on opaque near-black grounds, which read as dark blobs on YooLab's ivory hero, so the renderer never loads it. |
+| Modification | None to the file. At load the renderer slices it into 56 tiles and grades each one — `saturate(0.95) contrast(0.97)` plus a 9% ivory wash — for the light page. Nothing is written back. |
+| Attribution | None available to give. |
+
+> **This is the one asset in this repository whose licence has not been
+> verified, and it should not ship to production until it has been.**
+>
+> The reference folder carries a `README.md` and a `CLAUDE_INTEGRATION.md` and
+> neither states an author, a source or a licence for the sheet, so there is
+> nothing here to verify against. The cut-outs are photographic, which means they
+> are somebody's photographs. Every other row in this file exists because a
+> licence was checked before the file was committed; this row exists to say that
+> for this one, it was not — the sheet was handed over as the visual source of
+> truth for the hero and integrating it was the task.
+>
+> Whoever owns the sheet needs to confirm its terms, or it needs replacing with
+> plant photography whose commercial-use rights are verifiable. The renderer does
+> not care which sheet it slices: `atlasUrl` in `FlowerValleyOptions` is the only
+> reference to the path, and any 8x7 sheet with the same row semantics drops in.
+
+---
+
 ## Data
 
 ### `public/data/periodic-elements.json` — 118 elements

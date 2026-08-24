@@ -6,8 +6,13 @@ import { BrandMark } from './BrandMark';
 /**
  * Navigation follows the journey, in order: see it, use the tool, find the
  * content, see the hands-on side, find yourself, then check the evidence. Six
- * short labels so the row never wraps at 1240px, and the one thing a visitor
- * might want to do at any moment stays pinned as the CTA.
+ * short labels, and the one thing a visitor might want to do at any moment stays
+ * pinned as the CTA.
+ *
+ * The bar is full-bleed and its contents sit in the page shell, so the wordmark
+ * shares a left edge with every section heading below it. That inner wrapper is
+ * the whole reason this component has one more div than it looks like it needs:
+ * the glass has to reach the edges of the screen while the content cannot.
  */
 const links = [
   ['Khám phá', '#kham-pha'],
@@ -41,25 +46,27 @@ export function SiteHeader() {
       className={`site-header${open ? ' is-open' : ''}${scrolled ? ' is-scrolled' : ''}`}
       aria-label="Điều hướng chính"
     >
-      <a className="brand" href="#trang-chu" aria-label="YooLab — Trang chủ" onClick={() => setOpen(false)}>
-        <BrandMark size={34} />
-        <span className="brand-wordmark">YooLab</span>
-      </a>
-      <nav className="desktop-nav" aria-label="Các khu vực của YooLab">
-        {links.map(([label, href]) => <a href={href} key={href}>{label}</a>)}
-      </nav>
-      <a className="header-cta" href="#bat-dau-voi-yoolab">
-        Bắt đầu với YooLab <span aria-hidden="true">↗</span>
-      </a>
-      <button
-        className="menu-toggle"
-        type="button"
-        aria-label={open ? 'Đóng menu' : 'Mở menu'}
-        aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
-      >
-        <i /><i />
-      </button>
+      <div className="site-header-inner">
+        <a className="brand" href="#trang-chu" aria-label="YooLab — Trang chủ" onClick={() => setOpen(false)}>
+          <BrandMark size={32} />
+          <span className="brand-wordmark">YooLab</span>
+        </a>
+        <nav className="desktop-nav" aria-label="Các khu vực của YooLab">
+          {links.map(([label, href]) => <a href={href} key={href}>{label}</a>)}
+        </nav>
+        <a className="header-cta" href="#bat-dau-voi-yoolab">
+          Bắt đầu với YooLab <span aria-hidden="true">↗</span>
+        </a>
+        <button
+          className="menu-toggle"
+          type="button"
+          aria-label={open ? 'Đóng menu' : 'Mở menu'}
+          aria-expanded={open}
+          onClick={() => setOpen((value) => !value)}
+        >
+          <i /><i />
+        </button>
+      </div>
       <nav
         className="mobile-nav"
         aria-label="Điều hướng trên thiết bị di động"

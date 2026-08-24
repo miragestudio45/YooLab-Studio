@@ -50,30 +50,36 @@ export default function Home() {
         <ExploreStory />
         <BridgeSection />
 
-        {/* The editor is a product workspace, so it sits in the wide regime and
-            gets the full 1600 px rather than being a screenshot in a column. */}
+        {/* Heading and workspace are on the same shell now, so the section has one
+            left edge rather than an editorial one for its words and a wider one
+            for its product. */}
         <section className="tool-section" id="cong-cu" aria-labelledby="tool-title">
-          <div className="shell-editorial">
-            <div className="section-heading section-heading--split tool-heading" data-reveal>
-              <div>
-                <p className="section-kicker section-kicker--light">Công cụ YooLab · YooStudio</p>
-                <h2 id="tool-title">Từ kiến thức<br /><em>thành bài học.</em></h2>
+          {/* Heading and workspace are one viewport-height column, so the editor
+              takes exactly what the heading leaves rather than what a CSS token
+              guessed the heading would measure. See `.tool-stage`. */}
+          <div className="tool-stage">
+            <div className="shell">
+              <div className="section-heading section-heading--split tool-heading" data-reveal>
+                <div>
+                  <p className="section-kicker section-kicker--light">Công cụ YooLab · YooStudio</p>
+                  <h2 id="tool-title">Từ kiến thức<br /><em>thành bài học.</em></h2>
+                </div>
+                <div className="tool-heading-copy">
+                  <p>
+                    Chọn mô hình, thêm chú thích, nội dung, âm thanh và hoạt động
+                    tương tác — không cần lập trình. Khung bên dưới là bản thật.
+                  </p>
+                  <a href="#thu-vien">Xem thư viện học liệu <span aria-hidden="true">→</span></a>
+                </div>
               </div>
-              <div className="tool-heading-copy">
-                <p>
-                  Chọn mô hình, thêm chú thích, nội dung, âm thanh và hoạt động
-                  tương tác — không cần lập trình. Khung bên dưới là bản thật.
-                </p>
-                <a href="#thu-vien">Xem thư viện học liệu <span aria-hidden="true">→</span></a>
-              </div>
+            </div>
+
+            <div className="shell tool-workspace" data-reveal>
+              <StudioDemo />
             </div>
           </div>
 
-          <div className="shell-wide" data-reveal>
-            <StudioDemo />
-          </div>
-
-          <div className="shell-editorial">
+          <div className="shell">
             <div className="tool-features" data-stagger>
               {TOOL_FEATURES.map((feature) => (
                 <article key={feature.index} data-reveal>
