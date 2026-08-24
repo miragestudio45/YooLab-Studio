@@ -232,6 +232,7 @@ app/
   components/
     ExploreStory.tsx        scroll → one continuous number
     ExploreCanvas.tsx       the cinematic stage (bee/fish/jellyfish)
+    FlowerValleyLayer.tsx   the hero's flower valley, one Canvas2D layer
     BridgeSection.tsx       explore → product hinge
     StudioDemo.tsx          YooStudio — real GLB, raycast, gizmo, timeline
     WorkflowRibbon.tsx      four beats, one line
@@ -248,11 +249,54 @@ app/
     library/                types · manifest · openExperience
     chemistry/elements.ts   data access, Vietnamese labels, formatting
     three/                  environment · liquid · beeOptics · thumbnails
+    flowerValley/           atlas · valley · composition · renderer
 public/
   asset/                    GLBs and textures
   data/                     periodic-elements.json · world-110m.json
+scripts/
+  build-vercel.mjs          the Vercel production build (see below)
+vercel.json                 framework: null — the whole Vercel fix
 reference-sources/          research clones, git-ignored, never shipped
 ```
+
+## Building and deploying
+
+Two targets, one Vite config, and the difference is a single plugin.
+
+```
+npm run dev            vinext dev          workerd, HMR, local sign-in shim
+npm run build          vinext build        → dist/   (local / OpenAI Sites)
+npm run build:vercel   vite build + Nitro  → .vercel/output   (Vercel)
+```
+
+vinext is Next.js on Vite, and a Vite build does not know where it is going. The
+*deployment plugin* is what tells it: vinext looks for a plugin named
+`vite-plugin-cloudflare` or `nitro` in the plugin list and hands that plugin
+ownership of the server environment — externalisation, the server entry, the
+output layout. Exactly one may be present, so `vite.config.ts` chooses:
+
+- **No `NITRO_PRESET`, no `VERCEL`** → `@cloudflare/vite-plugin`, which is what
+  gives `vinext dev` a real workerd runtime and what the D1/R2 bindings in
+  `.openai/hosting.json` are declared against.
+- **Either one set** → `nitro/vite` with that preset. Vercel sets `VERCEL=1` in
+  every build container, so the Vercel build needs no flag; `NITRO_PRESET` is
+  Nitro's own variable and overrides it, which is how any other Nitro host
+  (`netlify`, `deno_deploy`, `node_server`) can be targeted without editing code.
+
+On Vercel the `vercel` preset emits **Build Output API v3** into `.vercel/output`:
+`/` prerendered to `static/index.html`, everything in `public/` copied to
+`static/`, `_next/static/*` served with immutable cache headers, and one Node
+function (`functions/__server.func`) behind a catch-all for anything not on disk.
+The client bundle is unchanged from the Cloudflare build — same Three.js, same
+scenes, same flower valley.
+
+`vercel.json` carries `"framework": null`. Without it Vercel sees `next` in
+`dependencies`, applies its Next.js preset and runs `next build`, which this
+project has no pipeline for. That single line is the deployment fix; the Nitro
+plugin is what makes the build it then runs produce something Vercel can serve.
+
+To inspect an output build locally: `npx vite preview` serves `.vercel/output`
+exactly as the CDN and the function would.
 
 ## Documents
 

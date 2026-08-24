@@ -1,4 +1,16 @@
-@import 'tailwindcss';
+/*
+ * `tailwindcss/index.css`, not the bare `tailwindcss` that Tailwind documents.
+ *
+ * They are the same file. Tailwind's package exports `"."` only under the `style`
+ * condition, so resolving the bare specifier from CSS depends on the bundler
+ * adding `style` to its resolve conditions. Vite does — until the Nitro plugin
+ * turns on `builder.sharedConfigBuild`, at which point the Vercel build resolves
+ * `tailwindcss` as a path relative to the project root and fails with ENOENT on a
+ * file that was never there. `./index.css` is an unconditional export, so this
+ * specifier resolves the same way on every target, and the emitted CSS is
+ * byte-identical either way.
+ */
+@import 'tailwindcss/index.css';
 
 /*
  * Partials.

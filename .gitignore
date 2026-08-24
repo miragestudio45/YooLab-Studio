@@ -33,6 +33,10 @@ yarn-error.log*
 .vercel
 next-env.d.ts
 /dist/
+# Nitro build output. `.vercel/output` (the vercel preset) is already covered by
+# `.vercel` above; this is where every other Nitro preset writes.
+/.output/
+/.nitro/
 /.wrangler/
 /outputs/
 /work/
