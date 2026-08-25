@@ -138,6 +138,16 @@ export type Layout = {
   perDrift: number;
   driftZ: number;
   driftSpan: number;
+  /** Optional authored drift used to close a specific foreground gap without
+   * changing the density or rhythm of the whole valley. */
+  foregroundFill?: {
+    side: -1 | 1;
+    count: number;
+    depthFrom: number;
+    depthSpan: number;
+    offsetFrom: number;
+    offsetSpan: number;
+  };
   /** Ceiling on plant size, as a fraction of frame height. */
   maxHeight: number;
   /** Global alpha for the whole layer at full presence. */
@@ -259,11 +269,21 @@ const DESKTOP: Layout = {
   perDrift: 9,
   driftZ: 8.5,
   driftSpan: 6.4,
-  opacity: 0.9,
+  /* A near-left drift fills the exposed foreground under the copy. It travels
+     out of frame before chapter 01, so the study composition stays untouched. */
+  foregroundFill: {
+    side: -1,
+    count: 96,
+    depthFrom: 22,
+    depthSpan: 16,
+    offsetFrom: 7.5,
+    offsetSpan: 11,
+  },
+  opacity: 0.96,
   interaction: 0.62,
   camHStudy: 7.6,
   pitchStudy: 0.062,
-  opacityStudy: 0.82,
+  opacityStudy: 0.92,
   zones: [
     /*
      * Headline, lede, CTA — and now the whole copy column, strongly.
@@ -364,7 +384,7 @@ const LAPTOP: Layout = {
   driftSpan: 6,
   camHStudy: 9.2,
   pitchStudy: 0.072,
-  opacityStudy: 0.8,
+  opacityStudy: 0.9,
   zones: [
     { u: 0.18, v: 0.5, ru: 0.35, rv: 0.33, strength: 0.96, role: 'copy' },
     { u: 0.625, v: 0.51, ru: 0.16, rv: 0.25, strength: 0.94, farOnly: true, role: 'subject' },
@@ -387,6 +407,7 @@ const LAPTOP: Layout = {
  */
 const TABLET: Layout = {
   ...LAPTOP,
+  foregroundFill: undefined,
   camH: 5.4,
   pitch: 0.006,
   fov: 36,
@@ -401,11 +422,11 @@ const TABLET: Layout = {
   perDrift: 9,
   driftZ: 7.4,
   driftSpan: 5.6,
-  opacity: 0.9,
+  opacity: 0.94,
   interaction: 0.5,
   camHStudy: 7.4,
   pitchStudy: 0.044,
-  opacityStudy: 0.78,
+  opacityStudy: 0.88,
   zonesStudy: [
     { u: 0.76, v: 0.5, ru: 0.3, rv: 0.44, strength: 0.94, role: 'copy' },
     { u: 0.3, v: 0.48, ru: 0.24, rv: 0.34, strength: 0.9, farOnly: true, role: 'subject' },
@@ -462,13 +483,13 @@ const COMPACT: Layout = {
   perDrift: 7,
   driftZ: 6.6,
   driftSpan: 5,
-  opacity: 0.86,
+  opacity: 0.92,
   interaction: 0.4,
   /* One column, so the chapter frame differs from the hero only in that the copy
      plate is taller and the creature has moved. The band just goes down. */
   camHStudy: 6.2,
   pitchStudy: -0.03,
-  opacityStudy: 0.8,
+  opacityStudy: 0.88,
   zones: [
     /* The creature, which owns the middle of this frame outright. */
     { u: 0.47, v: 0.3, ru: 0.3, rv: 0.14, strength: 0.7 },

@@ -125,8 +125,8 @@ const LAND_SHOTS: LandShot[] = [
  * being seen from its other side.
  */
 const BEE_MARKS = {
-  hero: place(1.46, 0.16, 0.1, 1.08, -0.8, -0.05),
-  study: place(-2.48, -0.02, 0.2, 0.99, 0.66, -0.02),
+  hero: place(2.15, 0.24, 0.1, 1.08, -0.8, -0.05),
+  study: place(-2.48, 0.16, 0.2, 0.99, 0.66, -0.02),
 };
 
 /** Where the bee goes when it leaves: up and out, ahead of the water. */
@@ -264,6 +264,7 @@ const beeEntry = { x: 6.4, y: 1.35 };
 
 export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
   const hostRef = useRef<HTMLDivElement>(null);
+  const foregroundHostRef = useRef<HTMLDivElement>(null);
   const beeModeRef = useRef(beeMode);
   // Held in a ref of our own so the scene effect can stay on an empty dependency
   // list: the renderer, the loaders and the models must survive a prop change,
@@ -275,7 +276,8 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
 
   useEffect(() => {
     const host = hostRef.current;
-    if (!host) return;
+    const foregroundHost = foregroundHostRef.current;
+    if (!host || !foregroundHost) return;
     const story = host.closest('.explore-story') as HTMLElement | null;
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const compact = window.matchMedia('(max-width: 780px)').matches;
@@ -299,6 +301,42 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
     renderer.setPixelRatio(pixelRatio);
     renderer.domElement.setAttribute('aria-hidden', 'true');
     host.insertBefore(renderer.domElement, host.firstChild);
+
+    /*
+     * A real foreground pass for the bee.
+     *
+     * FlowerValleyLayer is a DOM canvas, so no amount of alpha shaping inside
+     * that canvas can put the WebGL bee above it. This second renderer draws
+     * only layer 1 (the bee and its lights) into a transparent sibling canvas.
+     * The original renderer still owns the complete land/ocean composite; this
+     * pass only restores the correct visual order: world, flowers, bee, copy.
+     */
+    const foregroundRenderer = new THREE.WebGLRenderer({
+      antialias: !compact,
+      alpha: true,
+      premultipliedAlpha: true,
+      powerPreference: 'high-performance',
+    });
+    foregroundRenderer.outputColorSpace = THREE.SRGBColorSpace;
+    foregroundRenderer.toneMapping = THREE.ACESFilmicToneMapping;
+    foregroundRenderer.toneMappingExposure = renderer.toneMappingExposure;
+    foregroundRenderer.setClearColor(0x000000, 0);
+    foregroundRenderer.setPixelRatio(Math.min(window.devicePixelRatio, compact ? 1.1 : 1.35));
+    foregroundRenderer.domElement.className = 'explore-foreground-canvas';
+    foregroundRenderer.domElement.setAttribute('aria-hidden', 'true');
+    foregroundHost.appendChild(foregroundRenderer.domElement);
+
+    /* Render targets are context-local. Giving the foreground renderer its own
+       mipmapped scene capture preserves the exact ruby refraction instead of
+       replacing it with a flat colour approximation. */
+    const foregroundSceneCapture = new THREE.WebGLRenderTarget(1, 1, {
+      minFilter: THREE.LinearMipmapLinearFilter,
+      magFilter: THREE.LinearFilter,
+      generateMipmaps: true,
+      type: THREE.HalfFloatType,
+      depthBuffer: true,
+    });
+    foregroundSceneCapture.texture.colorSpace = THREE.LinearSRGBColorSpace;
 
     const landEnvironment = createProceduralEnvironment(renderer, exploreEnvironmentPalette);
     landScene.environment = landEnvironment.texture;
@@ -345,18 +383,23 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
 
     /* ---------------------------------------------------------------- lights --- */
     const hemisphere = new THREE.HemisphereLight(0xf2f6ff, 0xcfc4e6, 1.1);
+    hemisphere.layers.enable(1);
     landScene.add(hemisphere);
     const keyLight = new THREE.DirectionalLight(0xfff1fb, 2.0);
     keyLight.position.set(-3.4, 4.8, 5.2);
+    keyLight.layers.enable(1);
     landScene.add(keyLight);
     const cyanLight = new THREE.PointLight(0x74ecff, 7.6, 14, 2);
     cyanLight.position.set(3.4, 1.7, 2.6);
+    cyanLight.layers.enable(1);
     landScene.add(cyanLight);
     const pinkLight = new THREE.PointLight(0xff5aae, 4.8, 11, 2);
     pinkLight.position.set(-2.6, -1.9, 2.3);
+    pinkLight.layers.enable(1);
     landScene.add(pinkLight);
     const rimLight = new THREE.DirectionalLight(0xbfe9ff, 1.1);
     rimLight.position.set(4.2, -1.2, -4.5);
+    rimLight.layers.enable(1);
     landScene.add(rimLight);
 
     /* ------------------------------------------------------------ transition --- */
@@ -429,6 +472,7 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
       beeWings = handle.opticalLayers?.wings;
       beeActions = handle.actions ?? [];
       handle.root.visible = false;
+      handle.root.traverse((child) => child.layers.enable(1));
       landScene.add(handle.root);
       if (handle.mixer) mixers.push(handle.mixer);
       bee = handle;
@@ -457,6 +501,13 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
       ];
       // Starts on the fly clip: the very first thing the bee does is fly in.
       beeActions[2]?.reset().fadeIn(0.01).play();
+      /* Compile the foreground variant before it becomes visible. */
+      const sceneTexture = beeMaterialSet.optical.uScene.value;
+      beeMaterialSet.optical.uScene.value = foregroundSceneCapture.texture;
+      landCamera.layers.set(1);
+      foregroundRenderer.compile(landScene, landCamera);
+      landCamera.layers.set(0);
+      beeMaterialSet.optical.uScene.value = sceneTexture;
       host.dataset.ready = 'true';
     };
 
@@ -688,6 +739,12 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
       landCamera.updateProjectionMatrix();
       ocean?.resize(aspect);
       renderer.setSize(viewportWidth, viewportHeight, false);
+      foregroundRenderer.setSize(viewportWidth, viewportHeight, false);
+      const foregroundRatio = foregroundRenderer.getPixelRatio();
+      foregroundSceneCapture.setSize(
+        Math.max(1, Math.floor(viewportWidth * foregroundRatio * 0.8)),
+        Math.max(1, Math.floor(viewportHeight * foregroundRatio * 0.8)),
+      );
       const ratio = renderer.getPixelRatio();
       renderWidth = Math.floor(viewportWidth * ratio);
       renderHeight = Math.floor(viewportHeight * ratio);
@@ -1061,6 +1118,8 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
         drawLand(null);
       }
 
+      drawBeeForeground(dive);
+
       if (delta > worstFrame) worstFrame = delta;
 
       /* adaptive resolution: two sustained slow windows step the ratio down */
@@ -1098,6 +1157,42 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
       renderer.setRenderTarget(target);
       renderer.render(landScene, landCamera);
       renderer.setRenderTarget(null);
+    }
+
+    const foregroundResolution = new THREE.Vector2();
+    function drawBeeForeground(dive: number) {
+      const visibility = 1 - smoothstep(0.04, 0.3, dive);
+      foregroundHost.style.opacity = visibility.toFixed(3);
+      if (!bee || !beeMaterialSet || beePresence < 0.006 || visibility < 0.006) {
+        foregroundRenderer.clear();
+        return;
+      }
+
+      const sceneTexture = beeMaterialSet.optical.uScene.value;
+      beeMaterialSet.optical.uScene.value = foregroundSceneCapture.texture;
+      foregroundRenderer.getDrawingBufferSize(foregroundResolution);
+      beeMaterialSet.optical.uSceneResolution.value.copy(foregroundResolution);
+      foregroundRenderer.toneMappingExposure = renderer.toneMappingExposure;
+      const wingsVisible = beeWings?.visible ?? false;
+      const shellVisible = beeShell?.visible ?? false;
+      if (beeWings) beeWings.visible = false;
+      if (beeShell) beeShell.visible = false;
+
+      /* Capture the liquid backdrop plus ruby core in this WebGL context. */
+      landCamera.layers.set(0);
+      landCamera.layers.enable(1);
+      foregroundRenderer.setRenderTarget(foregroundSceneCapture);
+      foregroundRenderer.render(landScene, landCamera);
+      if (beeWings) beeWings.visible = wingsVisible;
+      if (beeShell) beeShell.visible = shellVisible;
+
+      /* Then draw only the complete Bee into the transparent DOM canvas. */
+      foregroundRenderer.setRenderTarget(null);
+      landCamera.layers.set(1);
+      foregroundRenderer.render(landScene, landCamera);
+      landCamera.layers.set(0);
+      beeMaterialSet.optical.uScene.value = sceneTexture;
+      beeMaterialSet.optical.uSceneResolution.value.set(renderWidth, renderHeight);
     }
 
     if (process.env.NODE_ENV !== 'production') {
@@ -1211,6 +1306,9 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
       liquid.dispose();
       landEnvironment.dispose();
       sceneCapture.dispose();
+      foregroundSceneCapture.dispose();
+      foregroundRenderer.dispose();
+      foregroundRenderer.domElement.remove();
       loader.dispose();
       renderer.dispose();
       renderer.domElement.remove();
@@ -1220,8 +1318,11 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
   }, []);
 
   return (
-    <div className="explore-canvas" ref={hostRef} aria-hidden="true">
-      <div className="visual-loader"><span />Đang mở phòng thí nghiệm 3D…</div>
-    </div>
+    <>
+      <div className="explore-canvas" ref={hostRef} aria-hidden="true">
+        <div className="visual-loader"><span />Đang mở phòng thí nghiệm 3D…</div>
+      </div>
+      <div className="explore-foreground" ref={foregroundHostRef} aria-hidden="true" />
+    </>
   );
 }

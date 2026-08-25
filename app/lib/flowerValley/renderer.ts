@@ -69,7 +69,6 @@ import {
 import { buildValleyField, curve, slope, type Flower, type ValleyField } from './valley';
 import { createVisibilityGate } from '../three/visibility';
 import { diveFor, waterlineFor } from '../story/clock';
-import { subjectRect } from '../story/subject';
 
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
@@ -339,8 +338,8 @@ export function createFlowerValley(host: HTMLElement, options: FlowerValleyOptio
      */
     const gain = 1 + dive * 0.55;
     haze = ctx.createLinearGradient(0, top, 0, bottom);
-    haze.addColorStop(0, `rgba(${tint}, ${(0.34 * gain).toFixed(3)})`);
-    haze.addColorStop(0.4, `rgba(${tint}, ${(0.15 * gain).toFixed(3)})`);
+    haze.addColorStop(0, `rgba(${tint}, ${(0.12 * gain).toFixed(3)})`);
+    haze.addColorStop(0.4, `rgba(${tint}, ${(0.04 * gain).toFixed(3)})`);
     haze.addColorStop(1, `rgba(${tint}, 0)`);
   }
 
@@ -359,6 +358,11 @@ export function createFlowerValley(host: HTMLElement, options: FlowerValleyOptio
       perDrift: layout.perDrift,
       driftZ: layout.driftZ,
       driftSpan: layout.driftSpan,
+      foregroundFill: layout.foregroundFill && {
+        ...layout.foregroundFill,
+        count: Math.round(layout.foregroundFill.count * preset.density),
+        zFrom: layout.from + layout.foregroundFill.depthFrom,
+      },
     });
   }
 
@@ -446,12 +450,9 @@ export function createFlowerValley(host: HTMLElement, options: FlowerValleyOptio
     };
   }
 
-  /**
-   * The corridor, in CSS pixels, under the last line of copy. The brief asks for
-   * roughly 40-60. The sides and the top get much less, because there is no
-   * corridor to keep there — only type to stay off.
-   */
-  const COPY_MARGIN = { x: 26, top: 30, bottom: 52 };
+  /** Tight breathing room around the compact specimen note. Plants may return
+   * immediately after the last line, but never print through the type itself. */
+  const COPY_MARGIN = { x: 18, top: 20, bottom: 28 };
   /* Small blocks — the specimen card and the scroll cue — need to be legible,
      not to open a corridor, so they clear themselves and little else. */
   const LABEL_MARGIN = { x: 18, top: 16, bottom: 18 };
@@ -474,86 +475,14 @@ export function createFlowerValley(host: HTMLElement, options: FlowerValleyOptio
     };
   }
 
-  /*
-   * The creature's two exclusions, rebuilt from its live screen rect.
-   *
-   * They are a PAIR, and the pair is the whole layering answer:
-   *
-   *   `subjectFar`   the full box, `farOnly`. Background and midground plants —
-   *                  which is nearly all of them — are removed across the entire
-   *                  creature. This is what stops the bee reading as if it were
-   *                  underneath a flower canvas.
-   *
-   *   `subjectCore`  the same box shrunk to 62%, applying to EVERY plant
-   *                  including foreground. So a near plant is free to cross the
-   *                  wing tip, a trailing leg or the silhouette's outer edge, and
-   *                  is still refused the head, thorax, abdomen and main legs.
-   *
-   * That is the brief's hierarchy expressed as two numbers rather than as a
-   * second canvas: valley behind, creature, then a small foreground pass that may
-   * only touch the periphery.
-   *
-   * Mutated in place rather than reallocated — this runs every frame.
-   */
-  const subjectFar: Zone = { u: 0, v: 0, ru: 0, rv: 0, strength: 0.99, boxed: true, feather: 0.26, farOnly: true };
-  const subjectCore: Zone = { u: 0, v: 0, ru: 0, rv: 0, strength: 0.97, boxed: true, feather: 0.3 };
-  const subjectZones: Zone[] = [];
-
-  /** How much of the box the foreground pass is refused. */
-  const SUBJECT_CORE = 0.62;
-  /** Breathing room around the projected box, in CSS px. */
-  const SUBJECT_MARGIN = 10;
-  /*
-   * The projected box is bigger than the creature.
-   *
-   * A bounding box around a bee is mostly wing and antenna: the silhouette is a
-   * cross, and the rectangle that contains it clears a good deal of valley that
-   * has no bee in it. 0.9 pulls the exclusion back onto the body, and the wings
-   * lose nothing by it — they are near-transparent refractive film, so a flower
-   * seen faintly through a wing is what depth actually looks like, whereas a
-   * flower across the thorax is the bug.
-   */
-  const SUBJECT_TIGHTEN_X = 0.92;
-  /*
-   * Tighter still vertically, because the lowest thing in the box is the legs
-   * and the brief explicitly allows flowers across the bottom of them. Leaving
-   * the box at full height put its released rim in the middle of the flower
-   * band, which read as a dip under the creature.
-   */
-  const SUBJECT_TIGHTEN_Y = 0.78;
-
-  function updateSubjectZones() {
-    subjectZones.length = 0;
-    if (subjectRect.presence < 0.02) return;
-    const left = subjectRect.left - SUBJECT_MARGIN;
-    const right = subjectRect.right + SUBJECT_MARGIN;
-    const top = subjectRect.top - SUBJECT_MARGIN;
-    const bottom = subjectRect.bottom + SUBJECT_MARGIN;
-    if (!(right > left) || !(bottom > top)) return;
-    const u = (left + right) / 2 / W;
-    const v = (top + bottom) / 2 / H;
-    const ru = (right - left) / 2 / W * SUBJECT_TIGHTEN_X;
-    const rv = (bottom - top) / 2 / H * SUBJECT_TIGHTEN_Y;
-    /* Fades with the creature, so a departing bee releases the field behind it
-       instead of dragging a hole off the top of the frame. */
-    const gain = Math.min(1, subjectRect.presence * 1.6);
-    subjectFar.u = u; subjectFar.v = v; subjectFar.ru = ru; subjectFar.rv = rv;
-    subjectFar.strength = 0.99 * gain;
-    subjectCore.u = u; subjectCore.v = v;
-    subjectCore.ru = ru * SUBJECT_CORE; subjectCore.rv = rv * SUBJECT_CORE;
-    subjectCore.strength = 0.97 * gain;
-    subjectZones.push(subjectFar, subjectCore);
-  }
-
   function measureCopyZones() {
     heroZones = [];
     studyZones = [];
     const hero = document.querySelector<HTMLElement>('.hero');
     const study = document.querySelector<HTMLElement>('.story-panel--bee');
-    /* The hero's box is headline through CTA. The lede and the eyebrow sit
-       between them, so the union of the two ends is the whole block. */
+    /* The hero's box is the compact headline-through-CTA composition. */
     const heroBox = bleed(hero && blockBox(hero, ['.hero-copy']));
-    if (heroBox) heroZones = [boxZone(heroBox, COPY_MARGIN, 0.96)];
+    if (heroBox) heroZones = [boxZone(heroBox, COPY_MARGIN, 0.94)];
     /*
      * The two small labels on the hero.
      *
@@ -568,32 +497,33 @@ export function createFlowerValley(host: HTMLElement, options: FlowerValleyOptio
       if (box) heroZones.push(boxZone(box, LABEL_MARGIN, 0.9));
     }
     const studyBox = bleed(study && blockBox(study, ['.story-copy']));
-    if (studyBox) studyZones = [boxZone(studyBox, COPY_MARGIN, 0.94)];
+    if (studyBox) studyZones = [boxZone(studyBox, COPY_MARGIN, 0.92)];
   }
 
   /**
-   * The authored list with each measured role swapped in.
+   * Wide layouts no longer carve the meadow around the Bee or the copy.
    *
-   * An authored zone survives only where the measurement is unavailable — a
-   * frame where the DOM could not be read, or a creature that has not loaded —
-   * so the hand-tuned ellipses remain a real fallback rather than dead code.
+   * The Bee now owns a real WebGL foreground pass and the compact copy rail sits
+   * above the flower band, so those holes are both unnecessary and visibly
+   * artificial. Narrow layouts keep the measured copy reservation because text
+   * and specimen necessarily share one column there.
    */
   function withMeasured(authored: Zone[], copy: Zone[]): Zone[] {
     const out: Zone[] = [];
     let usedCopy = false;
-    let usedSubject = false;
+    const reserveCopy = W <= 1000;
     for (const zone of authored) {
-      if (zone.role === 'copy' && copy.length) {
-        if (!usedCopy) { out.push(...copy); usedCopy = true; }
+      if (zone.role === 'copy') {
+        if (reserveCopy && copy.length && !usedCopy) {
+          out.push(...copy);
+          usedCopy = true;
+        }
         continue;
       }
-      if (zone.role === 'subject' && subjectZones.length) {
-        if (!usedSubject) { out.push(...subjectZones); usedSubject = true; }
-        continue;
-      }
+      if (zone.role === 'subject') continue;
       out.push(zone);
     }
-    if (!usedCopy && copy.length) out.push(...copy);
+    if (reserveCopy && !usedCopy && copy.length) out.push(...copy);
     return out;
   }
 
@@ -764,7 +694,6 @@ export function createFlowerValley(host: HTMLElement, options: FlowerValleyOptio
      * at either end one of them is skipped entirely, so the settled case costs
      * exactly what it did before.
      */
-    updateSubjectZones();
     const zones = withMeasured(layout.zones, heroZones);
     const zonesStudy = withMeasured(layout.zonesStudy, studyZones);
     const studyMix = chapter;

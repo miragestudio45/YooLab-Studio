@@ -274,96 +274,72 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 .brand-lockup--light .brand-wordmark { color: #fff; }
 
 /* ----------------------------------------------------------------- header --- */
-/*
- * A bar, not a pill.
- *
- * The floating 1240 px capsule was the single loudest "these sections were
- * designed separately" signal on the page: it was narrower than every band below
- * it, so the logo never lined up with a single heading, and at 1920 it sat 260 px
- * inside the workspace it was supposed to belong to. It is now full-bleed glass
- * whose *contents* sit in the same shell as everything else — so the wordmark
- * shares a left edge with every section heading on the page, which is the
- * strongest possible statement that this is one product.
- *
- * The premium quality moves from the capsule's border to the material: at rest
- * there is no chrome at all, only a soft top scrim that keeps the navigation
- * legible over the hero's creature, and the glass, hairline and shadow arrive on
- * scroll. It occupies exactly `--header-h`, and nothing on the page renders into
- * that band.
- */
+/* A thin glass rail. Its visual height changes without touching `--header-h`,
+   so the fitted sections, WebGL stage and anchor geometry stay intact. */
 .site-header {
   position: fixed;
   z-index: 50;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: var(--header-h);
-  transition: background 260ms ease, box-shadow 260ms ease, border-color 260ms ease;
-  border-bottom: 1px solid transparent;
+  top: 8px;
+  right: clamp(24px, 2vw, 32px);
+  left: clamp(24px, 2vw, 32px);
+  height: 56px;
+  color: var(--color-ink);
+  border: 1px solid rgba(255, 255, 255, 0.48);
+  border-radius: 15px;
+  background: rgba(255, 247, 238, 0.34);
+  box-shadow: 0 7px 24px rgba(87, 62, 43, 0.035);
+  backdrop-filter: blur(18px) saturate(1.14);
+  -webkit-backdrop-filter: blur(18px) saturate(1.14);
+  transition:
+    color 300ms ease,
+    background-color 300ms ease,
+    border-color 300ms ease,
+    box-shadow 300ms ease;
 }
 
-/*
- * The scrim. Present at rest, gone once the bar has its own ground, so the two
- * never stack into a grey band across the top of a scrolled page.
- *
- * It reaches 46 px past the bar and uses three stops, because a two-stop gradient
- * ending level with the bar's own edge drew a visible horizontal line across
- * every 3D chapter — the eye finds a linear ramp's endpoint immediately. The peak
- * alpha is low enough to leave the creature readable through it and high enough
- * that 13.5 px navigation over a jellyfish bell still has contrast.
- */
-.site-header::before {
-  content: '';
-  position: absolute;
-  z-index: -1;
-  inset: 0 0 -46px;
-  pointer-events: none;
-  background: linear-gradient(180deg,
-    rgba(251, 248, 244, 0.72) 0%,
-    rgba(251, 248, 244, 0.40) 42%,
-    rgba(251, 248, 244, 0.12) 76%,
-    rgba(251, 248, 244, 0) 100%);
-  transition: opacity 260ms ease;
+.site-header[data-theme='dark'] {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(4, 16, 39, 0.38);
+  box-shadow: 0 9px 28px rgba(0, 5, 20, 0.12);
 }
 
 .site-header.is-scrolled {
-  border-bottom-color: var(--color-border-hair);
-  background: rgba(255, 253, 249, 0.82);
-  box-shadow: 0 10px 34px rgba(87, 62, 43, 0.06);
-  backdrop-filter: blur(20px) saturate(1.25);
-  -webkit-backdrop-filter: blur(20px) saturate(1.25);
+  box-shadow: 0 10px 30px rgba(87, 62, 43, 0.065);
 }
-.site-header.is-scrolled::before { opacity: 0; }
+.site-header.is-scrolled[data-theme='dark'] { box-shadow: 0 12px 34px rgba(0, 5, 20, 0.18); }
 
-/* The shell. `min-width: 0` on the middle track is what lets the nav shrink
-   rather than push the CTA off the right edge at intermediate widths. */
 .site-header-inner {
   display: grid;
-  width: var(--shell);
+  width: 100%;
   height: 100%;
-  margin-inline: auto;
+  padding-inline: 15px 10px;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: clamp(16px, 2vw, 40px);
+  gap: clamp(15px, 1.7vw, 32px);
 }
+
+.site-header .brand { color: inherit; gap: 8px; }
+.site-header .brand svg { flex: 0 0 auto; }
+.site-header .brand-wordmark { color: inherit; font-size: 18px; }
 
 .desktop-nav {
   display: flex;
   min-width: 0;
   align-items: center;
   justify-content: center;
-  gap: clamp(13px, 1.7vw, 30px);
-  font-size: 13.5px;
-  font-weight: 550;
-  letter-spacing: -0.005em;
+  gap: clamp(14px, 1.45vw, 24px);
+  font-size: 13px;
+  font-weight: 570;
+  letter-spacing: -0.01em;
 }
 
 .desktop-nav a {
   position: relative;
   padding: 6px 0;
-  color: var(--ink-2);
+  color: color-mix(in srgb, currentColor 78%, transparent);
   white-space: nowrap;
-  transition: color 170ms ease;
+  transition: color 180ms ease;
 }
 /* A 1 px rule that grows from the centre, rather than a colour change alone: at
    13.5 px the hover state has to be visible without being a second weight. */
@@ -378,29 +354,27 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   transform: scaleX(0);
   transition: transform 200ms var(--ease-reveal);
 }
-.desktop-nav a:hover { color: var(--brand); }
+.desktop-nav a:hover { color: inherit; }
 .desktop-nav a:hover::after { transform: scaleX(1); }
 
 .header-cta {
   justify-self: end;
   display: inline-flex;
   align-items: center;
-  gap: 14px;
-  min-height: 40px;
-  padding: 0 18px;
-  border-radius: 11px;
+  gap: 10px;
+  min-height: 34px;
+  padding: 0 14px;
+  border-radius: 9px;
   color: #fff;
   background: var(--brand);
   font-size: 13px;
   font-weight: 620;
   white-space: nowrap;
-  box-shadow: 0 8px 22px rgba(180, 88, 70, 0.22);
+  box-shadow: 0 6px 18px rgba(180, 88, 70, 0.2);
   transition: background 180ms ease, transform 180ms ease;
 }
 .header-cta:hover { background: var(--brand-deep); transform: translateY(-1px); }
 .header-cta span { color: var(--brand-soft); }
-
-.brand-wordmark { font-size: 20px; }
 
 .menu-toggle, .mobile-nav { display: none; }
 
@@ -419,7 +393,8 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   isolation: isolate;
 }
 
-.explore-canvas, .explore-canvas canvas {
+.explore-canvas, .explore-canvas canvas,
+.explore-foreground, .explore-foreground canvas {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -428,6 +403,12 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 
 .explore-canvas { z-index: -4; background: #fbf8f4; }
 .explore-canvas canvas { display: block; }
+.explore-foreground {
+  z-index: -2;
+  pointer-events: none;
+  will-change: opacity;
+}
+.explore-foreground-canvas { display: block; }
 
 .visual-loader {
   position: absolute;
@@ -488,7 +469,7 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 
 .hero-noise {
   position: absolute;
-  z-index: -2;
+  z-index: -1;
   inset: 0;
   opacity: 0.035;
   pointer-events: none;
@@ -519,43 +500,21 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 .hero-copy {
   grid-column: 1 / span 6;
   grid-row: 1 / -1;
-  align-self: center;
-  max-width: 42rem;
-  margin-bottom: var(--hero-lift, clamp(104px, 20vh, 240px));
-}
-
-.eyebrow {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  margin: 0 0 24px;
-  color: rgba(45, 36, 32, 0.6);
-  font-size: 11px;
-  font-weight: 650;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
-}
-
-.eyebrow span {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--brand-accent);
-  box-shadow: 0 0 0 5px rgba(232, 120, 104, 0.14);
+  align-self: start;
+  max-width: 52rem;
+  margin-top: clamp(126px, 15.5vh, 176px);
 }
 
 .hero h1 {
-  /* The proposition is a full sentence, not a mood line, so it is sized to fit
-     three lines inside the copy column instead of being maximally large. Capped
-     by viewport height as well as width, for the same reason every other display
-     heading on the page is: a 1366×768 laptop is wide and short. */
-  max-width: 22ch;
+  /* Compact on wide frames and allowed to wrap once more on phones. Height joins
+     width in the clamp so a short laptop never lets type dominate the specimen. */
+  max-width: 18ch;
   margin: 0;
   text-wrap: balance;
-  font-size: clamp(36px, min(3.9vw, 6.4vh), 60px);
-  font-weight: 700;
-  line-height: 1.04;
-  letter-spacing: -0.042em;
+  font-size: clamp(36px, min(3.45vw, 5.9vh), 54px);
+  font-weight: 720;
+  line-height: 1.01;
+  letter-spacing: -0.04em;
 }
 
 .hero h1 em, .story-copy h2 em, .section-heading h2 em,
@@ -571,22 +530,22 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 }
 
 .hero-lede {
-  max-width: 47ch;
-  margin: 28px 0 0;
+  max-width: 64ch;
+  margin: 20px 0 0;
   color: var(--ink-2);
-  font-size: 16.5px;
-  line-height: 1.68;
+  font-size: 15.5px;
+  line-height: 1.62;
 }
 
-.hero-actions { display: flex; align-items: center; gap: 26px; margin-top: 34px; flex-wrap: wrap; }
+.hero-actions { display: flex; align-items: center; gap: 22px; margin-top: 26px; flex-wrap: wrap; }
 
 .primary-button {
   display: inline-flex;
-  min-height: 54px;
+  min-height: 48px;
   align-items: center;
   gap: 32px;
   padding: 0 24px;
-  border-radius: 15px;
+  border-radius: 13px;
   color: #fff;
   background: linear-gradient(135deg, var(--brand-deep), var(--color-accent) 88%);
   box-shadow: 0 16px 40px rgba(180, 88, 70, 0.26);
@@ -696,7 +655,7 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   isolation: isolate;
 }
 
-.explore-stage .hero-noise { z-index: -2; }
+.explore-stage .hero-noise { z-index: -1; }
 .explore-story > .story-panel:first-of-type { margin-top: -100svh; }
 
 .story-panel {
@@ -758,26 +717,26 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   padding-bottom: var(--section-gap);
 }
 
-.story-copy { position: relative; grid-column: 1 / span 5; grid-row: 1 / -1; align-self: center; }
-.story-copy--right { grid-column: 8 / span 5; }
+.story-copy {
+  position: relative;
+  grid-column: 1 / span 5;
+  grid-row: 1 / -1;
+  align-self: center;
+  width: 100%;
+  max-width: none;
+}
+.story-copy--right { grid-column: 8 / span 5; justify-self: end; }
 
 .section-kicker {
-  margin: 0 0 clamp(12px, 1.8vh, 20px);
+  margin: 0 0 clamp(10px, 1.4vh, 15px);
   color: var(--brand);
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.15em;
+  font-size: 10px;
+  font-weight: 680;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
-.section-kicker::before {
-  content: '';
-  display: inline-block;
-  width: 20px;
-  height: 1px;
-  margin: 0 10px 3px 0;
-  background: currentColor;
-}
+.section-kicker::before { display: none; }
 .section-kicker--light { color: var(--brand); }
 
 /*
@@ -809,23 +768,72 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   letter-spacing: -0.045em;
 }
 
-.story-copy > p:not(.section-kicker) {
-  max-width: 44ch;
-  margin: 24px 0 0;
-  color: var(--ink-2);
-  font-size: 15.5px;
-  line-height: 1.7;
+/* The proposition keeps a quiet second line; chapter headings use the same
+   weight shift inline so their wider rail stays shallow. */
+.hero h1 em {
+  display: block;
+  margin-top: 0.08em;
+  color: var(--brand);
+  background: none;
+  font-style: normal;
+  font-weight: 520;
+  letter-spacing: -0.04em;
 }
 
-.study-readout { margin: 28px 0 0; border-top: 1px solid var(--line); }
-.study-readout div {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 20px;
-  padding: 11px 0;
+.story-copy h2 em {
+  display: inline;
+  color: var(--brand);
+  background: none;
+  font-style: normal;
+  font-weight: 520;
+  letter-spacing: inherit;
+}
+
+.story-copy h2 {
+  max-width: none;
+  font-size: clamp(30px, min(2.55vw, 4.5vh), 43px);
+  font-weight: 700;
+  line-height: 1.02;
+  letter-spacing: -0.04em;
+}
+
+.story-copy-intro {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(220px, 0.85fr);
+  gap: clamp(20px, 2vw, 32px);
+  align-items: end;
+  padding-bottom: clamp(14px, 1.8vh, 18px);
   border-bottom: 1px solid var(--line);
 }
+
+.story-copy-intro > p {
+  max-width: 58ch;
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+
+.study-readout {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0;
+}
+.study-readout div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 4px;
+  padding: clamp(10px, 1.35vh, 13px) 14px clamp(10px, 1.35vh, 13px) 0;
+  border-bottom: 1px solid var(--line);
+}
+.study-readout div + div {
+  padding-left: 14px;
+  border-left: 1px solid var(--line);
+}
+.study-readout div:last-child { padding-right: 0; }
 .study-readout dt {
   color: var(--ink-3);
   font-size: 10.5px;
@@ -834,7 +842,7 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   text-transform: uppercase;
   white-space: nowrap;
 }
-.study-readout dd { margin: 0; color: var(--ink); font-size: 13.5px; font-weight: 500; text-align: right; }
+.study-readout dd { margin: 0; color: var(--ink); font-size: 11.5px; font-weight: 500; line-height: 1.4; text-align: left; }
 
 /*
  * Annotations belong to the creature, so they live in the creature's half.
@@ -968,17 +976,12 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   --line: color-mix(in oklab, var(--color-border), rgba(178, 231, 255, 0.36) calc(var(--sea) * 100%));
 }
 
-/* The italic half of a heading is a gradient rather than a colour, so it cannot
-   ride on `--ink` and is interpolated stop by stop instead. */
+/* Emphasis stays solid; only its hue follows the land-to-ocean transition. */
 .story-panel--bee .story-copy h2 em,
 .story-panel--fish .story-copy h2 em,
 .story-panel--jelly .story-copy h2 em {
-  background: linear-gradient(100deg,
-    color-mix(in oklab, var(--color-accent-deep), #63e0ff calc(var(--sea) * 100%)) 2%,
-    color-mix(in oklab, var(--color-accent-strong), #a6f1ff calc(var(--sea) * 100%)) 38%,
-    color-mix(in oklab, var(--color-lavender), #cfd8ff calc(var(--sea) * 100%)) 98%);
-  background-clip: text;
-  -webkit-background-clip: text;
+  color: color-mix(in oklab, var(--color-accent-strong), #bfefff calc(var(--sea) * 100%));
+  background: none;
 }
 
 /*
@@ -1030,17 +1033,17 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 .story-panel--fish .story-copy,
 .story-panel--jelly .story-copy {
   isolation: isolate;
-  padding-block: clamp(20px, 3vh, 34px);
+  padding-block: 0;
 }
 
 .story-panel--fish .story-copy {
-  padding-left: clamp(22px, 2.2vw, 34px);
-  border-left: 1px solid color-mix(in oklab, transparent, #8de9ff calc(var(--sea) * 46%));
+  padding-left: 0;
+  border-left: 0;
 }
 
 .story-panel--jelly .story-copy {
-  padding-right: clamp(22px, 2.2vw, 34px);
-  border-right: 1px solid color-mix(in oklab, transparent, #a9a2ff calc(var(--sea) * 44%));
+  padding-right: 0;
+  border-right: 0;
 }
 
 .story-panel--fish .story-copy::after {
@@ -1067,16 +1070,16 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 
 .story-panel--fish .section-kicker,
 .story-panel--jelly .section-kicker {
-  margin-bottom: clamp(10px, 1.4vh, 16px);
+  margin-bottom: clamp(9px, 1.2vh, 13px);
   color: #a9edff;
-  letter-spacing: 0.17em;
+  letter-spacing: 0.12em;
 }
 
 .story-panel--fish .story-copy h2,
 .story-panel--jelly .story-copy h2 {
-  max-width: 14ch;
-  font-size: clamp(33px, min(3.5vw, 5.15vh), 52px);
-  line-height: 0.98;
+  max-width: none;
+  font-size: clamp(30px, min(2.55vw, 4.5vh), 43px);
+  line-height: 1.02;
 }
 
 .story-panel--fish .story-copy h2 em {
@@ -1089,39 +1092,40 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   background: none;
 }
 
-.story-panel--fish .story-copy > p:not(.section-kicker),
-.story-panel--jelly .story-copy > p:not(.section-kicker) {
-  max-width: 42ch;
-  margin-top: clamp(16px, 2vh, 22px);
+.story-panel--fish .story-copy-intro > p,
+.story-panel--jelly .story-copy-intro > p {
+  max-width: 58ch;
+  margin: 0;
   color: rgba(224, 244, 252, 0.86);
-  font-size: 14.5px;
-  line-height: 1.62;
+  font-size: 13.5px;
+  line-height: 1.55;
 }
 
 .story-panel--fish .study-readout,
 .story-panel--jelly .study-readout {
-  counter-reset: ocean-feature;
-  margin-top: clamp(18px, 2.4vh, 26px);
+  margin-top: 0;
   border-color: rgba(156, 225, 247, 0.28);
 }
 
 .story-panel--fish .study-readout div,
 .story-panel--jelly .study-readout div {
-  counter-increment: ocean-feature;
-  display: grid;
-  grid-template-columns: 24px minmax(78px, 0.78fr) minmax(0, 1.72fr);
-  gap: 12px;
-  padding: clamp(8px, 1.15vh, 11px) 0;
+  display: flex;
+  gap: 4px;
+  padding: clamp(10px, 1.35vh, 13px) 14px;
   border-color: rgba(156, 225, 247, 0.2);
+}
+.story-panel--fish .study-readout div:first-child,
+.story-panel--jelly .study-readout div:first-child { padding-left: 0; }
+.story-panel--fish .study-readout div:last-child,
+.story-panel--jelly .study-readout div:last-child { padding-right: 0; }
+.story-panel--fish .study-readout div + div,
+.story-panel--jelly .study-readout div + div {
+  padding-left: 14px;
 }
 
 .story-panel--fish .study-readout div::before,
 .story-panel--jelly .study-readout div::before {
-  content: '0' counter(ocean-feature);
-  color: rgba(130, 228, 255, 0.66);
-  font-family: var(--font-display);
-  font-size: 10px;
-  letter-spacing: 0.06em;
+  display: none;
 }
 
 .story-panel--fish .study-readout dt,
@@ -1133,8 +1137,8 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 .story-panel--fish .study-readout dd,
 .story-panel--jelly .study-readout dd {
   color: rgba(244, 252, 255, 0.93);
-  font-size: 13px;
-  line-height: 1.35;
+  font-size: 12px;
+  line-height: 1.42;
 }
 
 /* Annotation halos invert with the ground: dark letterforms lifted off ivory
@@ -1161,20 +1165,20 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 .bee-modes {
   display: inline-flex;
   gap: 4px;
-  margin-top: 28px;
-  padding: 5px;
+  margin-top: 0;
+  padding: 4px;
   border: 1px solid rgba(45, 36, 32, 0.11);
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.4);
-  backdrop-filter: blur(15px);
+  backdrop-filter: blur(12px);
 }
 
 .bee-modes button {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 42px;
-  padding: 0 15px;
+  min-height: 34px;
+  padding: 0 13px;
   border: 0;
   border-radius: 12px;
   color: var(--ink-2);
@@ -1189,7 +1193,13 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   background: var(--brand);
   box-shadow: 0 9px 22px rgba(180, 88, 70, 0.24);
 }
-.bee-hint { margin: 14px 0 0; color: var(--ink-3); font-size: 12.5px; }
+.story-controls {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 12px;
+}
+.bee-hint { max-width: 26ch; margin: 0; color: var(--ink-3); font-size: 11.5px; line-height: 1.4; }
 
 /* ---------------------------------------------------------------- motion --- */
 /*
@@ -2437,12 +2447,16 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
  * chapters stop being two columns), 860 (single column everywhere) and 700 (the
  * phone regime, where fitted sections stop being fitted).
  */
+@media (min-width: 1001px) {
+  .hero h1 em { font-size: 0.84em; white-space: nowrap; }
+}
+
 @media (max-width: 1380px) {
   /* The copy column takes one more twelfth back from the creature: below this
      width a 5-column measure is under 40 characters and every heading wraps. */
-  .story-copy { grid-column: 1 / span 6; }
-  .story-copy--right { grid-column: 7 / span 6; }
-  .hero-copy { grid-column: 1 / span 7; }
+  .story-copy { grid-column: 1 / span 5; }
+  .story-copy--right { grid-column: 8 / span 5; }
+  .hero-copy { grid-column: 1 / span 6; }
 }
 
 @media (max-width: 1180px) {
@@ -2478,10 +2492,22 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
     grid-row: 2;
     align-self: end;
     max-width: 46rem;
+    margin-top: 0;
     /* The copy is bottom-anchored on its own plate here; there is no flower band
        under it to clear, and a lift would only push it into the creature. */
     --hero-lift: 0px;
   }
+  .story-copy-intro {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 11px;
+    align-items: start;
+  }
+  .study-readout { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .study-readout div:nth-child(odd) {
+    padding-left: 0;
+    border-left: 0;
+  }
+  .story-controls { flex-wrap: wrap; }
   /*
    * A legibility plate, sized to the copy rather than to the panel.
    *
@@ -2637,28 +2663,36 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
    */
   .mobile-nav {
     position: absolute;
-    top: var(--header-h);
-    left: max(var(--page-gutter), calc((100% - var(--page-max)) / 2));
-    right: max(var(--page-gutter), calc((100% - var(--page-max)) / 2));
+    top: calc(100% + 8px);
+    right: 0;
+    left: 0;
     display: flex;
     max-height: 0;
     flex-direction: column;
     overflow: hidden;
     border: 1px solid transparent;
-    border-radius: 0 0 18px 18px;
-    background: rgba(255, 253, 249, 0.96);
+    border-radius: 15px;
+    color: var(--color-ink);
+    background: rgba(255, 249, 242, 0.72);
     opacity: 0;
     box-shadow: 0 24px 55px rgba(87, 62, 43, 0.16);
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
-    transition: max-height 0.3s ease, opacity 0.2s;
+    backdrop-filter: blur(20px) saturate(1.12);
+    -webkit-backdrop-filter: blur(20px) saturate(1.12);
+    transition: max-height 300ms ease, opacity 200ms ease, background-color 300ms ease, color 300ms ease;
+  }
+  .site-header[data-theme='dark'] .mobile-nav {
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.16);
+    background: rgba(4, 16, 39, 0.72);
   }
   .site-header.is-open .mobile-nav {
     max-height: 560px;
     padding: 10px 14px 14px;
     border-color: var(--color-border-hair);
-    border-top-color: transparent;
     opacity: 1;
+  }
+  .site-header.is-open[data-theme='dark'] .mobile-nav {
+    border-color: rgba(255, 255, 255, 0.16);
   }
   .mobile-nav > a {
     display: flex;
@@ -2669,7 +2703,7 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
     font-size: 14px;
     font-weight: 540;
   }
-  .mobile-nav > a span { color: var(--ink-4); font-size: 9px; }
+  .mobile-nav > a span { color: color-mix(in srgb, currentColor 55%, transparent); font-size: 9px; }
   .mobile-nav .mobile-nav-cta {
     justify-content: center;
     margin-top: 10px;
@@ -2693,6 +2727,14 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
 }
 
 @media (max-width: 700px) {
+  .site-header {
+    right: 12px;
+    left: 12px;
+  }
+  .site-header-inner { padding-inline: 14px 6px; }
+}
+
+@media (max-width: 700px) {
   .story-panel { min-height: 820px; }
   .story-grid { min-height: 820px; padding-bottom: 66px; }
   .explore-stage { height: 820px; }
@@ -2709,9 +2751,9 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
   .story-copy h2, .section-heading h2, .final-cta h2 { font-size: clamp(27px, 7.2vw, 36px); }
   .story-panel--fish .story-copy h2,
   .story-panel--jelly .story-copy h2 { max-width: 13ch; }
-  .story-panel--fish .story-copy > p:not(.section-kicker),
-  .story-panel--jelly .story-copy > p:not(.section-kicker) {
-    margin-top: 13px;
+  .story-panel--fish .story-copy-intro > p,
+  .story-panel--jelly .story-copy-intro > p {
+    margin-top: 0;
     font-size: 13.5px;
     line-height: 1.5;
   }

@@ -144,6 +144,17 @@ export type ValleyFieldOptions = {
   /** How far a member strays from its drift centre, in z and in offset. */
   driftZ: number;
   driftSpan: number;
+  /** A small authored drift for a known foreground gap. Kept separate from the
+   * global scatter so filling one bank does not turn the valley into a carpet. */
+  foregroundFill?: {
+    side: -1 | 1;
+    count: number;
+    zFrom: number;
+    depthFrom: number;
+    depthSpan: number;
+    offsetFrom: number;
+    offsetSpan: number;
+  };
 };
 
 export type ValleyField = {
@@ -153,9 +164,10 @@ export type ValleyField = {
 };
 
 export function buildValleyField(options: ValleyFieldOptions): ValleyField {
-  const { from, span, count, clearance, spread, perDrift, driftZ, driftSpan } = options;
+  const { from, span, count, clearance, spread, perDrift, driftZ, driftSpan, foregroundFill } = options;
   const drifts = Math.max(4, Math.round(count / Math.max(2, perDrift)));
-  const flowers: Flower[] = new Array(count);
+  const fillCount = foregroundFill?.count ?? 0;
+  const flowers: Flower[] = new Array(count + fillCount);
 
   for (let i = 0; i < count; i += 1) {
     const r2 = hash(i * 4.771 + 7.3);
@@ -210,6 +222,45 @@ export function buildValleyField(options: ValleyFieldOptions): ValleyField {
       cosP: Math.cos(phase),
       tall,
     };
+  }
+
+  /*
+   * The normal drift hash deliberately creates negative space. One deterministic
+   * near-left gap, however, lands directly in the hero foreground at desktop
+   * aspect ratios. This authored drift fills only that piece of ground. Its z
+   * range is close enough to the opening camera that it falls behind the eye as
+   * soon as the story advances, so it cannot change the anatomy chapter.
+   */
+  if (foregroundFill) {
+    for (let j = 0; j < fillCount; j += 1) {
+      const index = count + j;
+      const seed = 50_000 + j;
+      const r2 = hash(seed * 4.771 + 7.3);
+      const r3 = hash(seed * 9.331 + 1.2);
+      const r4 = hash(seed * 2.771 + 18.8);
+      const z = foregroundFill.zFrom + r2 * foregroundFill.depthSpan;
+      const dist = foregroundFill.offsetFrom + r3 * foregroundFill.offsetSpan;
+      const x = curve(z) + foregroundFill.side * dist + (r4 - 0.5) * 2.5;
+      const tile = cell(seed, dist, z);
+      const tall = tileRow(tile) >= 4;
+      const scale = tall
+        ? lerp(0.95, 1.95, hash(seed * 3.11))
+        : lerp(0.8, 1.7, hash(seed * 6.17));
+      const phase = r4 * TAU + z * 0.014 + j * 0.37;
+
+      flowers[index] = {
+        x,
+        y: ground(x, z),
+        z,
+        tile,
+        scale,
+        sway: lerp(0.35, 1.15, hash(seed * 8.91)),
+        bright: lerp(0.9, 1.06, hash(seed * 4.15 + 99)),
+        sinP: Math.sin(phase),
+        cosP: Math.cos(phase),
+        tall,
+      };
+    }
   }
 
   /* Sorted by depth once, which is what makes the per-frame cost proportional to

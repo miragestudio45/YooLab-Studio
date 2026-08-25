@@ -118,10 +118,9 @@ export function ExploreStory() {
         <div className="hero-noise" />
       </div>
 
-      <section className="hero story-panel" data-snap data-scene="bee-hero" aria-labelledby="hero-title">
+      <section className="hero story-panel" data-snap data-scene="bee-hero" data-header-theme="light" aria-labelledby="hero-title">
         <div className="story-grid">
           <div className="hero-copy story-content">
-            <p className="eyebrow"><span aria-hidden="true" /> YooLab · 3D/XR Learning</p>
             <h1 id="hero-title">
               Biến kiến thức
               <br />
@@ -152,84 +151,86 @@ export function ExploreStory() {
         </a>
       </section>
 
-      <section className="story-panel story-panel--bee" id="ong-mat" data-snap data-scene="bee-study" aria-labelledby="bee-title">
+      <section className="story-panel story-panel--bee" id="ong-mat" data-snap data-scene="bee-study" data-header-theme="light" aria-labelledby="bee-title">
         <div className="story-grid">
           <div className="story-copy story-copy--right story-content" data-reveal="soft">
-            <p className="section-kicker">01 — Sinh học · Giải phẫu côn trùng</p>
-            <h2 id="bee-title">Ba phần cơ thể,<br /><em>một cơ chế bay.</em></h2>
-            <p>
-              Ong mật chia thành đầu, ngực và bụng. Cánh và cả sáu chân đều gắn
-              vào ngực — nơi tập trung toàn bộ cơ bay. Đổi trạng thái để thấy cơ
-              chế đó làm việc.
-            </p>
+            <div className="story-copy-intro">
+              <h2 id="bee-title">Ba phần cơ thể, <em>một cơ chế bay.</em></h2>
+              <p>
+                Ong mật chia thành đầu, ngực và bụng. Cánh và cả sáu chân đều gắn
+                vào ngực — nơi tập trung toàn bộ cơ bay.
+              </p>
+            </div>
             <dl className="study-readout study-readout--compact">
               <div><dt>Đầu</dt><dd>Râu và mắt kép — cơ quan nhận biết</dd></div>
               <div><dt>Ngực</dt><dd>Nơi gắn cánh và sáu chân</dd></div>
               <div><dt>Cánh</dt><dd>Hai đôi mỏng, đập rất nhanh</dd></div>
               <div><dt>Bụng</dt><dd>Nhiều đốt, chứa nội quan</dd></div>
             </dl>
-            <div className="bee-modes" role="group" aria-label="Trạng thái chuyển động của ong">
-              {beeStates.map((state, index) => (
-                <button
-                  type="button"
-                  className={beeMode === index ? 'is-active' : ''}
-                  onClick={() => setBeeMode(index)}
-                  aria-pressed={beeMode === index}
-                  key={state.label}
-                >
-                  <span>0{index + 1}</span>{state.label}
-                </button>
-              ))}
+            <div className="story-controls">
+              <div className="bee-modes" role="group" aria-label="Trạng thái chuyển động của ong">
+                {beeStates.map((state, index) => (
+                  <button
+                    type="button"
+                    className={beeMode === index ? 'is-active' : ''}
+                    onClick={() => setBeeMode(index)}
+                    aria-pressed={beeMode === index}
+                    key={state.label}
+                  >
+                    <span>0{index + 1}</span>{state.label}
+                  </button>
+                ))}
+              </div>
+              <p className="bee-hint">{beeStates[beeMode].hint}</p>
             </div>
-            <p className="bee-hint">{beeStates[beeMode].hint}</p>
-        </div>
-        <div className="annotation annotation--bee-a"><i />Cánh gắn vào ngực</div>
-        <div className="annotation annotation--flip annotation--bee-b"><i />Ngực — trung tâm cơ bay</div>
-        <div className="annotation annotation--bee-c"><i />Bụng chia thành nhiều đốt</div>
+          </div>
+          <div className="annotation annotation--bee-a"><i />Cánh gắn vào ngực</div>
+          <div className="annotation annotation--flip annotation--bee-b"><i />Ngực — trung tâm cơ bay</div>
+          <div className="annotation annotation--bee-c"><i />Bụng chia thành nhiều đốt</div>
         </div>
       </section>
 
-      <section className="story-panel story-panel--fish" id="ca-canh-bien" data-snap data-scene="fish" aria-labelledby="fish-title">
+      <section className="story-panel story-panel--fish" id="ca-canh-bien" data-snap data-scene="fish" data-header-theme="dark" aria-labelledby="fish-title">
         <div className="story-grid">
           <div className="story-copy story-copy--right story-content" data-reveal="soft">
-            <p className="section-kicker">02 — Sinh học · Hệ vây và chuyển động</p>
-            <h2 id="fish-title">Học bằng cách<br /><em>quan sát chuyển động.</em></h2>
-            <p>
-              Thân cá dẹp hai bên để len qua khe hẹp, còn mỗi vây làm một việc
-              khác nhau. Quan sát vòng bơi để thấy vây nào giữ thăng bằng và vây
-              nào tạo lực đẩy.
-            </p>
+            <div className="story-copy-intro">
+              <h2 id="fish-title">Học bằng cách <em>quan sát chuyển động.</em></h2>
+              <p>
+                Thân cá dẹp hai bên để len qua khe hẹp, còn mỗi vây làm một việc
+                khác nhau. Quan sát vòng bơi để thấy cấu tạo biến thành chuyển động.
+              </p>
+            </div>
             <dl className="study-readout">
               <div><dt>Thân</dt><dd>Dẹp hai bên để len qua khe hẹp</dd></div>
               <div><dt>Vây lưng</dt><dd>Giữ thân không lật khi bơi</dd></div>
               <div><dt>Vây ngực</dt><dd>Đổi hướng và phanh lại</dd></div>
               <div><dt>Vây đuôi</dt><dd>Tạo lực đẩy chính</dd></div>
             </dl>
-        </div>
-        <div className="annotation annotation--flip annotation--fish-a"><i />Vây lưng giữ thăng bằng</div>
-        <div className="annotation annotation--flip annotation--fish-b"><i />Vây đuôi tạo lực đẩy</div>
+          </div>
+          <div className="annotation annotation--flip annotation--fish-a"><i />Vây lưng giữ thăng bằng</div>
+          <div className="annotation annotation--flip annotation--fish-b"><i />Vây đuôi tạo lực đẩy</div>
         </div>
       </section>
 
-      <section className="story-panel story-panel--jelly" id="sinh-vat-bien" data-snap data-scene="jelly" aria-labelledby="jelly-title">
+      <section className="story-panel story-panel--jelly" id="sinh-vat-bien" data-snap data-scene="jelly" data-header-theme="dark" aria-labelledby="jelly-title">
         <div className="story-grid">
           <div className="story-copy story-content" data-reveal="soft">
-            <p className="section-kicker">03 — Sinh học · Cấu tạo cơ thể</p>
-            <h2 id="jelly-title">Nhìn xuyên qua<br /><em>một cơ thể sống.</em></h2>
-            <p>
-              Cơ thể sứa gần như trong suốt. Trên cùng một mô hình, học sinh thấy
-              được cả ba lớp một lúc: màng keo ngoài, tầng mô co bóp và khoang
-              tiêu hoá nằm giữa thân.
-            </p>
+            <div className="story-copy-intro">
+              <h2 id="jelly-title">Nhìn xuyên qua <em>một cơ thể sống.</em></h2>
+              <p>
+                Cơ thể sứa gần như trong suốt. Trên cùng một mô hình, học sinh thấy
+                màng keo ngoài, tầng mô co bóp và khoang tiêu hoá cùng lúc.
+              </p>
+            </div>
             <dl className="study-readout">
               <div><dt>Màng ngoài</dt><dd>Lớp keo trong suốt bảo vệ cơ thể</dd></div>
               <div><dt>Tầng giữa</dt><dd>Cơ co bóp đẩy nước để di chuyển</dd></div>
               <div><dt>Khoang giữa</dt><dd>Nơi tiêu hoá thức ăn bắt được</dd></div>
               <div><dt>Xúc tu</dt><dd>Bắt và đưa thức ăn vào khoang</dd></div>
             </dl>
-        </div>
-        <div className="annotation annotation--jelly-a"><i />Màng keo trong suốt</div>
-        <div className="annotation annotation--jelly-b"><i />Xúc tu bắt thức ăn</div>
+          </div>
+          <div className="annotation annotation--jelly-a"><i />Màng keo trong suốt</div>
+          <div className="annotation annotation--jelly-b"><i />Xúc tu bắt thức ăn</div>
         </div>
       </section>
     </div>
