@@ -7,6 +7,7 @@ import { LibraryWorkspace } from './components/library/LibraryWorkspace';
 import { PracticeSection } from './components/PracticeSection';
 import { ProofSection } from './components/ProofSection';
 import { ScrollReveal } from './components/ScrollReveal';
+import { SectionSnap } from './components/SectionSnap';
 import { SiteHeader } from './components/SiteHeader';
 import { StudioDemo } from './components/StudioDemo';
 import { WorkflowRibbon } from './components/WorkflowRibbon';
@@ -46,6 +47,7 @@ export default function Home() {
     <main id="trang-chu">
       <FormulaGate>
         <ScrollReveal />
+        <SectionSnap />
         <SiteHeader />
         <ExploreStory />
         <BridgeSection />

@@ -34,6 +34,29 @@ export const exploreEnvironmentPalette: EnvironmentPalette = {
   fillStrength: 1.3,
 };
 
+/*
+ * The ocean box.
+ *
+ * The reef's own three lights model the scene; this is what its *materials*
+ * reflect, and it has to be a body of water rather than a room: bright cyan
+ * overhead where the sun comes through the surface, deep blue below, and one
+ * strong panel high and slightly behind the subject so a wet flank has something
+ * to throw a highlight from. Handing the fish the ivory studio dome instead is
+ * what would put a white room in every specular on an animal that is forty feet
+ * down — the exact tell that reads as "3D model composited onto a background".
+ */
+export const oceanEnvironmentPalette: EnvironmentPalette = {
+  zenith: 0x8fe6ff,
+  horizon: 0x1d7fb8,
+  ground: 0x0a3d63,
+  keyColor: 0xdcfbff,
+  keyStrength: 4.6,
+  rimColor: 0x5fd8ff,
+  rimStrength: 2.4,
+  fillColor: 0x0f5c8c,
+  fillStrength: 1.1,
+};
+
 /* Light studio box. The editor viewport is a white room now, so the environment
    the glass in it reflects has to be a white room too — a dark dome behind a
    light stage puts black in every highlight and instantly reads as plastic. */

@@ -18,7 +18,7 @@ import { BEE_THUMBNAIL } from '../lib/three/thumbnailRequests';
  */
 export function BridgeSection() {
   return (
-    <section className="bridge" id="tu-kham-pha-den-tao" aria-labelledby="bridge-title">
+    <section className="bridge" id="tu-kham-pha-den-tao" data-snap aria-labelledby="bridge-title">
       <div className="bridge-veil" aria-hidden="true" />
       <div className="shell-editorial bridge-inner">
         <div className="bridge-copy" data-reveal>

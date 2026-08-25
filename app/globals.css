@@ -496,9 +496,33 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   mix-blend-mode: soft-light;
 }
 
-/* Cols 1–6: the bee sits at x = +1.62 in the hero shot, which is the right half
-   of the frame, so the proposition takes the left half and nothing crosses. */
-.hero-copy { grid-column: 1 / span 6; grid-row: 1 / -1; align-self: center; max-width: 42rem; }
+/*
+ * Cols 1–6: the bee sits at x = +1.62 in the hero shot, which is the right half
+ * of the frame, so the proposition takes the left half and nothing crosses.
+ *
+ * `--hero-lift` is the vertical half of the same argument, and it is what opens
+ * the corridor between the copy and the flower field.
+ *
+ * `align-self: center` centres the *margin* box, so a bottom margin of L moves
+ * the content up by L/2 — which is the one way to lift a block without either
+ * pinning it to the top of the grid area (where it collides with the header
+ * band on a short laptop) or hard-coding a translate that stops tracking the
+ * type as it clamps. At 1080 it is 162px of margin and therefore 81px of lift,
+ * which puts the bottom of the CTA about a tenth of the frame height clear of
+ * the densest part of the valley. The field answers from its own side: the
+ * copy-column exclusion zone in `flowerValley/composition.ts` is centred at
+ * `v: 0.46` with a soft rim, so nothing grows into that corridor either.
+ *
+ * The lift is removed below 1000px, where the copy is a bottom-anchored block on
+ * its own legibility plate and a lift would only push it into the creature.
+ */
+.hero-copy {
+  grid-column: 1 / span 6;
+  grid-row: 1 / -1;
+  align-self: center;
+  max-width: 42rem;
+  margin-bottom: var(--hero-lift, clamp(104px, 20vh, 240px));
+}
 
 .eyebrow {
   display: flex;
@@ -600,14 +624,26 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 /* The specimen card is a grid child now rather than a `right: 4.5vw` absolute:
    it lines up with the right edge of the shell, which is the same right edge the
    header CTA and the Library's live count use. */
+/*
+ * Right-centre, not bottom-right.
+ *
+ * At the bottom of the grid this block sat inside the flower band, so it needed
+ * an exclusion ellipse under it — and that ellipse is the thin empty patch in the
+ * lower right of the annotated capture. The block was creating the hole it then
+ * had to be protected from.
+ *
+ * Moved to the middle row it lands in the frame's one genuinely quiet region:
+ * right of the creature, above the flower horizon, roughly 81-96% across and
+ * 53% down. Nothing has to be cleared for it, so the valley closes back up
+ * underneath.
+ */
 .hero-spec {
   grid-column: 11 / span 2;
-  grid-row: 3;
-  align-self: end;
+  grid-row: 2;
+  align-self: center;
   display: flex;
   flex-direction: column;
   gap: 5px;
-  margin-bottom: clamp(24px, 9vh, 96px);
   padding-left: 18px;
   border-left: 1px solid rgba(45, 36, 32, 0.16);
 }
@@ -668,6 +704,25 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   z-index: 2;
   min-height: 100svh;
   pointer-events: none;
+  /*
+   * `clip`, not `hidden`, and on the panel rather than on the shell.
+   *
+   * The underwater copy scrim is a pseudo-element that bleeds a quarter of the
+   * copy column's width past it on every side, so its soft edge is never a
+   * visible line. Nothing was clipping that, so it extended the document: at
+   * 1920 `html.scrollWidth` was 2026 — the scrim's own right edge, to the pixel —
+   * and the page grew a horizontal scrollbar.
+   *
+   * It has to be clipped at the PANEL, which is full-bleed, rather than at
+   * `.story-grid`, which is the 1760px shell: clipping at the shell would cut the
+   * scrim's falloff at the shell edge and draw exactly the hard rectangle the
+   * scrim exists to avoid. Clipped at the viewport edge, the cut is invisible.
+   *
+   * `overflow-x: clip` leaves `overflow-y` genuinely `visible` — `hidden` would
+   * force the other axis to `auto` and turn every panel into a scroll container,
+   * which would break the sticky stage's containing block and trap focus scroll.
+   */
+  overflow-x: clip;
 }
 
 .story-content, .story-panel a, .story-panel button { pointer-events: auto; }
@@ -703,7 +758,7 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   padding-bottom: var(--section-gap);
 }
 
-.story-copy { grid-column: 1 / span 5; grid-row: 1 / -1; align-self: center; }
+.story-copy { position: relative; grid-column: 1 / span 5; grid-row: 1 / -1; align-self: center; }
 .story-copy--right { grid-column: 8 / span 5; }
 
 .section-kicker {
@@ -865,6 +920,127 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 .annotation--jelly-b i { width: 84px; }
 .annotation--jelly-a i::before,
 .annotation--jelly-b i::before { transform: none; }
+
+/* ------------------------------------------------------- ocean chapters --- */
+/*
+ * Chapters 02 and 03 change ground under their own type.
+ *
+ * `--dive` is written on `.explore-story` by the render loop — one number, the
+ * same one the water surface is drawn from, and only when it has actually moved.
+ * Everything below re-derives the page's ink tokens from it, so a heading is
+ * literally the same rule it always was (`color: var(--ink)`) and simply finds a
+ * different `--ink` once it is under water. Nothing switches at a threshold and
+ * nothing has a second, ocean-specific copy of itself.
+ *
+ * The brief's constraint on this is exact and worth restating: no blanket
+ * overlay. The ocean stays vivid. Separation comes from the type changing value,
+ * from a scrim that is the size of the copy block and not of the page, and from
+ * the reef composition itself — chapter 02's subject and copy are on opposite
+ * sides of the frame, so what sits behind each block of text is the open
+ * corridor between the reef banks rather than the banks.
+ *
+ * Chapter 01 is in this list too, and it has to be. Its copy is still a third of
+ * the way up the frame while the surface closes overhead — a capture at dive
+ * 0.67 showed the anatomy readout and the mode buttons sitting in ink-on-ivory
+ * colours over open water. It goes to zero at dive zero, so nothing about the
+ * land chapter changes; it only stops being dark once there is no longer
+ * anything light behind it.
+ */
+.explore-story { --dive: 0; }
+
+.story-panel--bee,
+.story-panel--fish,
+.story-panel--jelly {
+  --sea: clamp(0, var(--dive, 0), 1);
+  --ink: color-mix(in oklab, var(--color-ink), #f4fdff calc(var(--sea) * 100%));
+  --ink-2: color-mix(in oklab, var(--color-ink-2), #d6f0fc calc(var(--sea) * 100%));
+  /* The readout's `dt` labels are 10.5px uppercase and sit at the outer edge of
+     the copy block, where the scrim has already released — measured as the
+     weakest text in chapter 02 after the kicker, so both muted steps land much
+     closer to the body colour under water than they do on ivory. */
+  --ink-3: color-mix(in oklab, var(--color-muted), #c4e7f6 calc(var(--sea) * 100%));
+  --ink-4: color-mix(in oklab, var(--color-muted-2), #a9d5e8 calc(var(--sea) * 100%));
+  /* The kicker is 10.5px uppercase at 0.15em, and it sits at the top edge of the
+     scrim where the falloff is already giving ground back — a mid cyan there
+     measured as the least readable text in either ocean chapter. It goes to a
+     near-ivory blue instead of a saturated one. */
+  --brand: color-mix(in oklab, var(--color-accent-strong), #c6f3ff calc(var(--sea) * 100%));
+  --line: color-mix(in oklab, var(--color-border), rgba(178, 231, 255, 0.36) calc(var(--sea) * 100%));
+}
+
+/* The italic half of a heading is a gradient rather than a colour, so it cannot
+   ride on `--ink` and is interpolated stop by stop instead. */
+.story-panel--bee .story-copy h2 em,
+.story-panel--fish .story-copy h2 em,
+.story-panel--jelly .story-copy h2 em {
+  background: linear-gradient(100deg,
+    color-mix(in oklab, var(--color-accent-deep), #63e0ff calc(var(--sea) * 100%)) 2%,
+    color-mix(in oklab, var(--color-accent-strong), #a6f1ff calc(var(--sea) * 100%)) 38%,
+    color-mix(in oklab, var(--color-lavender), #cfd8ff calc(var(--sea) * 100%)) 98%);
+  background-clip: text;
+  -webkit-background-clip: text;
+}
+
+/*
+ * The local scrim.
+ *
+ * Sized to the copy block, bled well past it on all four sides so its own edge
+ * is never a visible shape, and faded to nothing before it reaches the subject.
+ * It is a soft radial rather than a rectangle for exactly that reason: a
+ * rectangle has corners, and a corner over a reef reads as a panel.
+ *
+ * `::after` rather than `::before` because `::before` is already the one-column
+ * legibility plate below 1000px, and the two have to coexist there — the plate
+ * fades out as this fades in, so a phone crossing the surface is never left with
+ * an ivory card sitting under water.
+ */
+.story-panel--bee .story-copy::after,
+.story-panel--fish .story-copy::after,
+.story-panel--jelly .story-copy::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: -22% -26% -24% -24%;
+  pointer-events: none;
+  opacity: var(--sea);
+  /*
+   * The radii are 50%/50% of the box, not 116%/84%.
+   *
+   * A radial larger than its own box never reaches its transparent stop before
+   * the box ends, so the element's bounding rectangle becomes the last visible
+   * edge — which a 1920 capture showed as a hard-cornered panel sitting on the
+   * reef, the exact "restrained scrim" failure the brief rules out. At 50% the
+   * gradient is already transparent everywhere on the box boundary, so the only
+   * shape on screen is the falloff.
+   */
+  background: radial-gradient(50% 50% at 50% 50%,
+    rgba(3, 30, 56, 0.6) 0%,
+    rgba(3, 30, 56, 0.5) 34%,
+    rgba(3, 30, 56, 0.26) 62%,
+    rgba(3, 30, 56, 0.08) 82%,
+    rgba(3, 30, 56, 0) 100%);
+}
+
+/* Annotation halos invert with the ground: dark letterforms lifted off ivory
+   become light letterforms lifted off deep water. */
+.story-panel--bee .annotation,
+.story-panel--fish .annotation,
+.story-panel--jelly .annotation {
+  color: color-mix(in oklab, rgba(45, 36, 32, 0.64), #e8faff calc(var(--sea) * 100%));
+  text-shadow:
+    0 0 3px color-mix(in oklab, rgba(251, 248, 244, 0.95), rgba(2, 24, 46, 0.95) calc(var(--sea) * 100%)),
+    0 0 9px color-mix(in oklab, rgba(251, 248, 244, 0.85), rgba(2, 24, 46, 0.85) calc(var(--sea) * 100%));
+}
+.story-panel--bee .annotation i,
+.story-panel--fish .annotation i,
+.story-panel--jelly .annotation i {
+  background: color-mix(in oklab, rgba(45, 36, 32, 0.3), rgba(190, 238, 255, 0.6) calc(var(--sea) * 100%));
+}
+.story-panel--bee .annotation i::before,
+.story-panel--fish .annotation i::before,
+.story-panel--jelly .annotation i::before {
+  border-color: color-mix(in oklab, rgba(45, 36, 32, 0.4), rgba(190, 238, 255, 0.7) calc(var(--sea) * 100%));
+}
 
 .bee-modes {
   display: inline-flex;
@@ -2186,6 +2362,9 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
     grid-row: 2;
     align-self: end;
     max-width: 46rem;
+    /* The copy is bottom-anchored on its own plate here; there is no flower band
+       under it to clear, and a lift would only push it into the creature. */
+    --hero-lift: 0px;
   }
   /*
    * A legibility plate, sized to the copy rather than to the panel.
@@ -2206,15 +2385,96 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
     z-index: -1;
     inset: -74px calc(var(--page-gutter) * -1) -120px;
     pointer-events: none;
-    /* Solid by the first line of type, not by the third: the kicker sits 20 px
-       into this box and at 0.62 alpha a fish's tail fin was still legible
-       through a 9.5 px uppercase label. */
+    /*
+     * Solid by the first line of type, not by the third: the kicker sits 20 px
+     * into this box and at 0.62 alpha a fish's tail fin was still legible
+     * through a 9.5 px uppercase label.
+     *
+     * And released again before the bottom edge, which is not symmetry for its
+     * own sake. The plate used to hold 0.97 all the way to 100%, so its own
+     * bottom was a step from nearly-solid ground to none — invisible at rest,
+     * because the 120 px bleed puts that edge below the panel, and a hard
+     * horizontal rule straight across the frame during the crossing, when the
+     * panel travels up and brings the edge into view. The taper is 116 px, so it
+     * lives entirely inside the bleed and no line of type ever sits on it.
+     */
     background: linear-gradient(180deg,
       rgba(251, 248, 244, 0) 0%,
       rgba(251, 248, 244, 0.68) 13%,
       rgba(251, 248, 244, 0.93) 26%,
-      rgba(251, 248, 244, 0.97) 100%);
+      rgba(251, 248, 244, 0.97) calc(100% - 116px),
+      rgba(251, 248, 244, 0) 100%);
   }
+  /*
+   * One plate that changes colour, not two plates cross-fading.
+   *
+   * The first version faded the ivory plate out on `1 - sea` while a deep-blue
+   * one faded in on `sea`. Halfway through the crossing both sat at half
+   * opacity, so the ground was a wash — and the ink is interpolating on the same
+   * number, so the type was mid-value on a mid-value ground. A 390x844 capture at
+   * dive 0.48 showed the anatomy readout almost gone.
+   *
+   * Interpolating the plate's own stops keeps it fully present the whole way
+   * through and simply moves it from ivory to deep water, which is what the type
+   * is doing too. The desktop halo is switched off here because this shape
+   * replaces it.
+   */
+  /*
+   * Chapter 01 keeps its ivory plate and its dark ink on one column.
+   *
+   * On desktop the anatomy copy has no plate: it sits directly on the world, so
+   * lightening it as the world goes blue is the only way it stays readable. Here
+   * it does have a plate, and the plate and the ink then interpolate on the same
+   * number in opposite directions — they cross in the middle, and a capture at
+   * dive 0.48 showed the readout at almost zero contrast against its own ground.
+   *
+   * The chapter is leaving at that point, so the right answer is not a cleverer
+   * curve: it is to leave a working composition alone. Chapters 02 and 03 keep
+   * the treatment, because for them the ocean is where they live rather than
+   * something they are passing through.
+   */
+  .story-panel--bee { --sea: 0; }
+
+  /*
+   * Chapter 01's copy yields to the water.
+   *
+   * The plate above is a near-solid ivory sheet across the whole frame, which is
+   * what makes a 9.5 px kicker readable over a bee — and it is also what a
+   * 390x844 capture of the crossing showed: at dive 0.75 the top 42% of the
+   * screen was blank ivory ending in a hard horizontal edge, with the reef below
+   * it. The surface closing over the eye, the meadow going under and the bee
+   * flying out were all behind the sheet, so on a phone the crossing was an
+   * ivory card wiping up to reveal an aquarium. Where a wide frame puts the copy
+   * in a column BESIDE the world, one column puts it ON the world — so here the
+   * copy is the thing that has to move.
+   *
+   * It fades on the dive rather than on scroll position because the dive is the
+   * same number the water is drawn from: the copy is gone before the surface
+   * reaches the middle of the frame, and scrolling back up brings it back on
+   * exactly the same curve, with no state to be out of step with. The chapter
+   * has been read by the time this starts — the descent does not begin until the
+   * panel is already a tenth of a chapter behind the centre.
+   *
+   * On `.story-grid` rather than on `.story-content` so that the reveal
+   * transition keeps sole ownership of the copy's own opacity; two rules on one
+   * property would mean the later one silently winning.
+   */
+  .story-panel--bee .story-grid {
+    opacity: clamp(0, calc((0.46 - var(--dive, 0)) / 0.34), 1);
+  }
+
+  .story-panel--fish .story-copy::before,
+  .story-panel--jelly .story-copy::before {
+    background: linear-gradient(180deg,
+      color-mix(in oklab, rgba(251, 248, 244, 0), rgba(3, 30, 56, 0) calc(var(--sea) * 100%)) 0%,
+      color-mix(in oklab, rgba(251, 248, 244, 0.68), rgba(3, 30, 56, 0.72) calc(var(--sea) * 100%)) 13%,
+      color-mix(in oklab, rgba(251, 248, 244, 0.93), rgba(3, 30, 56, 0.88) calc(var(--sea) * 100%)) 26%,
+      color-mix(in oklab, rgba(251, 248, 244, 0.97), rgba(3, 30, 56, 0.92) calc(var(--sea) * 100%)) calc(100% - 116px),
+      color-mix(in oklab, rgba(251, 248, 244, 0), rgba(3, 30, 56, 0) calc(var(--sea) * 100%)) 100%);
+  }
+  .story-panel--fish .story-copy::after,
+  .story-panel--jelly .story-copy::after { display: none; }
+
   .hero-spec { grid-column: 1; grid-row: 1; justify-self: end; align-self: end; margin-bottom: 22px; }
   .annotation { display: none; }
   .section-heading--split { grid-template-columns: minmax(0, 1fr); gap: 22px; align-items: start; }
@@ -2228,11 +2488,15 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
    * school — the header had a logo, a button, and no way to reach any section.
    */
   .site-header-inner { grid-template-columns: auto minmax(0, 1fr) auto auto; }
+  /* 44px, because it is the only way into every section of the site on a phone
+     and 40 was under the minimum touch target on both platforms' guidelines.
+     The bars inside are unchanged, so the mark looks the same; the 2px of extra
+     reach on each edge is what a thumb gets. */
   .menu-toggle {
     display: flex;
     justify-self: end;
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
     flex-direction: column;
     align-items: center;
     justify-content: center;

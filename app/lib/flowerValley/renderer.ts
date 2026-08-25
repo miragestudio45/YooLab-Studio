@@ -68,6 +68,8 @@ import {
 } from './composition';
 import { buildValleyField, curve, slope, type Flower, type ValleyField } from './valley';
 import { createVisibilityGate } from '../three/visibility';
+import { diveFor, waterlineFor } from '../story/clock';
+import { subjectRect } from '../story/subject';
 
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
@@ -77,43 +79,68 @@ const smooth = (a: number, b: number, x: number) => {
 };
 
 /**
- * Where the valley leaves, on the Explore panel axis: 0 is the hero, 1 the bee
- * study, 2 the fish, 3 the jellyfish.
+ * Where the valley leaves — and it is no longer a panel number.
  *
- * This window closed a long way, and a capture is the reason.
+ * The previous window closed at panel 0.72, on the argument that chapter 01 puts
+ * a full column of copy where the hero has nothing and the hero's exclusion
+ * ellipses could not rescue it. That was the right diagnosis and the wrong fix:
+ * the chapter is the same bee in the same meadow, and dissolving the world at
+ * its door is the most obvious seam in the story. The zones are per-station now
+ * (`Layout.zonesStudy`), so the field can stay.
  *
- * It started at 1.12 to 1.9 — full presence across the hero, carried through the
- * anatomy chapter on the argument that the chapter is still the same bee and a
- * meadow belongs to it, gone before the underwater fish. The `hero-exit` and
- * `bee-study` captures at 1920 refuted it twice over. Mid-handover, chapter two's
- * headline is already two thirds on screen and the field was at full composition
- * behind it; at the chapter itself the field was printing through the anatomy
- * readout and the three mode buttons.
- *
- * The exclusion zones cannot rescue that, and it is worth being clear about why:
- * they are authored against the *hero* frame — a bee at 62% and a specimen card
- * at 87% — and chapter two puts a full column of copy where the hero has nothing
- * at all. Making them panel-dependent would mean interpolating two sets of
- * ellipses through a hand-over, to keep a meadow behind an anatomy diagram.
- *
- * So the dispersal now starts as soon as the hero is left and is finished before
- * chapter two is centred. This is earlier than "by section three" in any reading
- * of the page's numbering, and it is the only window in which the field never
- * competes with copy it was not composed around.
+ * What replaces it is the dive itself. The valley holds at full composition
+ * across the hero and the whole anatomy chapter, and then leaves *because it
+ * goes under water* — sinking out of frame as the camera drops, cut from below
+ * by the same surface the WebGL composite draws, and gone before that surface
+ * has closed over the top of the frame. There is no fade window any more, only a
+ * crossing.
  */
-const FADE_FROM = 0.12;
-const FADE_TO = 0.72;
+/*
+ * The window is placed against the *surface*, not against taste.
+ *
+ * `waterlineFor` puts the water at 42% of the frame height by dive 0.48 and past
+ * the top by 0.86. A first pass had the field gone by 0.52, and the capture at
+ * dive 0.48 showed why that is wrong: the half of the frame still above water
+ * was empty pale sky, so the crossing read as a grey dissolve with a reef
+ * underneath rather than as a meadow going under. The field now holds until the
+ * surface has almost finished climbing — the mask below is already hiding
+ * whatever is submerged, so what remains visible is exactly the part still in
+ * air, which is the point.
+ */
+const SINK_FROM = 0.34;
+const SINK_TO = 0.76;
 
-/** Panel distance the camera's travel is spread over. Slightly past the fade so
- *  the valley is still moving as it leaves rather than freezing and dissolving. */
-const TRAVEL_SPAN = 0.85;
+/**
+ * Dive at which a layout's optional `descent` station has been reached.
+ *
+ * Before `SINK_FROM` and before `WATERLINE_ENTER`, deliberately: the station
+ * exists so the field is already composed where the surface is about to arrive.
+ * Overlapping the two ramps would have the meadow moving into place and
+ * dissolving at the same time, which reads as a glitch rather than as a
+ * crossing.
+ */
+const DESCENT_TO = 0.3;
+
+/** Panel distance the camera's travel is spread over. Two chapters, plus a
+ *  little, so the valley is still moving as it goes under rather than freezing
+ *  and dissolving. */
+const TRAVEL_SPAN = 1.7;
 
 /** How long the opening growth wave takes. A shade under the bee's 2.6 s entry,
  *  so the field is settled by the time the creature arrives on its mark. */
 const GROW_SECONDS = 2.1;
 
-/** The page's hero ivory, for the aerial-perspective wash. */
-const HAZE = '252, 247, 240';
+/**
+ * The aerial-perspective wash.
+ *
+ * Ivory at the surface, because that is the page's own ground and distance on an
+ * ivory page has to be paid for. As the dive begins it cools toward the same
+ * sea-glass the backdrop plate is turning, and it gets stronger — which is the
+ * brief's "atmospheric haze increases subtly", done in the one place on this
+ * layer where haze already lives rather than as a new overlay.
+ */
+const HAZE_AIR = [252, 247, 240] as const;
+const HAZE_WATER = [186, 214, 224] as const;
 
 export type FlowerValleyOptions = {
   /** Continuous Explore panel position, 0 to 3. A ref, read every frame. */
@@ -170,6 +197,10 @@ export function createFlowerValley(host: HTMLElement, options: FlowerValleyOptio
   let haze: CanvasGradient | null = null;
   /** Live values, after the quality tier's multipliers. */
   let far = layout.far * preset.reach;
+  /** Live near plane. Constant unless the layout has a `descent` station. */
+  let near = layout.near;
+  /** 0 = the station the chapter mix produced, 1 = `Layout.descent`. */
+  let descent = 0;
 
   /* Clock, scroll, pointer. */
   let clock = 0;
@@ -178,6 +209,20 @@ export function createFlowerValley(host: HTMLElement, options: FlowerValleyOptio
   let travelTarget = 0;
   let presence = 1;
   let paintedPresence = -1;
+  /** 0 = hero station, 1 = chapter-01 station. Smoothed panel position. */
+  let chapter = 0;
+  /**
+   * The two copy exclusions, derived from where the type actually is.
+   *
+   * See `measureCopyZones`. Null until the first measurement, and null again if
+   * the DOM cannot be read — in which case the authored ellipses stand.
+   */
+  let heroZones: Zone[] = [];
+  let studyZones: Zone[] = [];
+  /** 0 = above water, 1 = the surface has closed over the frame. */
+  let dive = 0;
+  let hazeDive = -1;
+  let paintedLine = -9;
   const pointer = { x: 0, y: 0, tx: 0, ty: 0, sx: -9999, sy: -9999, active: false };
 
   /* FPS window. */
@@ -206,6 +251,44 @@ export function createFlowerValley(host: HTMLElement, options: FlowerValleyOptio
     const z = layout.from + travel * layout.travel;
     const amount = layout.interaction;
     /*
+     * Two stations, plus the descent.
+     *
+     * `chapter` cross-fades the hero's eye height and pitch into the anatomy
+     * chapter's, which is how the same world can compose against two completely
+     * different copy layouts without the field being rebuilt or cut. `dive` then
+     * lifts the eye further and tips it down, so the band falls out of the frame
+     * as the water rises rather than simply going transparent — the flowers
+     * *descend*, which is what the crossing is supposed to look like.
+     */
+    /*
+     * The dive LOWERS the eye and tips it up-frame; the first pass had both
+     * signs the other way.
+     *
+     * Sinking means the ground rises in view — and it has to, because this field
+     * lives in the bottom third of the frame and the water surface also enters
+     * from the bottom. Pushing the band *down* as the water came up meant the
+     * meadow had already left before the surface reached it, and the capture at
+     * dive 0.39 showed the result: an empty grey sky above the waterline and a
+     * reef below, with nothing left of the world being left behind. Lowering the
+     * eye lifts the band into the frame so the last thing above the surface is a
+     * meadow going under, which is the shot the whole crossing exists for.
+     */
+    /*
+     * A layout with a `descent` station replaces the shared dive terms rather
+     * than adding to them: the two move the band in opposite directions, and on
+     * the one viewport that has a station the shared terms are what put the
+     * meadow off the top of the crossing frame. See `Layout.descent`.
+     */
+    let camH = lerp(layout.camH, layout.camHStudy, chapter);
+    let framePitch = lerp(layout.pitch, layout.pitchStudy, chapter);
+    if (layout.descent) {
+      camH = lerp(camH, layout.descent.camH, descent);
+      framePitch = lerp(framePitch, layout.descent.pitch, descent);
+    } else {
+      camH -= dive * 3.4;
+      framePitch -= dive * 0.055;
+    }
+    /*
      * The reference yaws 0.86 of the path's own heading, which keeps the camera
      * looking straight down a valley it is walking. At the hero's `from` that is
      * about six degrees, and six degrees is enough to swing the far valley off the
@@ -215,12 +298,12 @@ export function createFlowerValley(host: HTMLElement, options: FlowerValleyOptio
      * banks in frame; the bend is still visible, it is just no longer chased.
      */
     const yaw = Math.atan(slope(z)) * 0.3 + pointer.x * 0.026 * amount;
-    const pitch = layout.pitch + pointer.y * 0.012 * amount;
+    const pitch = framePitch + pointer.y * 0.012 * amount;
     const ny = -yaw;
     return {
       z,
       x: curve(z) + pointer.x * 1.45 * amount,
-      y: layout.camH + pointer.y * 0.28 * amount,
+      y: camH + pointer.y * 0.28 * amount,
       cy: Math.cos(ny),
       sy: Math.sin(ny),
       cp: Math.cos(pitch),
@@ -238,13 +321,27 @@ export function createFlowerValley(host: HTMLElement, options: FlowerValleyOptio
   }
 
   function rebuildHaze(cam: Camera) {
+    hazeDive = dive;
     const line = horizon(cam);
     const top = Math.max(0, line - H * 0.06);
-    const bottom = Math.min(H, line + H * 0.24);
+    const bottom = Math.min(H, line + H * (0.24 + dive * 0.5));
+    const tint = `${Math.round(lerp(HAZE_AIR[0], HAZE_WATER[0], dive))}, `
+      + `${Math.round(lerp(HAZE_AIR[1], HAZE_WATER[1], dive))}, `
+      + `${Math.round(lerp(HAZE_AIR[2], HAZE_WATER[2], dive))}`;
+    /*
+     * 0.55, not 1.5.
+     *
+     * The wash is meant to cool the field as the water comes up, and at 1.5 it
+     * was doing something else: at dive 0.48 the peak stop reached 0.58 alpha
+     * over an ivory-to-sea tint, which is enough to erase the meadow outright.
+     * The capture showed a blank grey air half above a waterline — the one thing
+     * the crossing cannot afford, because the meadow going under IS the shot.
+     */
+    const gain = 1 + dive * 0.55;
     haze = ctx.createLinearGradient(0, top, 0, bottom);
-    haze.addColorStop(0, `rgba(${HAZE}, 0.34)`);
-    haze.addColorStop(0.4, `rgba(${HAZE}, 0.15)`);
-    haze.addColorStop(1, `rgba(${HAZE}, 0)`);
+    haze.addColorStop(0, `rgba(${tint}, ${(0.34 * gain).toFixed(3)})`);
+    haze.addColorStop(0.4, `rgba(${tint}, ${(0.15 * gain).toFixed(3)})`);
+    haze.addColorStop(1, `rgba(${tint}, 0)`);
   }
 
   /* --------------------------------------------------------------- the field --- */
@@ -265,6 +362,241 @@ export function createFlowerValley(host: HTMLElement, options: FlowerValleyOptio
     });
   }
 
+  /* ------------------------------------------------------- measured zones --- */
+
+  /**
+   * Where a block of copy is, in this frame's own coordinates.
+   *
+   * Read from the offset chain rather than from `getBoundingClientRect`, because
+   * a rect is scroll-dependent and this runs on resize — at which point the page
+   * may be anywhere. Every Explore panel is exactly one stage height tall and the
+   * stage is sticky at the top, so a panel's internal offsets and the canvas's
+   * frame coordinates are the same numbers whenever that panel is the one on
+   * screen, which is the only time its zone is weighted in.
+   */
+  function blockBox(panel: HTMLElement, selectors: string[]) {
+    let left = Infinity;
+    let right = -Infinity;
+    let top = Infinity;
+    let bottom = -Infinity;
+    for (const selector of selectors) {
+      const el = panel.querySelector<HTMLElement>(selector);
+      if (!el || !el.offsetParent) continue;
+      let x = 0;
+      let y = 0;
+      let node: HTMLElement | null = el;
+      while (node && node !== panel) {
+        x += node.offsetLeft;
+        y += node.offsetTop;
+        node = node.offsetParent as HTMLElement | null;
+      }
+      if (!node) continue;
+      left = Math.min(left, x);
+      top = Math.min(top, y);
+      right = Math.max(right, x + el.offsetWidth);
+      bottom = Math.max(bottom, y + el.offsetHeight);
+    }
+    if (!Number.isFinite(left) || right <= left || bottom <= top) return null;
+    return { left, top, right, bottom };
+  }
+
+  /**
+   * A boxed zone built from the rectangle it must actually clear.
+   *
+   * Two earlier versions got this wrong in opposite directions and both were
+   * caught by measuring the composited frame rather than by looking at it.
+   *
+   * The first inflated an ellipse by `1 / 0.537`, so that its soft rim still
+   * removed 88% of a plant at the box edge. That is right for the hero, whose
+   * copy is roughly square, and badly wrong for chapter 01, whose copy is a
+   * full-height column: the inflated ellipse reached 65% across the frame and
+   * emptied the right-hand bank of the valley.
+   *
+   * The second used a rectangular metric sized to the block, which put the
+   * *feather* over the corridor instead of past it — plants came back at 18%
+   * alpha fifteen pixels under the CTA.
+   *
+   * So the input here is the rectangle that has to end up empty, and the zone is
+   * that rectangle divided by `1 - feather`: full strength covers the cleared
+   * rectangle exactly, and the release happens entirely outside it. The margins
+   * are per-side because they are not one idea — the sides and the top only have
+   * to cover the type, while the bottom is the corridor the brief specifies.
+   */
+  const FEATHER = 0.3;
+
+  function boxZone(
+    box: { left: number; top: number; right: number; bottom: number },
+    margin: { x: number; top: number; bottom: number },
+    strength: number,
+  ): Zone {
+    const left = box.left - margin.x;
+    const right = box.right + margin.x;
+    const top = box.top - margin.top;
+    const bottom = box.bottom + margin.bottom;
+    const halfW = (right - left) / 2;
+    const halfH = (bottom - top) / 2;
+    return {
+      u: (left + right) / 2 / W,
+      v: (top + bottom) / 2 / H,
+      ru: halfW / (1 - FEATHER) / W,
+      rv: halfH / (1 - FEATHER) / H,
+      strength,
+      boxed: true,
+      feather: FEATHER,
+    };
+  }
+
+  /**
+   * The corridor, in CSS pixels, under the last line of copy. The brief asks for
+   * roughly 40-60. The sides and the top get much less, because there is no
+   * corridor to keep there — only type to stay off.
+   */
+  const COPY_MARGIN = { x: 26, top: 30, bottom: 52 };
+  /* Small blocks — the specimen card and the scroll cue — need to be legible,
+     not to open a corridor, so they clear themselves and little else. */
+  const LABEL_MARGIN = { x: 18, top: 16, bottom: 18 };
+
+  /**
+   * A column that hugs a frame edge clears to that edge.
+   *
+   * Both copy columns sit against the page gutter, so the strip between the type
+   * and the frame edge is one gutter wide and contains nothing. Leaving it
+   * planted puts a flower level with the headline — technically outside the
+   * block, visually beside it — which is the collision the brief is describing.
+   * Nothing is lost by clearing it, because there is no composition out there.
+   */
+  function bleed(box: { left: number; top: number; right: number; bottom: number } | null | undefined) {
+    if (!box) return null;
+    return {
+      ...box,
+      left: box.left < 110 ? -70 : box.left,
+      right: box.right > W - 110 ? W + 70 : box.right,
+    };
+  }
+
+  /*
+   * The creature's two exclusions, rebuilt from its live screen rect.
+   *
+   * They are a PAIR, and the pair is the whole layering answer:
+   *
+   *   `subjectFar`   the full box, `farOnly`. Background and midground plants —
+   *                  which is nearly all of them — are removed across the entire
+   *                  creature. This is what stops the bee reading as if it were
+   *                  underneath a flower canvas.
+   *
+   *   `subjectCore`  the same box shrunk to 62%, applying to EVERY plant
+   *                  including foreground. So a near plant is free to cross the
+   *                  wing tip, a trailing leg or the silhouette's outer edge, and
+   *                  is still refused the head, thorax, abdomen and main legs.
+   *
+   * That is the brief's hierarchy expressed as two numbers rather than as a
+   * second canvas: valley behind, creature, then a small foreground pass that may
+   * only touch the periphery.
+   *
+   * Mutated in place rather than reallocated — this runs every frame.
+   */
+  const subjectFar: Zone = { u: 0, v: 0, ru: 0, rv: 0, strength: 0.99, boxed: true, feather: 0.26, farOnly: true };
+  const subjectCore: Zone = { u: 0, v: 0, ru: 0, rv: 0, strength: 0.97, boxed: true, feather: 0.3 };
+  const subjectZones: Zone[] = [];
+
+  /** How much of the box the foreground pass is refused. */
+  const SUBJECT_CORE = 0.62;
+  /** Breathing room around the projected box, in CSS px. */
+  const SUBJECT_MARGIN = 10;
+  /*
+   * The projected box is bigger than the creature.
+   *
+   * A bounding box around a bee is mostly wing and antenna: the silhouette is a
+   * cross, and the rectangle that contains it clears a good deal of valley that
+   * has no bee in it. 0.9 pulls the exclusion back onto the body, and the wings
+   * lose nothing by it — they are near-transparent refractive film, so a flower
+   * seen faintly through a wing is what depth actually looks like, whereas a
+   * flower across the thorax is the bug.
+   */
+  const SUBJECT_TIGHTEN_X = 0.92;
+  /*
+   * Tighter still vertically, because the lowest thing in the box is the legs
+   * and the brief explicitly allows flowers across the bottom of them. Leaving
+   * the box at full height put its released rim in the middle of the flower
+   * band, which read as a dip under the creature.
+   */
+  const SUBJECT_TIGHTEN_Y = 0.78;
+
+  function updateSubjectZones() {
+    subjectZones.length = 0;
+    if (subjectRect.presence < 0.02) return;
+    const left = subjectRect.left - SUBJECT_MARGIN;
+    const right = subjectRect.right + SUBJECT_MARGIN;
+    const top = subjectRect.top - SUBJECT_MARGIN;
+    const bottom = subjectRect.bottom + SUBJECT_MARGIN;
+    if (!(right > left) || !(bottom > top)) return;
+    const u = (left + right) / 2 / W;
+    const v = (top + bottom) / 2 / H;
+    const ru = (right - left) / 2 / W * SUBJECT_TIGHTEN_X;
+    const rv = (bottom - top) / 2 / H * SUBJECT_TIGHTEN_Y;
+    /* Fades with the creature, so a departing bee releases the field behind it
+       instead of dragging a hole off the top of the frame. */
+    const gain = Math.min(1, subjectRect.presence * 1.6);
+    subjectFar.u = u; subjectFar.v = v; subjectFar.ru = ru; subjectFar.rv = rv;
+    subjectFar.strength = 0.99 * gain;
+    subjectCore.u = u; subjectCore.v = v;
+    subjectCore.ru = ru * SUBJECT_CORE; subjectCore.rv = rv * SUBJECT_CORE;
+    subjectCore.strength = 0.97 * gain;
+    subjectZones.push(subjectFar, subjectCore);
+  }
+
+  function measureCopyZones() {
+    heroZones = [];
+    studyZones = [];
+    const hero = document.querySelector<HTMLElement>('.hero');
+    const study = document.querySelector<HTMLElement>('.story-panel--bee');
+    /* The hero's box is headline through CTA. The lede and the eyebrow sit
+       between them, so the union of the two ends is the whole block. */
+    const heroBox = bleed(hero && blockBox(hero, ['.hero-copy']));
+    if (heroBox) heroZones = [boxZone(heroBox, COPY_MARGIN, 0.96)];
+    /*
+     * The two small labels on the hero.
+     *
+     * They were authored as ellipses and survived a sparse field; at 2.4x the
+     * density the specimen card sits in a bank of daisies and the scroll cue sits
+     * on a poppy. They are DOM blocks like the copy, so they are measured like
+     * the copy — which also means they keep working when the type reflows or the
+     * card moves at a different breakpoint.
+     */
+    for (const selector of ['.hero-spec', '.scroll-cue']) {
+      const box = hero && blockBox(hero, [selector]);
+      if (box) heroZones.push(boxZone(box, LABEL_MARGIN, 0.9));
+    }
+    const studyBox = bleed(study && blockBox(study, ['.story-copy']));
+    if (studyBox) studyZones = [boxZone(studyBox, COPY_MARGIN, 0.94)];
+  }
+
+  /**
+   * The authored list with each measured role swapped in.
+   *
+   * An authored zone survives only where the measurement is unavailable — a
+   * frame where the DOM could not be read, or a creature that has not loaded —
+   * so the hand-tuned ellipses remain a real fallback rather than dead code.
+   */
+  function withMeasured(authored: Zone[], copy: Zone[]): Zone[] {
+    const out: Zone[] = [];
+    let usedCopy = false;
+    let usedSubject = false;
+    for (const zone of authored) {
+      if (zone.role === 'copy' && copy.length) {
+        if (!usedCopy) { out.push(...copy); usedCopy = true; }
+        continue;
+      }
+      if (zone.role === 'subject' && subjectZones.length) {
+        if (!usedSubject) { out.push(...subjectZones); usedSubject = true; }
+        continue;
+      }
+      out.push(zone);
+    }
+    if (!usedCopy && copy.length) out.push(...copy);
+    return out;
+  }
+
   /* --------------------------------------------------------------- resizing --- */
 
   function measure() {
@@ -279,6 +611,7 @@ export function createFlowerValley(host: HTMLElement, options: FlowerValleyOptio
     canvas.style.height = `${H}px`;
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'medium';
+    measureCopyZones();
     rebuildHaze(camera());
     dirty = true;
   }
@@ -320,18 +653,18 @@ export function createFlowerValley(host: HTMLElement, options: FlowerValleyOptio
   function project(o: Flower, cam: Camera, sinT: number, cosT: number, out: number[]): boolean {
     const dx = o.x - cam.x;
     const dz = o.z - cam.z;
-    if (dz < layout.near || dz > far) return false;
+    if (dz < near || dz > far) return false;
 
     const rx = dx * cam.cy - dz * cam.sy;
     let rz = dx * cam.sy + dz * cam.cy;
-    if (rz < layout.near) return false;
+    if (rz < near) return false;
 
     /* The angle-sum identity that replaces a per-plant `Math.sin`. */
     const wave = sinT * o.cosP + cosT * o.sinP;
     const ry = o.y + wave * o.sway * 0.12 - cam.y;
     const py = ry * cam.cp - rz * cam.sp;
     rz = ry * cam.sp + rz * cam.cp;
-    if (rz < layout.near) return false;
+    if (rz < near) return false;
 
     const x = W * 0.5 + (rx / rz) * cam.f;
     const y = H * 0.5 - (py / rz) * cam.f;
@@ -351,13 +684,44 @@ export function createFlowerValley(host: HTMLElement, options: FlowerValleyOptio
    * the projection returns — testing the base would let it grow straight through
    * the bee while its root sat safely outside every zone.
    */
-  function zoneFactor(zones: Zone[], u: number, v: number, foreground: boolean): number {
+  function zoneFactor(
+    zones: Zone[],
+    u: number,
+    v: number,
+    /* The plant's drawn top, in frame fractions. Boxed zones test the whole
+       span; elliptical ones keep testing the centre, which is what they were
+       authored against. */
+    vTop: number,
+    foreground: boolean,
+  ): number {
     let factor = 1;
     for (let i = 0; i < zones.length; i += 1) {
       const zone = zones[i];
       if (foreground && zone.farOnly) continue;
       const du = (u - zone.u) / zone.ru;
       const dv = (v - zone.v) / zone.rv;
+      if (zone.boxed) {
+        /*
+         * Rectangular, and tested against the plant's whole height.
+         *
+         * Every other zone here is evaluated at one point — the plant's visual
+         * centre — and for a soft ellipse around a creature that is fine. It is
+         * not fine for a corridor: a 300px grass whose centre sits comfortably
+         * below the copy still draws 150px upward, and a 1920 capture found one
+         * doing exactly that eleven pixels under the CTA. So the vertical test
+         * uses the closest point of the plant's drawn span to the zone centre,
+         * which means any plant that would *paint* into the cleared rectangle is
+         * attenuated, not just one whose midpoint lands in it.
+         */
+        const near = Math.max(vTop, Math.min(v, zone.v));
+        const dvBox = (near - zone.v) / zone.rv;
+        const r = Math.max(Math.abs(du), Math.abs(dvBox));
+        if (r >= 1) continue;
+        const rim = zone.feather ?? 0.3;
+        factor *= 1 - zone.strength * (1 - smooth(1 - rim, 1, r));
+        if (factor < 0.004) return 0;
+        continue;
+      }
       const r2 = du * du + dv * dv;
       if (r2 >= 1) continue;
       /*
@@ -393,9 +757,21 @@ export function createFlowerValley(host: HTMLElement, options: FlowerValleyOptio
     const cosT = reduceMotion ? 1 : Math.cos(t);
 
     const tiles = sheet.tiles;
-    const zones = layout.zones;
+    /*
+     * Two exclusion sets, blended by the same number that blends the camera.
+     *
+     * Both are evaluated only while the chapter hand-over is actually happening;
+     * at either end one of them is skipped entirely, so the settled case costs
+     * exactly what it did before.
+     */
+    updateSubjectZones();
+    const zones = withMeasured(layout.zones, heroZones);
+    const zonesStudy = withMeasured(layout.zonesStudy, studyZones);
+    const studyMix = chapter;
+    const useHero = studyMix < 0.998;
+    const useStudy = studyMix > 0.002;
     const stride = preset.stride;
-    const nearFade = layout.near + 3.2;
+    const nearFade = near + 3.2;
     const fadeIn = far - 40;
     const tallCap = H * layout.maxHeight * 1.16;
     const shortCap = H * layout.maxHeight;
@@ -406,7 +782,7 @@ export function createFlowerValley(host: HTMLElement, options: FlowerValleyOptio
     ctx.setTransform(renderScale, 0, 0, renderScale, 0, 0);
     ctx.clearRect(0, 0, W, H);
 
-    const start = valley.lowerBound(cam.z + layout.near);
+    const start = valley.lowerBound(cam.z + near);
     const end = valley.lowerBound(cam.z + far + 6);
     const flowers = valley.flowers;
     let visible = 0;
@@ -435,7 +811,7 @@ export function createFlowerValley(host: HTMLElement, options: FlowerValleyOptio
        * is what gives the two corner clusters plants large enough for the frame to
        * crop, which is the whole tell that a foreground exists.
        */
-      h *= (0.6 + 0.72 * smooth(92, 18, d)) * grow;
+      h *= (0.5 + 1.35 * smooth(110, 22, d)) * grow;
       if (h < 3.6) continue;
 
       /*
@@ -450,13 +826,21 @@ export function createFlowerValley(host: HTMLElement, options: FlowerValleyOptio
        * which is also why the visible count drops without the picture thinning.
        */
       const fade = smooth(far, fadeIn, d)
-        * smooth(layout.near, nearFade, d)
+        * smooth(near, nearFade, d)
         * smooth(3.5, 10, h);
       if (fade < 0.008) continue;
 
       const foreground = d < foregroundDepth;
-      const factor = zoneFactor(zones, px / W, (py - h * 0.45) / H, foreground);
-      if (factor <= 0) continue;
+      const u = px / W;
+      const v = (py - h * 0.45) / H;
+      /* `py` is the base and the sprite is drawn `h` tall above it; 0.92 keeps a
+         sliver of the very tip out of the test so a single stray blade does not
+         push the whole corridor down. */
+      const vTop = (py - h * 0.92) / H;
+      const heroFactor = useHero ? zoneFactor(zones, u, v, vTop, foreground) : 0;
+      const studyFactor = useStudy ? zoneFactor(zonesStudy, u, v, vTop, foreground) : 0;
+      const factor = heroFactor + (studyFactor - heroFactor) * studyMix;
+      if (factor <= 0.002) continue;
 
       let ox = 0;
       let oy = 0;
@@ -518,6 +902,14 @@ export function createFlowerValley(host: HTMLElement, options: FlowerValleyOptio
       canvas.dataset.visible = String(visible);
       canvas.dataset.quality = quality;
       canvas.dataset.scale = renderScale.toFixed(2);
+      /* Look-dev readout. The composition depends on five numbers that are not
+         visible in a screenshot, and guessing which one moved has cost more time
+         than printing them ever will. */
+      canvas.dataset.grow = grow.toFixed(3);
+      canvas.dataset.chapter = chapter.toFixed(3);
+      canvas.dataset.travel = travel.toFixed(3);
+      canvas.dataset.camh = cam.y.toFixed(2);
+      canvas.dataset.count = String(field?.flowers.length ?? 0);
 
       if (fps < 48) { slowSamples += 1; fastSamples = 0; }
       else if (fps > 57) { fastSamples += 1; slowSamples = 0; }
@@ -551,7 +943,26 @@ export function createFlowerValley(host: HTMLElement, options: FlowerValleyOptio
 
     const panel = progress.current;
     travelTarget = clamp(panel / TRAVEL_SPAN, 0, 1);
-    presence = 1 - smooth(FADE_FROM, FADE_TO, panel);
+    /* Damped toward the panel for the same reason the creature crossfade is: a
+       wheel flick moves the raw value far enough in one frame to make the two
+       stations visibly snap. */
+    const chapterTarget = clamp(panel, 0, 1);
+    chapter = reduceMotion ? chapterTarget : lerp(chapter, chapterTarget, 1 - Math.pow(0.004, dt));
+    if (Math.abs(chapter - chapterTarget) < 0.0015) chapter = chapterTarget;
+    dive = diveFor(panel);
+    /*
+     * How far into the descent station this frame is. Zero on every layout that
+     * does not have one, which is what keeps `camera()` and the near plane
+     * exactly as they were everywhere but the phone.
+     *
+     * Plants cross the moving plane through the same `smooth(near, nearFade, d)`
+     * term that fades one in when the camera walks up to it, so nothing pops
+     * into existence at the bottom of the frame.
+     */
+    descent = layout.descent ? smooth(0, DESCENT_TO, dive) : 0;
+    near = layout.descent ? lerp(layout.near, layout.descent.near, descent) : layout.near;
+    presence = 1 - smooth(SINK_FROM, SINK_TO, dive);
+    if (Math.abs(dive - hazeDive) > 0.02) rebuildHaze(camera());
 
     /*
      * The layer's presence is the element's opacity, not a per-plant multiply.
@@ -565,11 +976,46 @@ export function createFlowerValley(host: HTMLElement, options: FlowerValleyOptio
        snap the last write before the bail is whatever presence happened to be —
        0.001, say — and since nothing after it ever runs, the canvas keeps its
        final painted frame at that opacity for as long as the page is open. */
-    const shown = presence < 0.004 ? 0 : presence;
+    /* The painted value is the *final* alpha, not the presence: the two stations
+       have different base opacities, so comparing presence alone left the layer
+       at the hero's alpha for the whole of chapter 01. */
+    const shown = presence < 0.004 ? 0 : presence * lerp(layout.opacity, layout.opacityStudy, chapter);
     if (Math.abs(shown - paintedPresence) > 0.002) {
       paintedPresence = shown;
-      canvas.style.opacity = (shown * layout.opacity).toFixed(3);
+      canvas.style.opacity = shown.toFixed(3);
       dirty = true;
+    }
+
+    /*
+     * The water surface, as a mask.
+     *
+     * This layer is a Canvas2D field composited by the browser *above* the WebGL
+     * frame, so the transition shader cannot reach it — and a meadow that keeps
+     * printing over water while the shader draws a surface across the same
+     * pixels is the one thing that would give the whole crossing away. Clipping
+     * it here against `waterlineFor` — the identical function the shader's
+     * `uLine` comes from — puts the flowers under the same surface to the pixel,
+     * with a short feather so the cut has the softness of a meniscus rather than
+     * the hardness of a mask.
+     *
+     * Written only when the line has actually moved, and removed entirely above
+     * water so the settled hero never pays for a mask.
+     */
+    if (dive <= 0.0005) {
+      if (paintedLine !== -9) {
+        paintedLine = -9;
+        canvas.style.maskImage = '';
+        canvas.style.webkitMaskImage = '';
+      }
+    } else {
+      const line = waterlineFor(dive);
+      if (Math.abs(line - paintedLine) > 0.002) {
+        paintedLine = line;
+        const top = clamp((1 - line) * 100, -20, 120);
+        const mask = `linear-gradient(to bottom, #000 ${(top - 3.4).toFixed(2)}%, rgba(0,0,0,0) ${(top + 1.6).toFixed(2)}%)`;
+        canvas.style.maskImage = mask;
+        canvas.style.webkitMaskImage = mask;
+      }
     }
     if (shown === 0) return;
 
@@ -626,6 +1072,28 @@ export function createFlowerValley(host: HTMLElement, options: FlowerValleyOptio
   const resizeObserver = new ResizeObserver(resize);
   resizeObserver.observe(host);
 
+  /*
+   * The copy exclusions have to be re-derived whenever the type reflows, and the
+   * type reflows after this file has finished setting up.
+   *
+   * Two things move it and both land late: the Vietnamese web faces are
+   * `display: swap`, so the first layout is a fallback metric and the real one
+   * arrives when the font does; and `text-wrap: balance` can re-break the
+   * headline when it does. Measuring once at start produced a corridor that was
+   * 75px at one width and 16px at another for no reason visible in the code —
+   * the zone was simply describing where the copy used to be. Observing the two
+   * blocks costs one callback per reflow and makes the measurement true.
+   */
+  const copyObserver = new ResizeObserver(() => { measureCopyZones(); dirty = true; });
+  for (const block of document.querySelectorAll<HTMLElement>('.hero .hero-copy, .story-panel--bee .story-copy')) {
+    copyObserver.observe(block);
+  }
+  void document.fonts?.ready?.then(() => {
+    if (disposed) return;
+    measureCopyZones();
+    dirty = true;
+  }).catch(() => {});
+
   /* ------------------------------------------------------------------- start --- */
 
   void loadFlowerAtlas(atlasUrl, preset.cell)
@@ -655,6 +1123,7 @@ export function createFlowerValley(host: HTMLElement, options: FlowerValleyOptio
       window.removeEventListener('pointerleave', onPointerLeave);
       document.removeEventListener('visibilitychange', onVisibility);
       resizeObserver.disconnect();
+      copyObserver.disconnect();
       gate.dispose();
       atlas?.dispose();
       atlas = null;

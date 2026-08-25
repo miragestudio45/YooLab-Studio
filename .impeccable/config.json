@@ -1,0 +1,14 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "side-tab",
+        "value": "7px solid var(--brand-accent)",
+        "createdAt": "2026-08-25T07:53:12.370Z",
+        "reason": "Claude: not a card accent border — .bridge-arrow i::after is the zero-size-box CSS triangle idiom (width:0;height:0 with two transparent borders) drawing the arrowhead on the bridge flow connector"
+      }
+    ]
+  }
+}

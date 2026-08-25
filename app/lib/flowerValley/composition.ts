@@ -43,6 +43,41 @@ export type Zone = {
   strength: number;
   /** True: plants nearer than `Layout.foreground` ignore this zone. */
   farOnly?: boolean;
+  /**
+   * `copy` marks the ellipse that keeps the field off a block of type.
+   *
+   * The renderer replaces it with one derived from where that block ACTUALLY is
+   * (see `measureCopyZones` in `renderer.ts`). The authored values stay as the
+   * fallback for a frame where the DOM cannot be read, and as documentation of
+   * the intent — but they are not what ships, because an ellipse authored in
+   * frame fractions cannot track type whose position in the frame moves with
+   * viewport height. Measured on the composited frame at four desktop sizes, one
+   * authored zone left 111px of corridor under the hero CTA at 1920x1080 and
+   * 29px at 1366x768; the brief asks for 40-60 at both.
+   *
+   * `subject` is the same argument for the creature, and it is worse there,
+   * because the creature actually moves: hover bob, entry arc, pointer parallax
+   * and the chapter hand-over all shift it, and a static ellipse tracks none of
+   * them. It is replaced by the bee's projected bounding box — see `subjectRect`.
+   */
+  role?: 'copy' | 'subject';
+  /**
+   * Rectangular metric plus an explicit rim, instead of an ellipse.
+   *
+   * The authored zones are ellipses because they are aimed at *shapes* — a bee,
+   * a card, the open ground under the creature. A block of type is a rectangle,
+   * and covering a rectangle with an ellipse whose falloff releases from the rim
+   * inward costs an enormous amount of surrounding frame: the measured
+   * chapter-01 column, expressed as an ellipse, excluded 65% of the frame width
+   * and emptied the right half of the valley.
+   *
+   * With `boxed`, distance is `max(|du|, |dv|)` — so the zone IS the block — and
+   * `feather` is the fraction of the radius over which alpha is given back, so
+   * the interior is cleared outright and the edge is still soft.
+   */
+  boxed?: boolean;
+  /** Fraction of the radius used as the release rim. Requires `boxed`. */
+  feather?: number;
 };
 
 export type Layout = {
@@ -57,6 +92,38 @@ export type Layout = {
   /** Camera clip range, in valley units. */
   near: number;
   far: number;
+  /**
+   * A third station, reached during the descent. Optional, and absent on every
+   * landscape layout — those keep the shared dive terms in `renderer.ts`, which
+   * lower the eye and tip it up-frame so a band already sitting in the bottom
+   * third rises to meet the water.
+   *
+   * A 390x844 frame cannot use those terms, because its band does not sit in the
+   * bottom third: the phone camera is pitched hard up to place a thin strip of
+   * blooms between the creature and the copy plate, which is the only gap a
+   * portrait hero has. Lifting that strip further pushes it off the top of the
+   * frame, and the capture of the crossing showed the result — the copy scrolled
+   * away, the water had not arrived, and the whole lower half was flat page
+   * grey with the meadow still up behind the type.
+   *
+   * So the phone gets a station instead of a nudge. Where `zonesStudy` re-frames
+   * the same world for the anatomy chapter, this re-frames it once more for the
+   * crossing: the pitch comes back to level, which walks the band down into the
+   * half the copy has vacated, and `near` follows it in because the plane was
+   * parked at 46 to skip everything that would have drawn behind the plate.
+   *
+   * It is reached well before the surface arrives and then held, so what the
+   * visitor sees is a meadow that settles into the lower frame and is then taken
+   * by the water, rather than two ramps moving at once.
+   */
+  descent?: {
+    /** Eye height at the end of the sweep. */
+    camH: number;
+    /** Frame pitch at the end of the sweep. Level is 0. */
+    pitch: number;
+    /** Near plane at the end of the sweep. */
+    near: number;
+  };
   /** Depth below which a plant is foreground and ignores `farOnly` zones. */
   foreground: number;
   /** Where in the valley this hero sits, and how far it travels on scroll. */
@@ -78,6 +145,27 @@ export type Layout = {
   /** Pointer parallax and repulsion amplitude. */
   interaction: number;
   zones: Zone[];
+
+  /*
+   * The chapter-01 station.
+   *
+   * The valley does not end at the hero any more — the anatomy chapter is the
+   * same bee in the same meadow, and cutting the world at the chapter boundary
+   * was the single most obvious break in the story. But chapter 01 is a
+   * different *picture*: the copy moves from the left half to a full column on
+   * the right, the bee doubles in size and moves left, and three annotations
+   * appear down the left edge. So the field keeps its world and changes its
+   * framing — a higher, more steeply pitched camera drops the band into the
+   * lower third where none of that lives, and a second exclusion set is
+   * cross-faded in over the first as the chapter arrives.
+   *
+   * Both stations are interpolated continuously, so there is no boundary at
+   * which anything switches.
+   */
+  camHStudy: number;
+  pitchStudy: number;
+  opacityStudy: number;
+  zonesStudy: Zone[];
 };
 
 /**
@@ -90,33 +178,118 @@ export type Layout = {
  * demo is either straighter or bends harder than a hero can carry.
  */
 const DESKTOP: Layout = {
+  /*
+   * Unchanged, and a capture is why.
+   *
+   * These were briefly raised to 6.2 / 0.038 on the theory that a higher, more
+   * pitched camera brings the near band into frame. It does the opposite. A
+   * plant's base lands at `H/2 + (camH + 3.6) * f / d + sin(pitch) * f`, so both
+   * terms push the *near* cut-off further out: at 5 / 0.0095 the closest plant
+   * still inside the frame is about 29 units away, and at 6.2 / 0.038 it is 37 —
+   * which trades away exactly the large foreground plants the field was short
+   * of. The corridor under the copy is bought by lifting the copy and by the
+   * exclusion zone below, not by re-aiming a camera that was already right.
+   */
   camH: 5,
   pitch: 0.0095,
   fov: 34,
   near: 3.4,
   far: 106,
-  foreground: 26,
+  /*
+   * 34, up from 26.
+   *
+   * `foreground` is the depth under which a plant is allowed to cross the
+   * creature. At 26 nothing qualified — the nearest plant the hero frame can
+   * actually contain is about 29 units out — so the "foreground pass" the
+   * layering depends on was empty and every plant was treated as background.
+   * At 42 a real slice of the field qualifies and may clip the bee's periphery,
+   * which is what makes the creature sit IN the valley rather than in front of a
+   * flat picture of one. A capture at 34 still showed nothing crossing it.
+   */
+  foreground: 42,
   from: 344,
-  travel: 30,
-  clearance: 6.6,
-  spread: 17,
-  density: 13.6,
-  maxHeight: 0.32,
-  perDrift: 15,
-  driftZ: 7,
-  driftSpan: 5.5,
+  /* Travel now spans two chapters rather than one, so the camera keeps moving
+     through the anatomy chapter instead of parking at its end. */
+  travel: 46,
+  /*
+   * 5.4, down from 6.6.
+   *
+   * Clearance is what holds the middle of the valley open, and it was set when
+   * the copy sat low enough that the corridor had to be wide. With the copy
+   * lifted (see `.hero-copy` in globals.css) the corridor's job is smaller, and
+   * pulling the banks in is what lets the two foreground corners actually fill:
+   * the plants that reach the bottom of the frame are the ones nearest the path.
+   */
+  clearance: 5.2,
+  spread: 20,
+  /*
+   * 24, up from 13.6 — a 76% denser field.
+   *
+   * A 1920 capture of the old value showed about three hundred plants on screen
+   * spread over the whole lower third, which reads as a scattering rather than a
+   * meadow. The cost is bounded by the things that were already here and did not
+   * change: the field is depth-sorted once and binary-searched per frame, so the
+   * loop still only visits what is between the near and far planes, and the
+   * quality tiers still thin it evenly by `stride` on a machine that cannot hold
+   * the frame rate.
+   */
+  /*
+   * 32, from the reference's 13.6 — the field is 2.35x denser.
+   *
+   * Density is the honest lever here and the only one that adds material.
+   * Raising it is safe because none of the machinery that keeps this cheap
+   * depends on the count: the field is depth-sorted once at build, two binary
+   * searches bracket the visible slice every frame, and the quality tiers thin
+   * whatever is left by `stride` rather than by cutting a band out of it.
+   */
+  density: 32,
+  /* A foreground plant is allowed to be 38% of the frame tall. At 0.32 the
+     nearest ones were being clamped to the same size as the midground, which is
+     the ceiling that was flattening the field into one layer. */
+  maxHeight: 0.38,
+  /*
+   * Fewer plants per drift, at a much higher density.
+   *
+   * These two move together on purpose. Raising density alone fattens each
+   * existing clump and leaves the gaps between them exactly where they were,
+   * which produces a lumpier field rather than a richer one. Cutting the drift
+   * size at the same time scatters more, smaller clumps — which is what layers
+   * the field into foreground, midground and distance instead of banding it.
+   */
+  perDrift: 9,
+  driftZ: 8.5,
+  driftSpan: 6.4,
   opacity: 0.9,
   interaction: 0.62,
+  camHStudy: 7.6,
+  pitchStudy: 0.062,
+  opacityStudy: 0.82,
   zones: [
-    /* Headline, lede, CTA. Light: the copy is HTML above this canvas and the
-       flower line sits below the last line of type, so this only catches a tall
-       grass spiking into the button row. */
-    { u: 0.2, v: 0.605, ru: 0.26, rv: 0.17, strength: 0.6 },
+    /*
+     * Headline, lede, CTA — and now the whole copy column, strongly.
+     *
+     * It used to be a light touch at `v: 0.605` on the argument that the flower
+     * line sat below the last line of type. That was true of a sparse field and
+     * a copy block that ended near the bottom of the frame; it is true of
+     * neither now. The copy has moved up and the field has nearly doubled, so
+     * this is the corridor that keeps the two apart, and it is authored to leave
+     * roughly a tenth of the frame height clear under the CTA before the falloff
+     * even starts giving alpha back.
+     */
+    /*
+     * Sized against a measurement, not against a look.
+     *
+     * `qa/gap.mjs` reads the flower layer's own alpha and reports how many CSS
+     * pixels sit between the bottom of the CTA row and the first plant above a
+     * visibility threshold. At rv 0.28 that number was 27px on a 1920 frame and
+     * zero on 1536 and 1440 — the two short-and-wide desktops where the copy sits
+     * lowest relative to the band. This ellipse reaches to v = 0.79, which puts
+     * the released edge of the falloff below the CTA on every desktop class.
+     */
+    { u: 0.17, v: 0.46, ru: 0.36, rv: 0.33, strength: 0.96, role: 'copy' },
     /* The bee. Head, thorax and abdomen, generously — everything except the
        wing tips and the trailing legs, which foreground plants may cross. */
-    { u: 0.625, v: 0.5, ru: 0.155, rv: 0.24, strength: 0.94, farOnly: true },
-    /* The specimen card, bottom right. */
-    { u: 0.872, v: 0.83, ru: 0.118, rv: 0.118, strength: 0.9 },
+    { u: 0.625, v: 0.5, ru: 0.155, rv: 0.24, strength: 0.94, farOnly: true, role: 'subject' },
     /*
      * The clearing under the bee, and the brief's one prohibition.
      *
@@ -132,7 +305,25 @@ const DESKTOP: Layout = {
      * it is the reason the composition reads as two clusters with a path between
      * them rather than as a hedge with a bee over it.
      */
-    { u: 0.5, v: 1.06, ru: 0.178, rv: 0.34, strength: 0.82 },
+    /* Weaker and shallower than it was: the corridor's other job — keeping the
+       band off the CTA — now belongs to the copy zone above and to `--hero-lift`,
+       so all this still has to do is stop the bottom edge closing into a hedge
+       under the creature. */
+    { u: 0.5, v: 1.06, ru: 0.16, rv: 0.24, strength: 0.5 },
+  ],
+  /*
+   * Chapter 01. Copy is a full column on the right, the bee owns the left half,
+   * and three annotations run down the far left edge.
+   */
+  zonesStudy: [
+    /* The copy column, twelfths 7–12. */
+    { u: 0.79, v: 0.5, ru: 0.28, rv: 0.46, strength: 0.94, role: 'copy' },
+    /* The bee, which at this station fills most of the left half. Far-only, so
+       a foreground grass at the frame edge may still cross a trailing leg —
+       which is the whole reason the chapter reads as the same world. */
+    { u: 0.3, v: 0.48, ru: 0.2, rv: 0.32, strength: 0.9, farOnly: true, role: 'subject' },
+    /* The three annotation labels. */
+    { u: 0.1, v: 0.5, ru: 0.15, rv: 0.46, strength: 0.5 },
   ],
 };
 
@@ -162,20 +353,27 @@ const LAPTOP: Layout = {
   pitch: 0.018,
   near: 3.8,
   far: 92,
-  foreground: 24,
-  travel: 26,
-  clearance: 5.9,
-  spread: 15.5,
-  density: 12.4,
-  maxHeight: 0.29,
-  perDrift: 14,
-  driftZ: 6.6,
-  driftSpan: 5.2,
+  foreground: 38,
+  travel: 40,
+  clearance: 4.7,
+  spread: 18,
+  density: 29,
+  maxHeight: 0.35,
+  perDrift: 9,
+  driftZ: 8,
+  driftSpan: 6,
+  camHStudy: 9.2,
+  pitchStudy: 0.072,
+  opacityStudy: 0.8,
   zones: [
-    { u: 0.2, v: 0.645, ru: 0.27, rv: 0.185, strength: 0.66 },
-    { u: 0.625, v: 0.51, ru: 0.16, rv: 0.25, strength: 0.94, farOnly: true },
-    { u: 0.868, v: 0.845, ru: 0.125, rv: 0.125, strength: 0.9 },
-    { u: 0.5, v: 1.06, ru: 0.19, rv: 0.35, strength: 0.82 },
+    { u: 0.18, v: 0.5, ru: 0.35, rv: 0.33, strength: 0.96, role: 'copy' },
+    { u: 0.625, v: 0.51, ru: 0.16, rv: 0.25, strength: 0.94, farOnly: true, role: 'subject' },
+    { u: 0.5, v: 1.06, ru: 0.17, rv: 0.26, strength: 0.5 },
+  ],
+  zonesStudy: [
+    { u: 0.78, v: 0.5, ru: 0.29, rv: 0.47, strength: 0.94, role: 'copy' },
+    { u: 0.3, v: 0.48, ru: 0.21, rv: 0.33, strength: 0.9, farOnly: true, role: 'subject' },
+    { u: 0.1, v: 0.5, ru: 0.16, rv: 0.46, strength: 0.5 },
   ],
 };
 
@@ -195,20 +393,26 @@ const TABLET: Layout = {
   near: 5.2,
   far: 92,
   foreground: 22,
-  travel: 22,
-  clearance: 6.8,
-  spread: 14,
-  density: 12,
+  travel: 34,
+  clearance: 5.8,
+  spread: 16,
+  density: 25,
   maxHeight: 0.3,
-  perDrift: 13,
-  driftZ: 6.4,
-  driftSpan: 5,
+  perDrift: 9,
+  driftZ: 7.4,
+  driftSpan: 5.6,
   opacity: 0.9,
   interaction: 0.5,
+  camHStudy: 7.4,
+  pitchStudy: 0.044,
+  opacityStudy: 0.78,
+  zonesStudy: [
+    { u: 0.76, v: 0.5, ru: 0.3, rv: 0.44, strength: 0.94, role: 'copy' },
+    { u: 0.3, v: 0.48, ru: 0.24, rv: 0.34, strength: 0.9, farOnly: true, role: 'subject' },
+  ],
   zones: [
-    { u: 0.24, v: 0.65, ru: 0.3, rv: 0.18, strength: 0.52 },
-    { u: 0.6, v: 0.5, ru: 0.19, rv: 0.26, strength: 0.94, farOnly: true },
-    { u: 0.87, v: 0.84, ru: 0.145, rv: 0.155, strength: 0.92 },
+    { u: 0.24, v: 0.55, ru: 0.32, rv: 0.26, strength: 0.88, role: 'copy' },
+    { u: 0.6, v: 0.5, ru: 0.19, rv: 0.26, strength: 0.94, farOnly: true, role: 'subject' },
     { u: 0.5, v: 1.04, ru: 0.22, rv: 0.3, strength: 0.8 },
   ],
 };
@@ -240,7 +444,7 @@ const COMPACT: Layout = {
   near: 34,
   far: 88,
   foreground: 0,
-  travel: 18,
+  travel: 27,
   /*
    * The banks come in, because a portrait frame has almost no horizontal field.
    *
@@ -251,21 +455,26 @@ const COMPACT: Layout = {
    * depth the camera can see it. Narrowing the planted band is not a density
    * decision here; it is the only way the band is in frame at all.
    */
-  clearance: 4.2,
-  spread: 10.5,
-  density: 14,
+  clearance: 4.0,
+  spread: 11.5,
+  density: 21,
   maxHeight: 0.19,
-  perDrift: 9,
-  driftZ: 6,
-  driftSpan: 4.6,
+  perDrift: 7,
+  driftZ: 6.6,
+  driftSpan: 5,
   opacity: 0.86,
   interaction: 0.4,
+  /* One column, so the chapter frame differs from the hero only in that the copy
+     plate is taller and the creature has moved. The band just goes down. */
+  camHStudy: 6.2,
+  pitchStudy: -0.03,
+  opacityStudy: 0.8,
   zones: [
     /* The creature, which owns the middle of this frame outright. */
     { u: 0.47, v: 0.3, ru: 0.3, rv: 0.14, strength: 0.7 },
-    /* The specimen card, which on one column sits at the bottom right of the
-       creature's own cell rather than at the bottom of the page. */
-    { u: 0.87, v: 0.615, ru: 0.16, rv: 0.075, strength: 0.9 },
+  ],
+  zonesStudy: [
+    { u: 0.47, v: 0.3, ru: 0.32, rv: 0.16, strength: 0.72 },
   ],
 };
 
@@ -298,20 +507,55 @@ const PHONE: Layout = {
    */
   near: 46,
   far: 88,
-  travel: 14,
+  travel: 21,
   /* 390 px of width is a horizontal half-angle of ten degrees. See COMPACT. */
-  clearance: 3.4,
-  spread: 9,
-  density: 17,
-  maxHeight: 0.1,
-  perDrift: 8,
-  driftZ: 5.4,
-  driftSpan: 4.2,
-  opacity: 0.92,
+  clearance: 3.2,
+  spread: 9.5,
+  /*
+   * The densest tier on the page, for the thinnest band on the page.
+   *
+   * A 390x844 capture shows about sixty pixels of visible strip between the
+   * creature's trailing legs and the top of the copy plate, and at that distance
+   * a plant is forty pixels tall — so the only lever that adds material here is
+   * count. Everything else about this layout is already at its geometric limit;
+   * pulling the near plane in would only plant flowers behind the plate.
+   */
+  density: 31,
+  maxHeight: 0.13,
+  perDrift: 6,
+  driftZ: 5.8,
+  driftSpan: 4.4,
+  opacity: 1,
   interaction: 0.26,
+  camHStudy: 5.4,
+  pitchStudy: -0.244,
+  opacityStudy: 0.84,
+  /*
+   * Every number here is read off the projection rather than chosen by eye.
+   *
+   * A plant's base lands at `0.5 + sin(pitch) * f/H + (camH + 3.6) * f/(d * H)`
+   * of the frame, and on this viewport `f/H` is 1.237. Level pitch therefore
+   * puts the far end of the band at 60% down and 25 units out at 88%, which is
+   * the lower third the copy has just left — where the phone's crossing frame
+   * was empty.
+   *
+   * `camH: 4.8` is the eye dropping about half a metre through the sweep, which
+   * is the only part of "sinking" this frame can express geometrically; the rest
+   * is the water climbing over the result.
+   *
+   * `near: 21` is a floor, not a preference. The field is planted 3.2 to 9.5
+   * units either side of the path and the horizontal half-angle here is 10.6
+   * degrees, so nothing closer than about 17 units is inside the picture at any
+   * height — pulling the plane in past that would cost projection work for
+   * plants that are all off the sides of the frame.
+   */
+  descent: { camH: 4.8, pitch: 0, near: 21 },
   zones: [
     /* The bee, and nothing else — the copy is already on its own ivory plate. */
     { u: 0.5, v: 0.24, ru: 0.34, rv: 0.11, strength: 0.72 },
+  ],
+  zonesStudy: [
+    { u: 0.5, v: 0.26, ru: 0.36, rv: 0.13, strength: 0.74 },
   ],
 };
 

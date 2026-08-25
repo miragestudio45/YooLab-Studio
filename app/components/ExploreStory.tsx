@@ -118,7 +118,7 @@ export function ExploreStory() {
         <div className="hero-noise" />
       </div>
 
-      <section className="hero story-panel" data-scene="bee-hero" aria-labelledby="hero-title">
+      <section className="hero story-panel" data-snap data-scene="bee-hero" aria-labelledby="hero-title">
         <div className="story-grid">
           <div className="hero-copy story-content">
             <p className="eyebrow"><span aria-hidden="true" /> YooLab · 3D/XR Learning</p>
@@ -152,7 +152,7 @@ export function ExploreStory() {
         </a>
       </section>
 
-      <section className="story-panel story-panel--bee" id="ong-mat" data-scene="bee-study" aria-labelledby="bee-title">
+      <section className="story-panel story-panel--bee" id="ong-mat" data-snap data-scene="bee-study" aria-labelledby="bee-title">
         <div className="story-grid">
           <div className="story-copy story-copy--right story-content" data-reveal="soft">
             <p className="section-kicker">01 — Sinh học · Giải phẫu côn trùng</p>
@@ -189,7 +189,7 @@ export function ExploreStory() {
         </div>
       </section>
 
-      <section className="story-panel story-panel--fish" id="ca-canh-bien" data-scene="fish" aria-labelledby="fish-title">
+      <section className="story-panel story-panel--fish" id="ca-canh-bien" data-snap data-scene="fish" aria-labelledby="fish-title">
         <div className="story-grid">
           <div className="story-copy story-copy--right story-content" data-reveal="soft">
             <p className="section-kicker">02 — Sinh học · Hệ vây và chuyển động</p>
@@ -211,7 +211,7 @@ export function ExploreStory() {
         </div>
       </section>
 
-      <section className="story-panel story-panel--jelly" id="sinh-vat-bien" data-scene="jelly" aria-labelledby="jelly-title">
+      <section className="story-panel story-panel--jelly" id="sinh-vat-bien" data-snap data-scene="jelly" aria-labelledby="jelly-title">
         <div className="story-grid">
           <div className="story-copy story-content" data-reveal="soft">
             <p className="section-kicker">03 — Sinh học · Cấu tạo cơ thể</p>

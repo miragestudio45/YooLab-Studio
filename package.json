@@ -10,7 +10,7 @@
     "build": "vinext build",
     "build:vercel": "node ./scripts/build-vercel.mjs",
     "start": "vinext start",
-    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next --ignore-pattern .claude --ignore-pattern public/asset/draco --ignore-pattern reference-audit --ignore-pattern reference-sources"
+    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next --ignore-pattern .claude --ignore-pattern public/asset/draco --ignore-pattern public/asset/basis --ignore-pattern reference-audit --ignore-pattern reference-sources"
   },
   "dependencies": {
     "next": "16.2.6",

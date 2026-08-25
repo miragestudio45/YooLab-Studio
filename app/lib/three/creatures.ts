@@ -90,15 +90,59 @@ export function disposeObject(object: THREE.Object3D) {
  * fin would otherwise vanish the moment `opacity` fell below the cutoff. The
  * value is clamped above zero so the `USE_ALPHATEST` define never toggles and
  * the program stays cached.
+ *
+ * `blendable` is what a fully present creature gets back. The previous version
+ * left `transparent = true` permanently after the first call, which put an
+ * opaque fish in the transparent queue for the whole chapter: no early-Z, sorted
+ * against the reef by centroid rather than by depth, and every fin drawn in
+ * whatever order the sort landed on. A creature at full presence is opaque, and
+ * only the crossfade needs blending.
  */
-export function fadeTargets(targets: FadeTarget[], presence: number) {
+export function fadeTargets(targets: FadeTarget[], presence: number, blendable = true) {
+  const blend = blendable && presence < 0.995;
   for (const target of targets) {
     target.material.opacity = target.opacity * presence;
     if (target.alphaTest > 0) {
       target.material.alphaTest = Math.max(0.02, target.alphaTest * presence);
     }
-    target.material.transparent = true;
+    const wanted = blend || target.opacity < 1;
+    if (target.material.transparent !== wanted) {
+      target.material.transparent = wanted;
+      target.material.needsUpdate = true;
+    }
   }
+}
+
+/**
+ * Sampler state, applied to every map on a creature.
+ *
+ * This is the least glamorous item in the whole render audit and the one with
+ * the largest visible payoff. glTF carries no anisotropy, so three defaults it
+ * to 1, and every one of these animals is seen at a grazing angle along its own
+ * length — a fish's flank *is* the grazing case. At anisotropy 1 the 1024px
+ * body atlas collapses to a low mip across most of its own silhouette, which is
+ * precisely the "soft, low-resolution" read the brief is describing. It costs
+ * nothing but a sampler flag.
+ */
+export function tuneMaps(object: THREE.Object3D, maxAnisotropy: number) {
+  const anisotropy = Math.min(8, Math.max(1, maxAnisotropy));
+  const seen = new Set<THREE.Texture>();
+  object.traverse((child) => {
+    const mesh = child as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    const list = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    for (const material of list) {
+      const source = material as THREE.MeshStandardMaterial;
+      const maps = [source.map, source.normalMap, source.roughnessMap, source.metalnessMap,
+        source.emissiveMap, source.aoMap, source.alphaMap];
+      for (const map of maps) {
+        if (!map || seen.has(map)) continue;
+        seen.add(map);
+        map.anisotropy = anisotropy;
+        map.needsUpdate = true;
+      }
+    }
+  });
 }
 
 /**
@@ -310,15 +354,70 @@ export function createBeeCreature(gltf: GLTF, options: BeeCreatureOptions): Crea
 
 /* ------------------------------------------------------------------- fish --- */
 
-export function createFishCreature(gltf: GLTF, options: { targetSize: number }): CreatureHandle {
+/**
+ * Where a creature is being lit, which is the only thing that legitimately
+ * differs between the two stages that build these.
+ *
+ * `studio` is the Library's white room. `ocean` is the reef, where the
+ * environment is a body of water rather than a lightbox — so a flank can carry a
+ * much stronger specular before it blows out, and the surface needs *more*
+ * environment rather than less to separate from the reef behind it.
+ */
+export type CreatureFinish = 'studio' | 'ocean';
+
+export type FishCreatureOptions = {
+  targetSize: number;
+  finish?: CreatureFinish;
+  maxAnisotropy?: number;
+};
+
+/**
+ * The fish, rebuilt against what the asset actually ships.
+ *
+ * The audit that produced these numbers, because every one of them was a real
+ * defect rather than a taste call:
+ *
+ *   GEOMETRY   `fish_Body/Fin/Eyes`, skinned, one 376-channel swim clip, UV0
+ *              only. No tangents and no second UV set — so no normal map and no
+ *              AO map are possible, and nothing here pretends otherwise.
+ *
+ *   TEXTURES   three 1024² WebP maps: base colour, a shared metallic-roughness
+ *              pair, and a fin base colour. glTF puts base colour in sRGB and the
+ *              MR map in linear, which `GLTFLoader` already gets right — there is
+ *              no double gamma here. What was missing was `anisotropy`, left at
+ *              three's default of 1 on an animal whose whole flank is a grazing
+ *              angle. See `tuneMaps`.
+ *
+ *   MATERIAL   the glTF declares no `roughnessFactor`, so it is the spec default
+ *              of **1.0**, and the previous setup's `Math.max(source.roughness,
+ *              0.38)` therefore left it at 1.0. The body was rendering fully
+ *              diffuse — no specular lobe at all — which is the entire "flat,
+ *              milky, washed-out" complaint in one line. The fix is to let the MR
+ *              map keep authoring the *variation* and pull the factor down to a
+ *              wet value, then put the sharp highlight where it belongs on a fish:
+ *              in a clearcoat, which is a film of water over a semi-matte animal
+ *              rather than a plastic-shiny animal.
+ *
+ *   QUEUE      every material was `transparent: true` with `opacity: 1` forever.
+ *              Fixed in `fadeTargets`.
+ */
+export function createFishCreature(gltf: GLTF, options: FishCreatureOptions): CreatureHandle {
   const visual = gltf.scene;
+  const ocean = (options.finish ?? 'studio') === 'ocean';
   const fades: FadeTarget[] = [];
+  const created: THREE.Material[] = [];
+
   visual.traverse((child) => {
     const mesh = child as THREE.Mesh;
     if (!mesh.isMesh) return;
     mesh.frustumCulled = false;
     const source = mesh.material as THREE.MeshStandardMaterial;
+
     if (source.name === 'fish_Fin') {
+      /* Thin, wet, back-lit tissue. The previous pass reached for sheen and
+         heavy iridescence to say "delicate" and got milk instead: a broad pink
+         sheen lobe over a pale fin is a wash by construction. Crispness comes
+         from a tight clearcoat and a restrained iridescent tint on the rays. */
       const fin = new THREE.MeshPhysicalMaterial({
         name: 'fish_Fin_calibrated',
         color: source.color,
@@ -326,56 +425,84 @@ export function createFishCreature(gltf: GLTF, options: { targetSize: number }):
         alphaMap: source.alphaMap,
         metalnessMap: source.metalnessMap,
         roughnessMap: source.roughnessMap,
-        roughness: Math.max(source.roughness, 0.34),
-        metalness: 0.06,
+        roughness: ocean ? 0.28 : 0.34,
+        metalness: 0,
         alphaTest: 0.82,
-        transparent: true,
         opacity: 1,
         depthWrite: true,
-        iridescence: 0.52,
-        iridescenceIOR: 1.3,
-        iridescenceThicknessRange: [160, 520],
-        sheen: 0.7,
-        sheenColor: new THREE.Color(0xffd9ec),
-        sheenRoughness: 0.5,
-        clearcoat: 0.4,
-        clearcoatRoughness: 0.35,
-        envMapIntensity: 0.62,
+        iridescence: ocean ? 0.28 : 0.4,
+        iridescenceIOR: 1.28,
+        iridescenceThicknessRange: [180, 540],
+        sheen: ocean ? 0.24 : 0.4,
+        sheenColor: new THREE.Color(ocean ? 0xbfe6ff : 0xffd9ec),
+        sheenRoughness: 0.42,
+        clearcoat: ocean ? 0.9 : 0.55,
+        clearcoatRoughness: ocean ? 0.1 : 0.24,
+        specularIntensity: 1,
+        specularColor: new THREE.Color(0xffffff),
+        envMapIntensity: ocean ? 1.15 : 0.7,
         side: THREE.DoubleSide,
       });
       mesh.material = fin;
       mesh.renderOrder = 1;
       source.dispose();
+      created.push(fin);
       fades.push({ material: fin, opacity: 1, alphaTest: 0.82 });
-    } else if (source.name === 'fish_Eyes') {
-      source.color.set(0x2c2d35);
-      source.emissive.set(0x000000);
-      source.emissiveIntensity = 0;
-      source.transparent = true;
-      source.opacity = 1;
-      source.depthWrite = true;
-      source.alphaTest = 0;
-      source.metalness = 0.92;
-      source.roughness = 0.1;
-      source.envMapIntensity = 0.85;
-      source.needsUpdate = true;
-      mesh.renderOrder = 2;
-      fades.push({ material: source, opacity: 1, alphaTest: 0 });
-    } else {
-      source.emissive.set(0x000000);
-      source.emissiveIntensity = 0;
-      source.envMapIntensity = 0.5;
-      source.metalness = 0.05;
-      source.roughness = Math.max(source.roughness, 0.38);
-      source.aoMapIntensity = 0.62;
-      source.transparent = true;
-      source.opacity = 1;
-      source.depthWrite = true;
-      source.needsUpdate = true;
-      mesh.renderOrder = 0;
-      fades.push({ material: source, opacity: 1, alphaTest: 0 });
+      return;
     }
+
+    if (source.name === 'fish_Eyes') {
+      /* The asset ships this at `baseColorFactor` alpha 0.0655 in BLEND mode —
+         an eye that is 93% invisible. It is authored here instead: near-black,
+         metallic and mirror-smooth, which is what makes a fish look alive. */
+      const eyes = new THREE.MeshPhysicalMaterial({
+        name: 'fish_Eyes_calibrated',
+        color: new THREE.Color(0x1e2028),
+        metalness: 0.95,
+        roughness: 0.06,
+        clearcoat: 1,
+        clearcoatRoughness: 0.03,
+        opacity: 1,
+        depthWrite: true,
+        envMapIntensity: ocean ? 1.35 : 0.95,
+      });
+      mesh.material = eyes;
+      mesh.renderOrder = 2;
+      source.dispose();
+      created.push(eyes);
+      fades.push({ material: eyes, opacity: 1, alphaTest: 0 });
+      return;
+    }
+
+    const body = new THREE.MeshPhysicalMaterial({
+      name: 'fish_Body_calibrated',
+      color: source.color,
+      map: source.map,
+      roughnessMap: source.roughnessMap,
+      metalnessMap: source.metalnessMap,
+      /* The map authors the variation; this factor decides how wet the animal
+         is. 1.0 — the glTF default this asset inherits — is a chalk fish. */
+      roughness: ocean ? 0.52 : 0.6,
+      metalness: 0,
+      /* A film of water, not a plastic shell: high coverage, very low roughness,
+         and the base material underneath left semi-matte. This is what carries
+         the sharp, controlled highlight along the back and the gill plate. */
+      clearcoat: ocean ? 0.95 : 0.6,
+      clearcoatRoughness: ocean ? 0.075 : 0.16,
+      specularIntensity: 1,
+      specularColor: new THREE.Color(0xffffff),
+      envMapIntensity: ocean ? 1.25 : 0.72,
+      opacity: 1,
+      depthWrite: true,
+    });
+    mesh.material = body;
+    mesh.renderOrder = 0;
+    source.dispose();
+    created.push(body);
+    fades.push({ material: body, opacity: 1, alphaTest: 0 });
   });
+
+  tuneMaps(visual, options.maxAnisotropy ?? 8);
   normalizeObject(visual, options.targetSize);
   const root = new THREE.Group();
   root.add(visual);
@@ -393,17 +520,50 @@ export function createFishCreature(gltf: GLTF, options: { targetSize: number }):
     dispose: () => {
       mixer?.stopAllAction();
       disposeObject(root);
+      for (const material of created) material.dispose();
     },
   };
 }
 
 /* -------------------------------------------------------------- jellyfish --- */
 
+/**
+ * The jellyfish, which must not be treated like the fish.
+ *
+ * The asset ships three nested skinned shells — `JF_heart` inside `JF_skin_in`
+ * inside `JF_skin_out` — each with its own 512² base colour, a shared
+ * metallic-roughness pair, and, on the two outer shells, a real **emissive map**
+ * with `emissiveFactor` 1,1,1. That map is the animal's own luminosity and it is
+ * the thing to build on: the glow belongs to specific tissue, so it is driven
+ * from the texture and tinted, never faked with a uniform emissive over the
+ * whole body (which is what produces a glow blob) and never post-processed into
+ * one with a bloom pass over the frame.
+ *
+ * Volume comes from transmission plus attenuation rather than from opacity: an
+ * alpha-blended shell is a flat translucent decal, whereas transmission with a
+ * short `attenuationDistance` darkens *through* thickness, so the bell's crown
+ * is pale and the deep folds under it hold colour. That gradient is what reads
+ * as a body with an inside.
+ *
+ * On the ocean stage everything is re-graded once more: the tints stop being
+ * lilac-over-ivory and become cyan-violet against blue, the emissive is allowed
+ * to carry more of the value range because there is no bright room competing
+ * with it, and `envMapIntensity` goes up rather than down — a transmissive shell
+ * with nothing to refract is grey plastic.
+ */
+export type JellyfishCreatureOptions = {
+  targetSize: number;
+  transmissive: boolean;
+  finish?: CreatureFinish;
+  maxAnisotropy?: number;
+};
+
 export function createJellyfishCreature(
   gltf: GLTF,
-  options: { targetSize: number; transmissive: boolean },
+  options: JellyfishCreatureOptions,
 ): CreatureHandle {
   const visual = gltf.scene;
+  const ocean = (options.finish ?? 'studio') === 'ocean';
   const fades: FadeTarget[] = [];
   // Either every layer is transmissive or none is: three sorts transmissive
   // and transparent objects into separate passes, and a split would draw the
@@ -420,9 +580,9 @@ export function createJellyfishCreature(
     if (material.name === 'JF_heart') {
       // Inner bell. Source of the internal glow, kept low enough that the
       // two membranes above it stay readable.
-      material.color.set(0x6f8dff);
-      material.emissive.set(0x3d1f86);
-      material.emissiveIntensity = 0.52;
+      material.color.set(ocean ? 0x8fb2ff : 0x6f8dff);
+      material.emissive.set(ocean ? 0x4b2ea8 : 0x3d1f86);
+      material.emissiveIntensity = ocean ? 0.86 : 0.52;
       material.metalness = 0;
       material.roughness = 0.28;
       material.opacity = 1;
@@ -435,15 +595,15 @@ export function createJellyfishCreature(
       material.sheen = 0.7;
       material.sheenColor = new THREE.Color(0xa8f0ff);
       material.sheenRoughness = 0.48;
-      material.envMapIntensity = 0.62;
+      material.envMapIntensity = ocean ? 0.95 : 0.62;
       mesh.renderOrder = 1;
       fades.push({ material, opacity: 1, alphaTest: 0 });
     } else if (material.name === 'JF_skin_in') {
       // Living tissue. Translucent with real transmission so the heart
       // reads through it instead of being alpha-masked away.
-      material.color.set(0xa79bff);
-      material.emissive.set(0x8a5cf0);
-      material.emissiveIntensity = 0.54;
+      material.color.set(ocean ? 0xc3bcff : 0xa79bff);
+      material.emissive.set(ocean ? 0x9a6cff : 0x8a5cf0);
+      material.emissiveIntensity = ocean ? 0.82 : 0.54;
       material.metalness = 0;
       material.roughness = 0.18;
       material.opacity = transmissive ? 0.9 : 0.78;
@@ -451,49 +611,50 @@ export function createJellyfishCreature(
       material.transmission = transmissive ? 0.44 : 0;
       material.thickness = 0.55;
       material.ior = 1.34;
-      material.attenuationDistance = 1.5;
-      material.attenuationColor = new THREE.Color(0x7a34ff);
+      material.attenuationDistance = ocean ? 1.15 : 1.5;
+      material.attenuationColor = new THREE.Color(ocean ? 0x5a2bd8 : 0x7a34ff);
       material.iridescence = 0.45;
       material.iridescenceIOR = 1.28;
       material.iridescenceThicknessRange = [180, 640];
       material.clearcoat = 0.55;
       material.clearcoatRoughness = 0.28;
-      material.envMapIntensity = 0.78;
+      material.envMapIntensity = ocean ? 1.1 : 0.78;
       material.side = THREE.FrontSide;
       mesh.renderOrder = 2;
       fades.push({ material, opacity: material.opacity, alphaTest: 0 });
     } else if (material.name === 'JF_skin_out') {
       // Opal shell. High transmission, low opacity, heavy iridescence: the
       // layer that has to carry the holographic colour shift.
-      material.color.set(0xb9aaff);
-      material.emissive.set(0x7a5ce6);
-      material.emissiveIntensity = 0.30;
+      material.color.set(ocean ? 0xd2ccff : 0xb9aaff);
+      material.emissive.set(ocean ? 0x8f6dff : 0x7a5ce6);
+      material.emissiveIntensity = ocean ? 0.52 : 0.3;
       material.metalness = 0;
       material.roughness = 0.08;
       material.opacity = transmissive ? 0.6 : 0.5;
       material.depthWrite = false;
-      material.transmission = transmissive ? 0.74 : 0;
+      material.transmission = transmissive ? 0.78 : 0;
       material.thickness = 0.95;
       material.ior = 1.31;
-      material.attenuationDistance = 2.3;
-      material.attenuationColor = new THREE.Color(0x9560ff);
+      material.attenuationDistance = ocean ? 1.9 : 2.3;
+      material.attenuationColor = new THREE.Color(ocean ? 0x7a44ff : 0x9560ff);
       material.iridescence = 0.9;
       material.iridescenceIOR = 1.33;
       material.iridescenceThicknessRange = [220, 800];
       material.clearcoat = 1;
       material.clearcoatRoughness = 0.08;
       material.sheen = 1;
-      material.sheenColor = new THREE.Color(0xffc6ec);
+      material.sheenColor = new THREE.Color(ocean ? 0xa9e6ff : 0xffc6ec);
       material.sheenRoughness = 0.32;
       material.specularIntensity = 1;
       material.specularColor = new THREE.Color(0xdff6ff);
-      material.envMapIntensity = 0.92;
+      material.envMapIntensity = ocean ? 1.3 : 0.92;
       material.side = THREE.FrontSide;
       mesh.renderOrder = 3;
       fades.push({ material, opacity: material.opacity, alphaTest: 0 });
     }
     material.needsUpdate = true;
   });
+  tuneMaps(visual, options.maxAnisotropy ?? 8);
   normalizeObject(visual, options.targetSize);
   const root = new THREE.Group();
   root.add(visual);
