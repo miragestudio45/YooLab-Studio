@@ -70,7 +70,10 @@ export const SUBJECT_STAGES: Record<'fish' | 'jelly', SubjectStage> = {
     x: -1.6,
     y: 0.52,
     scale: 1.34,
-    yaw: 2.62,
+    /* Near-profile like the Peach reference. The previous 150-degree pose put
+       the nose much closer to the lens than the tail and read as a compressed
+       mesh even though the source geometry was unchanged. */
+    yaw: 1.68,
     pitch: 0.05,
     roll: -0.02,
     span: 3.15,
@@ -80,7 +83,7 @@ export const SUBJECT_STAGES: Record<'fish' | 'jelly', SubjectStage> = {
   jelly: {
     distance: 5.9,
     x: 1.62,
-    y: 0.72,
+    y: -0.04,
     /*
      * Smaller than the fish's, and that is a consequence rather than a taste.
      *
@@ -88,7 +91,7 @@ export const SUBJECT_STAGES: Record<'fish' | 'jelly', SubjectStage> = {
      * sand, and those two pull in opposite directions on a model whose height IS
      * its longest axis. At 1.28 there was no value of `y` that satisfied both.
      */
-    scale: 1.02,
+    scale: 1.08,
     yaw: 0.24,
     pitch: -0.04,
     roll: -0.04,
@@ -141,18 +144,10 @@ export const SUBJECT_FRAMING: Record<'fish' | 'jelly', { wide: SubjectFraming; t
    */
   fish: {
     wide: { width: 0.44, height: 0.42, cx: -0.175, cy: 0.055 },
-    /*
-     * `cx` is not zero on a centred composition, and the model is why.
-     *
-     * The fish is yawed 150 degrees on its mark, so its bounding box sits about
-     * four tenths of a world unit right of the node that carries it. On a
-     * landscape frame six and a half units wide that is six per cent and
-     * invisible; on a 390x844 frame two and a half units wide it is sixteen, and
-     * the measured box ran off the right edge. The correction is expressed here
-     * rather than hidden in the placement code because it is a property of this
-     * pose of this asset.
-     */
-    tall: { width: 0.7, height: 0.28, cx: -0.135, cy: 0.2 },
+    /* Portrait uses the new near-profile pose too. Its visual mass extends a
+       little left of the pivot, so a small positive centre keeps the mouth and
+       tail inside 390px without shrinking the specimen into insignificance. */
+    tall: { width: 0.66, height: 0.27, cx: 0.03, cy: 0.2 },
   },
   /*
    * The jellyfish reads DOWN the frame, so height binds. It gets more of the
@@ -161,8 +156,11 @@ export const SUBJECT_FRAMING: Record<'fish' | 'jelly', { wide: SubjectFraming; t
    * centre because chapter 03 puts its copy in twelfths 1-5.
    */
   jelly: {
-    wide: { width: 0.34, height: 0.66, cx: 0.2, cy: 0.11 },
-    tall: { width: 0.72, height: 0.5, cx: 0.02, cy: 0.17 },
+    /* The annotated red volume is intentionally allowed to carry the animal
+       almost to the lower edge. At this size the bell becomes the focal point
+       and the tentacles can leave the frame without looking accidentally cut. */
+    wide: { width: 0.46, height: 0.82, cx: 0.215, cy: -0.035 },
+    tall: { width: 0.78, height: 0.56, cx: 0.02, cy: 0.14 },
   },
 };
 
@@ -241,11 +239,11 @@ export function stageClearance(stage: SubjectStage): Clearance {
   return {
     centre: stageCentre(stage),
     radii: new THREE.Vector3(half, halfY, half),
-    /* An opaque subject only needs its own footprint clear; a transmissive one
-       needs the water immediately behind it clear too, or the reef is visible
-       inside it. 1.1 radii, not 2.4 — at 2.4 the cull reached 110 instances of
-       194 and hollowed the reef out into a scatter. */
-    behind: stage.seeThrough ? 1.1 : 0.35,
+    /* The fish is opaque, but the specimen silhouette still needs one clean
+       depth layer behind it: a boulder touching its belly reads as collision
+       even when technically occluded. Jellyfish needs slightly more because
+       its membranes reveal that water directly. */
+    behind: stage.seeThrough ? 1.1 : 0.78,
   };
 }
 

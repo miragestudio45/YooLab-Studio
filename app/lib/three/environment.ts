@@ -46,15 +46,46 @@ export const exploreEnvironmentPalette: EnvironmentPalette = {
  * down — the exact tell that reads as "3D model composited onto a background".
  */
 export const oceanEnvironmentPalette: EnvironmentPalette = {
-  zenith: 0x8fe6ff,
-  horizon: 0x1d7fb8,
-  ground: 0x0a3d63,
-  keyColor: 0xdcfbff,
-  keyStrength: 4.6,
-  rimColor: 0x5fd8ff,
-  rimStrength: 2.4,
-  fillColor: 0x0f5c8c,
-  fillStrength: 1.1,
+  /*
+   * A dark ocean dome with one bright surface aperture.
+   *
+   * The previous palette was evenly cyan from zenith to ground, so every wet
+   * material reflected the same broad blue room. That flattened the fish and
+   * made the jellyfish look like translucent plastic. Peach's HAR proves the
+   * useful opposite: a near-black world plus a small, high-energy HDR source.
+   * The material then has a dark side, a readable midtone and one controlled
+   * highlight instead of one value everywhere.
+   */
+  zenith: 0x42b8e8,
+  horizon: 0x05042c,
+  ground: 0x000014,
+  keyColor: 0xd9f8ff,
+  keyStrength: 5.4,
+  rimColor: 0x469fe8,
+  rimStrength: 2.8,
+  fillColor: 0x451a68,
+  fillStrength: 1.15,
+};
+
+/**
+ * A small neutral/magenta reflection room used only by Fish and Jellyfish.
+ *
+ * The water still reflects the ocean dome, but a hero specimen needs the same
+ * controlled studio sources Peach uses: neutral white carries the fish texture,
+ * cyan traces wet edges and magenta returns colour to fins and jelly tissue.
+ * Keeping the dome nearly black prevents those panels from becoming a uniform
+ * cyan wash over every surface normal.
+ */
+export const specimenEnvironmentPalette: EnvironmentPalette = {
+  zenith: 0x11102e,
+  horizon: 0x020018,
+  ground: 0x07000e,
+  keyColor: 0xffffff,
+  keyStrength: 7.2,
+  rimColor: 0x35c8ff,
+  rimStrength: 4.1,
+  fillColor: 0xff4ba8,
+  fillStrength: 2.5,
 };
 
 /* Light studio box. The editor viewport is a white room now, so the environment

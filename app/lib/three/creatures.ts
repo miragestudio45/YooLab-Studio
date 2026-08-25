@@ -113,6 +113,44 @@ export function fadeTargets(targets: FadeTarget[], presence: number, blendable =
   }
 }
 
+/** A small local aura, not a frame-wide bloom pass. */
+function createSpecimenGlow(
+  color: THREE.ColorRepresentation,
+  opacity: number,
+  width: number,
+  height: number,
+) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 256;
+  const context = canvas.getContext('2d');
+  if (context) {
+    const gradient = context.createRadialGradient(128, 128, 8, 128, 128, 126);
+    gradient.addColorStop(0, 'rgba(255,255,255,.82)');
+    gradient.addColorStop(0.24, 'rgba(255,255,255,.28)');
+    gradient.addColorStop(0.58, 'rgba(255,255,255,.08)');
+    gradient.addColorStop(1, 'rgba(255,255,255,0)');
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, 256, 256);
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const material = new THREE.SpriteMaterial({
+    map: texture,
+    color,
+    transparent: true,
+    opacity,
+    depthWrite: false,
+    depthTest: true,
+    blending: THREE.AdditiveBlending,
+    toneMapped: false,
+  });
+  const sprite = new THREE.Sprite(material);
+  sprite.scale.set(width, height, 1);
+  sprite.renderOrder = -1;
+  return { sprite, material, texture, opacity };
+}
+
 /**
  * Sampler state, applied to every map on a creature.
  *
@@ -369,6 +407,8 @@ export type FishCreatureOptions = {
   targetSize: number;
   finish?: CreatureFinish;
   maxAnisotropy?: number;
+  /** Optional specimen-only PMREM; keeps a blue world from tinting white scales. */
+  environment?: THREE.Texture;
 };
 
 /**
@@ -425,29 +465,33 @@ export function createFishCreature(gltf: GLTF, options: FishCreatureOptions): Cr
         alphaMap: source.alphaMap,
         metalnessMap: source.metalnessMap,
         roughnessMap: source.roughnessMap,
-        roughness: ocean ? 0.28 : 0.34,
+        roughness: ocean ? 0.2 : 0.34,
         metalness: 0,
-        alphaTest: 0.82,
+        alphaTest: ocean ? 0.76 : 0.82,
         opacity: 1,
         depthWrite: true,
-        iridescence: ocean ? 0.28 : 0.4,
-        iridescenceIOR: 1.28,
-        iridescenceThicknessRange: [180, 540],
-        sheen: ocean ? 0.24 : 0.4,
-        sheenColor: new THREE.Color(ocean ? 0xbfe6ff : 0xffd9ec),
+        transmission: ocean ? 0.18 : 0,
+        thickness: ocean ? 0.16 : 0,
+        ior: ocean ? 1.48 : 1.4,
+        iridescence: ocean ? 0.48 : 0.4,
+        iridescenceIOR: ocean ? 1.48 : 1.28,
+        iridescenceThicknessRange: [180, 680],
+        sheen: ocean ? 0.12 : 0.4,
+        sheenColor: new THREE.Color(ocean ? 0xff8fc5 : 0xffd9ec),
         sheenRoughness: 0.42,
-        clearcoat: ocean ? 0.9 : 0.55,
-        clearcoatRoughness: ocean ? 0.1 : 0.24,
+        clearcoat: ocean ? 1 : 0.55,
+        clearcoatRoughness: ocean ? 0.055 : 0.24,
         specularIntensity: 1,
         specularColor: new THREE.Color(0xffffff),
-        envMapIntensity: ocean ? 1.15 : 0.7,
+        envMap: options.environment ?? null,
+        envMapIntensity: ocean ? 1.32 : 0.7,
         side: THREE.DoubleSide,
       });
       mesh.material = fin;
       mesh.renderOrder = 1;
       source.dispose();
       created.push(fin);
-      fades.push({ material: fin, opacity: 1, alphaTest: 0.82 });
+      fades.push({ material: fin, opacity: 1, alphaTest: ocean ? 0.76 : 0.82 });
       return;
     }
 
@@ -457,14 +501,18 @@ export function createFishCreature(gltf: GLTF, options: FishCreatureOptions): Cr
          metallic and mirror-smooth, which is what makes a fish look alive. */
       const eyes = new THREE.MeshPhysicalMaterial({
         name: 'fish_Eyes_calibrated',
-        color: new THREE.Color(0x1e2028),
-        metalness: 0.95,
-        roughness: 0.06,
+        color: new THREE.Color(ocean ? 0x171820 : 0x1e2028),
+        metalness: 1,
+        roughness: ocean ? 0.12 : 0.06,
+        iridescence: ocean ? 0.62 : 0,
+        iridescenceIOR: 1.42,
+        iridescenceThicknessRange: [120, 420],
         clearcoat: 1,
         clearcoatRoughness: 0.03,
         opacity: 1,
         depthWrite: true,
-        envMapIntensity: ocean ? 1.35 : 0.95,
+        envMap: options.environment ?? null,
+        envMapIntensity: ocean ? 1.62 : 0.95,
       });
       mesh.material = eyes;
       mesh.renderOrder = 2;
@@ -482,16 +530,20 @@ export function createFishCreature(gltf: GLTF, options: FishCreatureOptions): Cr
       metalnessMap: source.metalnessMap,
       /* The map authors the variation; this factor decides how wet the animal
          is. 1.0 — the glTF default this asset inherits — is a chalk fish. */
-      roughness: ocean ? 0.52 : 0.6,
-      metalness: 0,
+      roughness: ocean ? 0.36 : 0.6,
+      metalness: ocean ? 0.02 : 0,
       /* A film of water, not a plastic shell: high coverage, very low roughness,
          and the base material underneath left semi-matte. This is what carries
          the sharp, controlled highlight along the back and the gill plate. */
-      clearcoat: ocean ? 0.95 : 0.6,
-      clearcoatRoughness: ocean ? 0.075 : 0.16,
+      clearcoat: ocean ? 1 : 0.6,
+      clearcoatRoughness: ocean ? 0.045 : 0.16,
+      sheen: ocean ? 0.06 : 0,
+      sheenColor: new THREE.Color(0xffffff),
+      sheenRoughness: 0.42,
       specularIntensity: 1,
       specularColor: new THREE.Color(0xffffff),
-      envMapIntensity: ocean ? 1.25 : 0.72,
+      envMap: options.environment ?? null,
+      envMapIntensity: ocean ? 1.26 : 0.72,
       opacity: 1,
       depthWrite: true,
     });
@@ -506,6 +558,14 @@ export function createFishCreature(gltf: GLTF, options: FishCreatureOptions): Cr
   normalizeObject(visual, options.targetSize);
   const root = new THREE.Group();
   root.add(visual);
+  const glow = ocean
+    ? createSpecimenGlow(0x51c8ff, 0.11, options.targetSize * 1.32, options.targetSize * 0.7)
+    : null;
+  if (glow) {
+    glow.sprite.position.z = -0.16;
+    root.add(glow.sprite);
+    fades.push({ material: glow.material, opacity: glow.opacity, alphaTest: 0 });
+  }
 
   let mixer: THREE.AnimationMixer | undefined;
   if (gltf.animations[0]) {
@@ -521,6 +581,8 @@ export function createFishCreature(gltf: GLTF, options: FishCreatureOptions): Cr
       mixer?.stopAllAction();
       disposeObject(root);
       for (const material of created) material.dispose();
+      glow?.material.dispose();
+      glow?.texture.dispose();
     },
   };
 }
@@ -556,6 +618,7 @@ export type JellyfishCreatureOptions = {
   transmissive: boolean;
   finish?: CreatureFinish;
   maxAnisotropy?: number;
+  environment?: THREE.Texture;
 };
 
 export function createJellyfishCreature(
@@ -580,77 +643,82 @@ export function createJellyfishCreature(
     if (material.name === 'JF_heart') {
       // Inner bell. Source of the internal glow, kept low enough that the
       // two membranes above it stay readable.
-      material.color.set(ocean ? 0x8fb2ff : 0x6f8dff);
-      material.emissive.set(ocean ? 0x4b2ea8 : 0x3d1f86);
-      material.emissiveIntensity = ocean ? 0.86 : 0.52;
+      material.color.set(ocean ? 0x23439b : 0x6f8dff);
+      material.emissive.set(ocean ? 0x245cc4 : 0x3d1f86);
+      material.emissiveIntensity = ocean ? 1.35 : 0.52;
       material.metalness = 0;
-      material.roughness = 0.28;
+      material.roughness = ocean ? 0.2 : 0.28;
       material.opacity = 1;
       material.depthWrite = true;
       material.transmission = transmissive ? 0.08 : 0;
       material.thickness = 0.35;
       material.ior = 1.36;
-      material.clearcoat = 0.45;
-      material.clearcoatRoughness = 0.32;
-      material.sheen = 0.7;
-      material.sheenColor = new THREE.Color(0xa8f0ff);
+      material.clearcoat = ocean ? 0.76 : 0.45;
+      material.clearcoatRoughness = ocean ? 0.18 : 0.32;
+      material.sheen = ocean ? 0.9 : 0.7;
+      material.sheenColor = new THREE.Color(ocean ? 0xff77ce : 0xa8f0ff);
       material.sheenRoughness = 0.48;
-      material.envMapIntensity = ocean ? 0.95 : 0.62;
+      material.envMap = options.environment ?? null;
+      material.envMapIntensity = ocean ? 1.28 : 0.62;
       mesh.renderOrder = 1;
       fades.push({ material, opacity: 1, alphaTest: 0 });
     } else if (material.name === 'JF_skin_in') {
       // Living tissue. Translucent with real transmission so the heart
       // reads through it instead of being alpha-masked away.
-      material.color.set(ocean ? 0xc3bcff : 0xa79bff);
-      material.emissive.set(ocean ? 0x9a6cff : 0x8a5cf0);
-      material.emissiveIntensity = ocean ? 0.82 : 0.54;
+      material.color.set(ocean ? 0x6047c4 : 0xa79bff);
+      material.emissive.set(ocean ? 0xb64de4 : 0x8a5cf0);
+      material.emissiveIntensity = ocean ? 1.72 : 0.54;
       material.metalness = 0;
-      material.roughness = 0.18;
-      material.opacity = transmissive ? 0.9 : 0.78;
+      material.roughness = ocean ? 0.24 : 0.18;
+      material.opacity = transmissive ? 0.94 : 0.88;
+      material.alphaTest = ocean ? 0.18 : 0;
       material.depthWrite = false;
-      material.transmission = transmissive ? 0.44 : 0;
-      material.thickness = 0.55;
-      material.ior = 1.34;
-      material.attenuationDistance = ocean ? 1.15 : 1.5;
-      material.attenuationColor = new THREE.Color(ocean ? 0x5a2bd8 : 0x7a34ff);
-      material.iridescence = 0.45;
-      material.iridescenceIOR = 1.28;
+      material.transmission = transmissive ? 0.22 : 0;
+      material.thickness = 0.48;
+      material.ior = ocean ? 1.42 : 1.34;
+      material.attenuationDistance = ocean ? 0.94 : 1.5;
+      material.attenuationColor = new THREE.Color(ocean ? 0x6a30c8 : 0x7a34ff);
+      material.iridescence = ocean ? 0.82 : 0.45;
+      material.iridescenceIOR = ocean ? 1.4 : 1.28;
       material.iridescenceThicknessRange = [180, 640];
-      material.clearcoat = 0.55;
-      material.clearcoatRoughness = 0.28;
-      material.envMapIntensity = ocean ? 1.1 : 0.78;
+      material.clearcoat = ocean ? 0.78 : 0.55;
+      material.clearcoatRoughness = ocean ? 0.2 : 0.28;
+      material.envMap = options.environment ?? null;
+      material.envMapIntensity = ocean ? 1.45 : 0.78;
       material.side = THREE.FrontSide;
       mesh.renderOrder = 2;
-      fades.push({ material, opacity: material.opacity, alphaTest: 0 });
+      fades.push({ material, opacity: material.opacity, alphaTest: material.alphaTest });
     } else if (material.name === 'JF_skin_out') {
       // Opal shell. High transmission, low opacity, heavy iridescence: the
       // layer that has to carry the holographic colour shift.
-      material.color.set(ocean ? 0xd2ccff : 0xb9aaff);
-      material.emissive.set(ocean ? 0x8f6dff : 0x7a5ce6);
-      material.emissiveIntensity = ocean ? 0.52 : 0.3;
+      material.color.set(ocean ? 0x1f3d83 : 0xb9aaff);
+      material.emissive.set(ocean ? 0x2bb7ef : 0x7a5ce6);
+      material.emissiveIntensity = ocean ? 1.95 : 0.3;
       material.metalness = 0;
-      material.roughness = 0.08;
-      material.opacity = transmissive ? 0.6 : 0.5;
+      material.roughness = ocean ? 0.16 : 0.08;
+      material.opacity = transmissive ? 0.78 : 0.66;
+      material.alphaTest = ocean ? 0.02 : 0;
       material.depthWrite = false;
-      material.transmission = transmissive ? 0.78 : 0;
-      material.thickness = 0.95;
-      material.ior = 1.31;
-      material.attenuationDistance = ocean ? 1.9 : 2.3;
-      material.attenuationColor = new THREE.Color(ocean ? 0x7a44ff : 0x9560ff);
-      material.iridescence = 0.9;
+      material.transmission = transmissive ? 0.24 : 0;
+      material.thickness = 0.72;
+      material.ior = ocean ? 1.4 : 1.31;
+      material.attenuationDistance = ocean ? 1.25 : 2.3;
+      material.attenuationColor = new THREE.Color(ocean ? 0x2d4fc8 : 0x9560ff);
+      material.iridescence = ocean ? 0.94 : 0.9;
       material.iridescenceIOR = 1.33;
       material.iridescenceThicknessRange = [220, 800];
       material.clearcoat = 1;
-      material.clearcoatRoughness = 0.08;
-      material.sheen = 1;
-      material.sheenColor = new THREE.Color(ocean ? 0xa9e6ff : 0xffc6ec);
+      material.clearcoatRoughness = ocean ? 0.16 : 0.08;
+      material.sheen = ocean ? 1 : 1;
+      material.sheenColor = new THREE.Color(ocean ? 0xff82d6 : 0xffc6ec);
       material.sheenRoughness = 0.32;
       material.specularIntensity = 1;
       material.specularColor = new THREE.Color(0xdff6ff);
-      material.envMapIntensity = ocean ? 1.3 : 0.92;
+      material.envMap = options.environment ?? null;
+      material.envMapIntensity = ocean ? 1.58 : 0.92;
       material.side = THREE.FrontSide;
       mesh.renderOrder = 3;
-      fades.push({ material, opacity: material.opacity, alphaTest: 0 });
+      fades.push({ material, opacity: material.opacity, alphaTest: material.alphaTest });
     }
     material.needsUpdate = true;
   });
@@ -658,6 +726,14 @@ export function createJellyfishCreature(
   normalizeObject(visual, options.targetSize);
   const root = new THREE.Group();
   root.add(visual);
+  const glow = ocean
+    ? createSpecimenGlow(0x4f7dff, 0.26, options.targetSize * 1.08, options.targetSize * 1.46)
+    : null;
+  if (glow) {
+    glow.sprite.position.z = -0.2;
+    root.add(glow.sprite);
+    fades.push({ material: glow.material, opacity: glow.opacity, alphaTest: 0 });
+  }
 
   let mixer: THREE.AnimationMixer | undefined;
   if (gltf.animations[0]) {
@@ -672,6 +748,8 @@ export function createJellyfishCreature(
     dispose: () => {
       mixer?.stopAllAction();
       disposeObject(root);
+      glow?.material.dispose();
+      glow?.texture.dispose();
     },
   };
 }

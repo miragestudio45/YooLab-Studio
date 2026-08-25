@@ -39,6 +39,8 @@ export type WaterlinePass = {
   uniforms: {
     uLand: { value: THREE.Texture | null };
     uOcean: { value: THREE.Texture | null };
+    uOceanBloom: { value: THREE.Texture | null };
+    uBloomStrength: { value: number };
     uDive: { value: number };
     uLine: { value: number };
     uBand: { value: number };
@@ -53,6 +55,8 @@ export function createWaterlinePass(): WaterlinePass {
   const uniforms = {
     uLand: { value: null as THREE.Texture | null },
     uOcean: { value: null as THREE.Texture | null },
+    uOceanBloom: { value: null as THREE.Texture | null },
+    uBloomStrength: { value: 0 },
     uDive: { value: 0 },
     uLine: { value: -0.4 },
     uBand: { value: 0.02 },
@@ -83,6 +87,8 @@ export function createWaterlinePass(): WaterlinePass {
 
       uniform sampler2D uLand;
       uniform sampler2D uOcean;
+      uniform sampler2D uOceanBloom;
+      uniform float uBloomStrength;
       uniform float uDive;
       uniform float uLine;
       uniform float uBand;
@@ -152,6 +158,7 @@ export function createWaterlinePass(): WaterlinePass {
 
       vec3 sampleLand(vec2 uv) { return texture(uLand, clamp(uv, vec2(0.0005), vec2(0.9995))).rgb; }
       vec3 sampleOcean(vec2 uv) { return texture(uOcean, clamp(uv, vec2(0.0005), vec2(0.9995))).rgb; }
+      vec3 sampleOceanBloom(vec2 uv) { return texture(uOceanBloom, clamp(uv, vec2(0.0005), vec2(0.9995))).rgb; }
 
       void main() {
         vec2 uv = vUv;
@@ -212,7 +219,7 @@ export function createWaterlinePass(): WaterlinePass {
         air *= 1.0 - chill * 0.34;
 
         /* ------------------------------------------------------------ below --- */
-        vec3 sea = sampleOcean(uv);
+        vec3 sea = sampleOcean(uv) + sampleOceanBloom(uv) * uBloomStrength;
 
         /*
          * Snell's window.

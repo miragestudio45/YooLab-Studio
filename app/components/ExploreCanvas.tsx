@@ -6,6 +6,7 @@ import {
   createProceduralEnvironment,
   exploreEnvironmentPalette,
   oceanEnvironmentPalette,
+  specimenEnvironmentPalette,
   type ProceduralEnvironment,
 } from '../lib/three/environment';
 import { createLiquidSurface, liquidPalette, type LiquidPalette } from '../lib/three/liquid';
@@ -24,6 +25,7 @@ import { createOceanWorld, type OceanWorld } from '../lib/ocean/scene';
 import { OCEAN_CAMERA, oceanFovFor } from '../lib/ocean/camera';
 import { frameSubject, seabedSafeY, SUBJECT_STAGES, type SubjectPlacement } from '../lib/ocean/stage';
 import { createWaterlinePass } from '../lib/three/waterline';
+import { createOceanBloomPass } from '../lib/three/oceanBloom';
 import { creatureWeights, diveFor, waterbandFor, waterlineFor } from '../lib/story/clock';
 import { clearSubjectRect, subjectRect } from '../lib/story/subject';
 
@@ -359,6 +361,7 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
 
     /* ------------------------------------------------------------ transition --- */
     const waterline = createWaterlinePass();
+    const oceanBloom = createOceanBloomPass(compact);
     const targetOptions = {
       type: THREE.HalfFloatType,
       minFilter: THREE.LinearFilter,
@@ -393,6 +396,7 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
 
     let ocean: OceanWorld | null = null;
     let oceanEnvironment: ProceduralEnvironment | null = null;
+    let specimenEnvironment: ProceduralEnvironment | null = null;
     let oceanRig: THREE.Group | null = null;
     let fish: CreatureHandle | undefined;
     let jelly: CreatureHandle | undefined;
@@ -473,6 +477,7 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
       void (async () => {
         try {
           oceanEnvironment = createProceduralEnvironment(renderer, oceanEnvironmentPalette);
+          specimenEnvironment = createProceduralEnvironment(renderer, specimenEnvironmentPalette);
           const world = await createOceanWorld(renderer, oceanEnvironment.texture, { compact, reduceMotion });
           if (disposed) { world.dispose(); return; }
           /*
@@ -519,6 +524,7 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
             targetSize: CREATURE_SPAN.fish,
             finish: 'ocean',
             maxAnisotropy,
+            environment: specimenEnvironment.texture,
           });
           jelly = createJellyfishCreature(jellyGltf, {
             targetSize: CREATURE_SPAN.jelly,
@@ -528,6 +534,7 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
             transmissive: !compact,
             finish: 'ocean',
             maxAnisotropy,
+            environment: specimenEnvironment.texture,
           });
           fish.root.visible = false;
           jelly.root.visible = false;
@@ -578,6 +585,9 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
               renderer.setRenderTarget(oceanTarget);
               renderer.render(world.scene, world.camera);
             }
+            /* Compile and allocate the HDR extract/blur/composite while the
+               visitor is still in the meadow, exactly like the waterline pass. */
+            oceanBloom.render(renderer, oceanTarget.texture, 0.88, OCEAN_EXPOSURE, warmScratch);
             /* The land half, including the bee's own blended variant, so the way
                back up is warm too. */
             const beePresence = bee ? 1 : 0;
@@ -596,6 +606,8 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
              */
             waterline.uniforms.uLand.value = landTarget.texture;
             waterline.uniforms.uOcean.value = oceanTarget.texture;
+            waterline.uniforms.uOceanBloom.value = oceanBloom.texture;
+            waterline.uniforms.uBloomStrength.value = 0.88;
             renderer.setRenderTarget(warmScratch);
             renderer.render(waterline.scene, waterline.camera);
 
@@ -691,6 +703,7 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
       );
       landTarget?.setSize(renderWidth, renderHeight);
       oceanTarget?.setSize(renderWidth, renderHeight);
+      oceanBloom.setSize(renderWidth, renderHeight);
       waterline.uniforms.uAspect.value = aspect;
       beeMaterialSet?.optical.uSceneResolution.value.set(renderWidth, renderHeight);
     };
@@ -1019,19 +1032,31 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
       waterline.uniforms.uLine.value = waterlineFor(dive);
       waterline.uniforms.uBand.value = waterbandFor(dive);
       waterline.uniforms.uExposure.value = renderer.toneMappingExposure;
+      const bloomStrength = 0.22 + jellyPresence * 0.66;
+      waterline.uniforms.uBloomStrength.value = bloomStrength;
 
       if (composite) {
         ensureTargets();
         drawLand(landTarget);
         renderer.setRenderTarget(oceanTarget);
         renderer.render(ocean!.scene, ocean!.camera);
+        oceanBloom.prepare(renderer, oceanTarget!.texture);
         renderer.setRenderTarget(null);
         waterline.uniforms.uLand.value = landTarget!.texture;
         waterline.uniforms.uOcean.value = oceanTarget!.texture;
+        waterline.uniforms.uOceanBloom.value = oceanBloom.texture;
         renderer.render(waterline.scene, waterline.camera);
       } else if (wantsOcean) {
-        renderer.setRenderTarget(null);
+        ensureTargets();
+        renderer.setRenderTarget(oceanTarget);
         renderer.render(ocean!.scene, ocean!.camera);
+        oceanBloom.render(
+          renderer,
+          oceanTarget!.texture,
+          bloomStrength,
+          renderer.toneMappingExposure,
+          null,
+        );
       } else {
         drawLand(null);
       }
@@ -1177,7 +1202,9 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
       for (const map of beeMaps) map.dispose();
       ocean?.dispose();
       oceanEnvironment?.dispose();
+      specimenEnvironment?.dispose();
       waterline.dispose();
+      oceanBloom.dispose();
       landTarget?.dispose();
       oceanTarget?.dispose();
       warmScratch.dispose();
