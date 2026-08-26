@@ -125,6 +125,10 @@ export function createSectionSnap(): SnapController {
     if (anchors.length < 2) return null;
     const first = anchors[0];
     const last = anchors[anchors.length - 1];
+    /* Once the visitor has deliberately crossed an outer anchor, release the
+       page immediately instead of pulling them back to the first/last chapter. */
+    if (direction >= 0 && y > last + DEAD_ZONE_PX) return null;
+    if (direction < 0 && y < first - DEAD_ZONE_PX) return null;
     /* Outside the cinematic run the page is an ordinary document and behaves
        like one. Half a viewport of margin keeps entry and exit from feeling
        like a wall. */

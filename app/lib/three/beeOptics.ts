@@ -249,6 +249,28 @@ const beeVaryings = /* glsl */ `
   varying vec3 vViewDir;
 `;
 
+/**
+ * The bee is authored as one skinned mesh, but `aPart` already carries the
+ * semantic skin weights used by the ruby material. The annotation lesson can
+ * therefore isolate a real anatomical region in the shader without swapping
+ * the model or faking a cut-out in HTML.
+ *
+ * uIsolatePart: -1 all, 0 head, 1 thorax + limbs, 2 wings, 3 abdomen.
+ */
+const beeIsolation = /* glsl */ `
+  uniform float uIsolatePart;
+  float isolatedPartWeight() {
+    if ( uIsolatePart < -0.5 ) return 1.0;
+    if ( uIsolatePart < 0.5 ) return vPart.w;
+    if ( uIsolatePart < 1.5 ) {
+      float limb = max( 0.0, 1.0 - dot( vPart, vec4( 1.0 ) ) );
+      return max( vPart.y, limb );
+    }
+    if ( uIsolatePart < 2.5 ) return vPart.x;
+    return vPart.z;
+  }
+`;
+
 /** Derivative-space TBN. No tangent attribute ships with this GLB. */
 const perturbNormal = /* glsl */ `
   vec3 perturbNormal( vec3 N, vec3 worldPos, vec2 uv, float strength ) {
@@ -277,7 +299,9 @@ const coreFragment = /* glsl */ `
   uniform float uAo;
   uniform float uPresence;
   ${beeVaryings}
+  ${beeIsolation}
   void main() {
+    if ( isolatedPartWeight() < 0.16 ) discard;
     // The wings are carried by the dedicated membrane pass; an opaque red wing
     // is the single most plastic-looking thing this model can do.
     if ( vPart.x > 0.34 ) discard;
@@ -335,6 +359,7 @@ const shellFragment = /* glsl */ `
   uniform vec3 uLightDir;
   uniform float uPresence;
   ${beeVaryings}
+  ${beeIsolation}
   ${perturbNormal}
   float fresnelTerm( float cosTheta, float power, float f0 ) {
     return f0 + ( 1.0 - f0 ) * pow( 1.0 - cosTheta, power );
@@ -352,6 +377,7 @@ const shellFragment = /* glsl */ `
     return mix( luma, rgb, intensity );
   }
   void main() {
+    if ( isolatedPartWeight() < 0.16 ) discard;
     if ( vPart.x > 0.34 ) discard;
 
     vec3 N = normalize( vWorldNormal );
@@ -449,8 +475,10 @@ const wingFragment = /* glsl */ `
   uniform vec3 uLightDir;
   uniform float uPresence;
   ${beeVaryings}
+  ${beeIsolation}
   ${perturbNormal}
   void main() {
+    if ( isolatedPartWeight() < 0.16 ) discard;
     float wing = smoothstep( 0.24, 0.62, vPart.x );
     if ( wing <= 0.001 ) discard;
 
@@ -509,6 +537,8 @@ export type BeeMaterialSet = {
   coreInset: { value: number };
   /** Crossfade weight shared by every layer. */
   presence: { value: number };
+  /** -1 renders the whole bee; 0..3 isolates a semantic anatomy region. */
+  isolatePart: { value: number };
   dispose: () => void;
 };
 
@@ -525,6 +555,7 @@ export function createBeeMaterials(options: {
   const uLightDir = { value: new THREE.Vector3(0.354, 0.866, 0.354) };
   const uTime = { value: 0 };
   const presence = { value: 1 };
+  const isolatePart = { value: -1 };
   const coreInset = { value: 1 };
 
   // Reference values, verbatim, except where noted.
@@ -566,6 +597,7 @@ export function createBeeMaterials(options: {
       uLightDir,
       uAo: { value: 0.5 },
       uPresence: presence,
+      uIsolatePart: isolatePart,
     },
     // The core sits one geometry unit inside a shell that shares its topology,
     // so it needs the same depth nudge the reference uses.
@@ -606,6 +638,7 @@ export function createBeeMaterials(options: {
       uAo: { value: 0.75 },
       uLightDir,
       uPresence: presence,
+      uIsolatePart: isolatePart,
     },
     side: THREE.FrontSide,
   });
@@ -625,6 +658,7 @@ export function createBeeMaterials(options: {
       uRimTint: { value: new THREE.Color(0x9fe0ff) },
       uLightDir,
       uPresence: presence,
+      uIsolatePart: isolatePart,
     },
     side: THREE.DoubleSide,
     transparent: true,
@@ -638,6 +672,7 @@ export function createBeeMaterials(options: {
     optical,
     coreInset,
     presence,
+    isolatePart,
     dispose: () => {
       core.dispose();
       shell.dispose();

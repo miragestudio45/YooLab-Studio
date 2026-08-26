@@ -1,79 +1,292 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
+import {
+  createCarLoaders,
+  createCarMaterials,
+  disposeScene,
+  loadCarTextures,
+  prepareCarVisual,
+  type CarPieceState,
+  type MaterialShader,
+} from '../lib/formula/carRuntime';
 import { createProceduralEnvironment, studioEnvironmentPalette } from '../lib/three/environment';
-import { createVisibilityGate } from '../lib/three/visibility';
 
-/**
- * YooStudio workspace.
- *
- * This is the product surface, so nothing here is a picture of an editor: the
- * viewport is the real `jellyfish.glb`, selection is a raycast against its three
- * meshes, the transform handles move the object they are attached to, the
- * material and effect sliders write straight into the live materials, and the
- * timeline drives the actual AnimationMixer. Layout and track colours follow the
- * shipped YooStudio UI (`reference-audit/design/figma.png`).
- */
-
-type Tool = 'select' | 'move' | 'rotate' | 'scale' | 'annotate';
+type StudioMode = 'assemble' | 'inspect' | 'drive';
 type TrackId = 'model' | 'text' | 'audio' | 'effect';
+type EditorTool = { id: string; label: string; asset: string };
 
-type Vector3Tuple = [number, number, number];
+const EDITOR_ASSET_ROOT = '/asset/ui/yoolab-editor';
+const FIGMA_ASSET_ROOT = `${EDITOR_ASSET_ROOT}/figma`;
 
-type TransformReadout = {
-  position: Vector3Tuple;
-  rotation: Vector3Tuple;
-  scale: Vector3Tuple;
-};
-
-type Annotation = {
-  id: string;
-  label: string;
-  target: string;
-};
-
-type ViewportApi = {
-  setTool: (tool: Tool) => void;
-  select: (name: string | null) => void;
-  setPlaying: (playing: boolean) => void;
-  setTime: (time: number) => void;
-  setOpacity: (value: number) => void;
-  setGlow: (value: number) => void;
-  setAnnotationsVisible: (visible: boolean) => void;
-  removeAnnotation: (id: string) => void;
-  bindAnnotationElement: (id: string, element: HTMLElement | null) => void;
-  frameSelection: () => void;
-};
-
-const LAYERS: { name: string; label: string; note: string }[] = [
-  { name: 'JF_skin_out', label: 'Màng ngoài', note: 'Lớp keo trong suốt' },
-  { name: 'JF_skin_in', label: 'Tầng mô giữa', note: 'Cơ co bóp' },
-  { name: 'JF_heart', label: 'Khoang tiêu hoá', note: 'Lõi bên trong' },
+const MAIN_TOOLS: EditorTool[] = [
+  { id: 'create', label: 'Tạo mới Dự án', asset: 'create.svg' },
+  { id: 'templates', label: 'Mẫu', asset: 'templates.svg' },
+  { id: 'components', label: 'Thành phần', asset: 'components.svg' },
+  { id: 'projectInfo', label: 'Thông tin dự án', asset: 'project-info.svg' },
+  { id: 'decor', label: 'Decor', asset: 'decor.svg' },
+  { id: 'settings', label: 'Thiết lập', asset: 'settings.svg' },
+  { id: 'projects', label: 'Dự án', asset: 'projects.svg' },
+  { id: 'vrLab', label: 'VR Lab', asset: 'vr-lab.svg' },
 ];
 
-const TRACKS: { id: TrackId; label: string; color: string; start: number; length: number }[] = [
-  { id: 'model', label: 'Model', color: '#A852FC', start: 0, length: 1 },
-  { id: 'text', label: 'Văn bản', color: '#2B7FFF', start: 0.06, length: 0.62 },
-  { id: 'audio', label: 'Âm thanh', color: '#00C950', start: 0.12, length: 0.5 },
-  { id: 'effect', label: 'Hiệu ứng', color: '#F6339A', start: 0.3, length: 0.66 },
+const DETAIL_TOOLS: EditorTool[] = [
+  { id: 'labels', label: 'Quản lý nhãn', asset: 'info.svg' },
+  { id: 'space', label: 'Không gian', asset: 'space.svg' },
+  { id: 'steps', label: 'Bước', asset: 'steps.svg' },
+  { id: 'text', label: 'Văn bản', asset: 'text.svg' },
+  { id: 'audio', label: 'Âm thanh', asset: 'sound.svg' },
+  { id: 'media', label: 'Media', asset: 'media.svg' },
+  { id: 'hotspot', label: 'Hotspot', asset: 'scene-tool.svg' },
+  { id: 'info', label: 'Icon info', asset: 'info.svg' },
+  { id: 'sticker', label: 'Sticker', asset: 'sticker.svg' },
+  { id: 'effect', label: 'Hiệu ứng', asset: 'effects.svg' },
+  { id: 'quiz', label: 'Tạo Quiz', asset: 'quiz.svg' },
 ];
 
-const MODULES: { id: string; label: string; glyph: string }[] = [
-  { id: 'space', label: 'Không gian', glyph: '◫' },
-  { id: 'step', label: 'Bước', glyph: '⌘' },
-  { id: 'model', label: 'Mô hình', glyph: '◇' },
-  { id: 'text', label: 'Văn bản', glyph: 'T' },
-  { id: 'audio', label: 'Âm thanh', glyph: '♪' },
-  { id: 'media', label: 'Media', glyph: '▣' },
-  { id: 'hotspot', label: 'Hotspot', glyph: '✥' },
-  { id: 'effect', label: 'Hiệu ứng', glyph: '✧' },
-  { id: 'quiz', label: 'Tạo Quiz', glyph: '?' },
+const TRACKS: { id: TrackId; label: string; color: string; asset: string; start: number; length: number }[] = [
+  { id: 'model', label: 'Model', color: '#a852fc', asset: 'space.svg', start: 0, length: 1 },
+  { id: 'text', label: 'Văn bản', color: '#2b7fff', asset: 'text.svg', start: 0, length: 0.50958 },
+  { id: 'audio', label: 'Âm thanh', color: '#00c950', asset: 'sound.svg', start: 0, length: 0.62021 },
+  { id: 'effect', label: 'Hiệu ứng', color: '#f6339a', asset: 'effects.svg', start: 0, length: 0.82317 },
 ];
 
-const labelFor = (name: string) => LAYERS.find((layer) => layer.name === name)?.label ?? name;
+function CarViewport({ mode, explode, playing, light, showGrid, resetKey, onReady, onError }: {
+  mode: StudioMode;
+  explode: number;
+  playing: boolean;
+  light: number;
+  showGrid: boolean;
+  resetKey: number;
+  onReady: () => void;
+  onError: () => void;
+}) {
+  const hostRef = useRef<HTMLDivElement>(null);
+  const modeRef = useRef(mode);
+  const explodeRef = useRef(explode);
+  const playingRef = useRef(playing);
+  const lightRef = useRef(light);
+  const gridRef = useRef(showGrid);
+  const resetRef = useRef(resetKey);
+
+  useEffect(() => { modeRef.current = mode; }, [mode]);
+  useEffect(() => { explodeRef.current = explode; }, [explode]);
+  useEffect(() => { playingRef.current = playing; }, [playing]);
+  useEffect(() => { lightRef.current = light; }, [light]);
+  useEffect(() => { gridRef.current = showGrid; }, [showGrid]);
+  useEffect(() => { resetRef.current = resetKey; }, [resetKey]);
+
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host) return;
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x292b2c);
+    scene.fog = new THREE.Fog(0x292b2c, 13, 29);
+    const camera = new THREE.PerspectiveCamera(32, 1, 0.05, 70);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.03;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.55));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.domElement.style.touchAction = 'none';
+    host.appendChild(renderer.domElement);
+
+    const environment = createProceduralEnvironment(renderer, studioEnvironmentPalette);
+    scene.environment = environment.texture;
+    const hemi = new THREE.HemisphereLight(0xe8f4f2, 0x171c22, 1.75);
+    scene.add(hemi);
+    const key = new THREE.DirectionalLight(0xfff6ef, 5.8);
+    key.position.set(-5, 7, 5);
+    key.castShadow = true;
+    scene.add(key);
+    const teal = new THREE.PointLight(0x60d5d0, 16, 18, 2);
+    teal.position.set(5, 2, -3);
+    scene.add(teal);
+    const coral = new THREE.PointLight(0xff7f6b, 11, 15, 2);
+    coral.position.set(-4, 1.5, 4);
+    scene.add(coral);
+
+    const world = new THREE.Group();
+    scene.add(world);
+    const floor = new THREE.Mesh(
+      new THREE.CircleGeometry(12, 96),
+      new THREE.MeshStandardMaterial({ color: 0x15191a, roughness: 0.94, metalness: 0.02, envMapIntensity: 0.18 }),
+    );
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.y = -1.22;
+    floor.receiveShadow = true;
+    world.add(floor);
+    const grid = new THREE.GridHelper(24, 32, 0x4a817f, 0x3b4243);
+    grid.position.y = -1.205;
+    const gridMaterials = Array.isArray(grid.material) ? grid.material : [grid.material];
+    gridMaterials.forEach((material) => { material.transparent = true; material.opacity = 0.16; material.depthWrite = false; });
+    world.add(grid);
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(3.6, 3.63, 128),
+      new THREE.MeshBasicMaterial({ color: 0x568f8c, transparent: true, opacity: 0.24, side: THREE.DoubleSide }),
+    );
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = -1.19;
+    world.add(ring);
+
+    const carRoot = new THREE.Group();
+    carRoot.position.y = -0.38;
+    world.add(carRoot);
+    const loaders = createCarLoaders(renderer);
+    const carPieces: CarPieceState[] = [];
+    const shaderGroups: MaterialShader[][] = [];
+    let carVisual: THREE.Object3D | undefined;
+    let disposed = false;
+    let kitProgress = 0;
+
+    Promise.all([loaders.loadProtected('formulaCar.glb'), loadCarTextures(loaders)])
+      .then(([gltf, textures]) => {
+        if (disposed) return;
+        const carMaterials = createCarMaterials(textures, { initialKitProgress: 0, envMapIntensity: 0.76 });
+        shaderGroups.push(carMaterials.shaders);
+        carVisual = gltf.scene;
+        carPieces.push(...prepareCarVisual(carVisual, carMaterials.materials, 4.7));
+        carRoot.add(carVisual);
+        host.dataset.ready = 'true';
+        onReady();
+      })
+      .catch((error) => {
+        console.error('YooLab car workspace failed to load', error);
+        if (!disposed) onError();
+      });
+
+    let orbitYaw = 0.75;
+    let orbitPitch = 0.31;
+    let orbitRadius = 7.2;
+    let dragging = false;
+    let previousX = 0;
+    let previousY = 0;
+    let lastReset = resetRef.current;
+    const onPointerDown = (event: PointerEvent) => {
+      dragging = true;
+      previousX = event.clientX;
+      previousY = event.clientY;
+      renderer.domElement.setPointerCapture(event.pointerId);
+    };
+    const onPointerMove = (event: PointerEvent) => {
+      if (!dragging) return;
+      orbitYaw -= (event.clientX - previousX) * 0.006;
+      orbitPitch = THREE.MathUtils.clamp(orbitPitch + (event.clientY - previousY) * 0.004, 0.1, 0.82);
+      previousX = event.clientX;
+      previousY = event.clientY;
+    };
+    const onPointerUp = (event: PointerEvent) => {
+      dragging = false;
+      if (renderer.domElement.hasPointerCapture(event.pointerId)) renderer.domElement.releasePointerCapture(event.pointerId);
+    };
+    const onWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      orbitRadius = THREE.MathUtils.clamp(orbitRadius + event.deltaY * 0.006, 5.2, 10.5);
+    };
+    renderer.domElement.addEventListener('pointerdown', onPointerDown);
+    renderer.domElement.addEventListener('pointermove', onPointerMove);
+    renderer.domElement.addEventListener('pointerup', onPointerUp);
+    renderer.domElement.addEventListener('pointercancel', onPointerUp);
+    renderer.domElement.addEventListener('wheel', onWheel, { passive: false });
+
+    const resize = () => {
+      const width = Math.max(host.clientWidth, 1);
+      const height = Math.max(host.clientHeight, 1);
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+      renderer.setSize(width, height, false);
+    };
+    const observer = new ResizeObserver(resize);
+    observer.observe(host);
+    resize();
+
+    let driveDistance = 0;
+    let wheelRoll = 0;
+    const rollAxis = new THREE.Vector3(1, 0, 0);
+    const rollQuaternion = new THREE.Quaternion();
+    const cameraTarget = new THREE.Vector3();
+    const lookTarget = new THREE.Vector3();
+    const timer = new THREE.Timer();
+    renderer.setAnimationLoop(() => {
+      timer.update();
+      const delta = Math.min(timer.getDelta(), 0.05);
+      const targetKit = modeRef.current === 'assemble' ? explodeRef.current / 100 : 0;
+      kitProgress += (targetKit - kitProgress) * Math.min(1, delta * 4.8);
+      for (const group of shaderGroups) {
+        for (const shader of group) shader.uniforms.uKitProgress.value = kitProgress;
+      }
+
+      if (modeRef.current === 'drive' && playingRef.current && !reduceMotion) {
+        driveDistance += delta * 2.25;
+        wheelRoll -= delta * 5.9;
+      }
+      const driveX = modeRef.current === 'drive' ? Math.sin(driveDistance * 0.42) * 0.8 : 0;
+      carRoot.position.x += (driveX - carRoot.position.x) * Math.min(1, delta * 3.5);
+      carRoot.rotation.y = modeRef.current === 'drive' ? -Math.PI / 2 : 0;
+
+      if (carVisual) {
+        rollQuaternion.setFromAxisAngle(rollAxis, wheelRoll);
+        for (const piece of carPieces) {
+          piece.object.position.lerpVectors(piece.assembledPosition, piece.kitPosition, kitProgress);
+          piece.object.quaternion.slerpQuaternions(piece.assembledQuaternion, piece.kitQuaternion, kitProgress);
+          if (piece.isWheel && kitProgress < 0.015) {
+            // The authored wheel is rotated 90° around Y, so its axle is local X.
+            // Rolling around local Z made the wheel wobble sideways in the old viewer.
+            piece.object.quaternion.multiply(rollQuaternion);
+          }
+        }
+      }
+
+      if (lastReset !== resetRef.current) {
+        lastReset = resetRef.current;
+        orbitYaw = 0.75;
+        orbitPitch = 0.31;
+        orbitRadius = 7.2;
+      }
+      grid.visible = gridRef.current;
+      ring.visible = gridRef.current;
+      const luminance = lightRef.current / 100;
+      key.intensity = 3.6 + luminance * 4.4;
+      teal.intensity = 8 + luminance * 17;
+      coral.intensity = 5 + luminance * 14;
+
+      // A narrow editor canvas needs more distance to preserve the whole car;
+      // this is real camera framing, not a responsive CSS scale.
+      const frameRadius = orbitRadius * Math.max(1, 1.16 / camera.aspect);
+      cameraTarget.set(
+        carRoot.position.x + Math.sin(orbitYaw) * frameRadius,
+        Math.sin(orbitPitch) * frameRadius * 0.5,
+        Math.cos(orbitYaw) * frameRadius,
+      );
+      camera.position.lerp(cameraTarget, 1 - Math.pow(0.025, delta));
+      lookTarget.set(carRoot.position.x, -0.26, 0);
+      camera.lookAt(lookTarget);
+      renderer.render(scene, camera);
+    });
+
+    return () => {
+      disposed = true;
+      renderer.setAnimationLoop(null);
+      observer.disconnect();
+      renderer.domElement.removeEventListener('pointerdown', onPointerDown);
+      renderer.domElement.removeEventListener('pointermove', onPointerMove);
+      renderer.domElement.removeEventListener('pointerup', onPointerUp);
+      renderer.domElement.removeEventListener('pointercancel', onPointerUp);
+      renderer.domElement.removeEventListener('wheel', onWheel);
+      disposeScene(world);
+      environment.dispose();
+      loaders.dispose();
+      renderer.dispose();
+      renderer.domElement.remove();
+    };
+  }, [onError, onReady]);
+
+  return <div className="studio-car-viewport" ref={hostRef} aria-label="Mô hình xe Formula 3D tương tác" />;
+}
 
 function formatTime(seconds: number) {
   const whole = Math.max(0, seconds);
@@ -84,845 +297,213 @@ function formatTime(seconds: number) {
 }
 
 export function StudioDemo() {
-  const hostRef = useRef<HTMLDivElement>(null);
-  const apiRef = useRef<ViewportApi | null>(null);
-
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
-  const [tool, setTool] = useState<Tool>('select');
-  const [activeModule, setActiveModule] = useState('model');
-  const [selected, setSelected] = useState<string | null>('JF_skin_out');
-  const [transform, setTransform] = useState<TransformReadout>({
-    position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1],
-  });
-  const [opacity, setOpacity] = useState(80);
-  const [glow, setGlow] = useState(45);
-  const [annotations, setAnnotations] = useState<Annotation[]>([]);
-  const [annotationsVisible, setAnnotationsVisible] = useState(true);
-  const [playing, setPlaying] = useState(true);
-  const [time, setTime] = useState(0);
-  const [duration, setDuration] = useState(4.25);
-  const [track, setTrack] = useState<TrackId>('model');
+  const [mode, setMode] = useState<StudioMode>('inspect');
+  const [activeMain, setActiveMain] = useState('decor');
+  const [activeDetail, setActiveDetail] = useState('text');
+  const [showGrid, setShowGrid] = useState(true);
+  const [muted, setMuted] = useState(false);
+  const [shared, setShared] = useState(false);
+  const [playing, setPlaying] = useState(false);
+  const [time, setTime] = useState(5.2);
+  const [track, setTrack] = useState<TrackId>('text');
+  const [resetKey, setResetKey] = useState(0);
+  const [noteLength, setNoteLength] = useState(100);
+  const [noteWidth, setNoteWidth] = useState(50);
+  const [noteOpacity, setNoteOpacity] = useState(100);
+  const duration = 10.3;
+  const progress = (time / duration) * 100;
+  const handleReady = useCallback(() => setReady(true), []);
+  const handleError = useCallback(() => setFailed(true), []);
 
-  const annotationCounter = useRef(0);
-
-  /* ------------------------------------------------------------------ scene --- */
   useEffect(() => {
-    const host = hostRef.current;
-    if (!host) return;
-    let disposed = false;
-    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-    const scene = new THREE.Scene();
-    // A light viewport. The editor chrome around it is light now, and a
-    // near-black stage inside a white panel reads as a hole punched in the page.
-    scene.background = new THREE.Color(0xedf1f8);
-    scene.fog = new THREE.Fog(0xedf1f8, 10, 24);
-    const camera = new THREE.PerspectiveCamera(32, 1, 0.05, 60);
-
-    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.06;
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.6));
-    host.insertBefore(renderer.domElement, host.firstChild);
-
-    const environment = createProceduralEnvironment(renderer, studioEnvironmentPalette);
-    scene.environment = environment.texture;
-
-    scene.add(new THREE.HemisphereLight(0xffffff, 0xc9d4e6, 1.6));
-    const keyLight = new THREE.DirectionalLight(0xfff6fb, 2.1);
-    keyLight.position.set(-3.2, 4.4, 4.6);
-    scene.add(keyLight);
-    const rimLight = new THREE.DirectionalLight(0x9fe9ff, 1.1);
-    rimLight.position.set(3.6, -0.8, -3.4);
-    scene.add(rimLight);
-    const accentLight = new THREE.PointLight(0x00aaab, 6, 16, 2);
-    accentLight.position.set(2.4, 1.4, 2.6);
-    scene.add(accentLight);
-
-    // Ground grid, matching the shipped viewport's perspective floor. Dark
-    // lines on a light floor, which is how the real editor draws it.
-    const grid = new THREE.GridHelper(26, 26, 0x00aaab, 0x9aa6bd);
-    grid.position.y = -1.6;
-    const gridMaterials = Array.isArray(grid.material) ? grid.material : [grid.material];
-    for (const material of gridMaterials) {
-      material.transparent = true;
-      material.opacity = 0.34;
-      material.depthWrite = false;
-    }
-    scene.add(grid);
-
-    const modelRoot = new THREE.Group();
-    scene.add(modelRoot);
-
-    /* ------------------------------------------------------------- gizmo --- */
-    const gizmo = new THREE.Group();
-    gizmo.visible = false;
-    gizmo.renderOrder = 20;
-    scene.add(gizmo);
-    const axisColors = [0xff5f7a, 0x63e08a, 0x53b9ff];
-    const axisVectors = [new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 1)];
-    const handles: THREE.Mesh[] = [];
-    for (let index = 0; index < 3; index += 1) {
-      const handle = new THREE.Group();
-      const material = new THREE.MeshBasicMaterial({
-        color: axisColors[index],
-        depthTest: false,
-        depthWrite: false,
-        transparent: true,
-      });
-      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.62, 8), material);
-      shaft.position.y = 0.31;
-      const tip = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.14, 10), material);
-      tip.position.y = 0.68;
-      // Invisible fat cylinder so the handle is comfortable to grab.
-      const picker = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.07, 0.07, 0.8, 6),
-        new THREE.MeshBasicMaterial({ visible: false }),
-      );
-      picker.position.y = 0.4;
-      picker.userData.axis = index;
-      handle.add(shaft, tip, picker);
-      if (index === 0) handle.rotation.z = -Math.PI / 2;
-      if (index === 2) handle.rotation.x = Math.PI / 2;
-      handle.renderOrder = 20;
-      gizmo.add(handle);
-      handles.push(picker);
-      shaft.renderOrder = 20;
-      tip.renderOrder = 20;
-    }
-
-    const selectionBox = new THREE.Box3Helper(new THREE.Box3(), new THREE.Color(0x00d0d1));
-    (selectionBox.material as THREE.LineBasicMaterial).transparent = true;
-    (selectionBox.material as THREE.LineBasicMaterial).opacity = 0.62;
-    selectionBox.visible = false;
-    scene.add(selectionBox);
-
-    /* ------------------------------------------------------------- model --- */
-    const loader = new GLTFLoader();
-    loader.setMeshoptDecoder(MeshoptDecoder);
-    const meshes = new Map<string, THREE.Mesh>();
-    const baseOpacity = new Map<string, number>();
-    let mixer: THREE.AnimationMixer | undefined;
-    let action: THREE.AnimationAction | undefined;
-    let clipDuration = 4.25;
-
-    const annotationPoints = new Map<string, { local: THREE.Vector3; host: THREE.Object3D }>();
-    const annotationElements = new Map<string, HTMLElement>();
-    let annotationsShown = true;
-
-    let currentTool: Tool = 'select';
-    let currentSelection: string | null = null;
-    let opacityValue = 0.8;
-    let glowValue = 0.45;
-
-    let orbitYaw = 0.62;
-    let orbitPitch = 0.2;
-    let orbitRadius = 6.4;
-    const orbitTarget = new THREE.Vector3(0, 0, 0);
-
-    const raycaster = new THREE.Raycaster();
-    const pointerNdc = new THREE.Vector2();
-    const dragPlane = new THREE.Plane();
-    const dragPoint = new THREE.Vector3();
-    const dragStart = new THREE.Vector3();
-    const objectStartPosition = new THREE.Vector3();
-    const objectStartScale = new THREE.Vector3();
-    const objectStartQuaternion = new THREE.Quaternion();
-    let dragAxis = -1;
-    let dragging = false;
-    let orbiting = false;
-    let pointerPrevious = { x: 0, y: 0 };
-    let transformSignalTimer = 0;
-
-    const emitTransform = () => {
-      const target = currentSelection ? meshes.get(currentSelection) : undefined;
-      if (!target) return;
-      setTransform({
-        position: [target.position.x, target.position.y, target.position.z],
-        rotation: [
-          THREE.MathUtils.radToDeg(target.rotation.x),
-          THREE.MathUtils.radToDeg(target.rotation.y),
-          THREE.MathUtils.radToDeg(target.rotation.z),
-        ],
-        scale: [target.scale.x, target.scale.y, target.scale.z],
-      });
+    if (!playing) return;
+    let last = performance.now();
+    let frame = 0;
+    const tick = (now: number) => {
+      const delta = Math.min((now - last) / 1000, 0.1);
+      last = now;
+      setTime((current) => (current + delta) % duration);
+      frame = requestAnimationFrame(tick);
     };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [playing]);
 
-    const applySelection = (name: string | null) => {
-      currentSelection = name;
-      const target = name ? meshes.get(name) : undefined;
-      gizmo.visible = Boolean(target) && currentTool !== 'select' && currentTool !== 'annotate';
-      selectionBox.visible = Boolean(target);
-      if (target) emitTransform();
-    };
+  const chooseMode = (next: StudioMode) => {
+    setMode(next);
+    setPlaying(next === 'drive');
+    if (next === 'assemble') setTrack('model');
+  };
 
-    const applyOpacity = () => {
-      const target = currentSelection ? meshes.get(currentSelection) : undefined;
-      if (!target) return;
-      const material = target.material as THREE.MeshPhysicalMaterial;
-      const base = baseOpacity.get(currentSelection ?? '') ?? 1;
-      material.opacity = base * opacityValue;
-      material.transparent = true;
-      material.needsUpdate = false;
-    };
-
-    const applyGlow = () => {
-      accentLight.intensity = 3 + glowValue * 22;
-      rimLight.intensity = 0.6 + glowValue * 2.4;
-      for (const mesh of meshes.values()) {
-        const material = mesh.material as THREE.MeshPhysicalMaterial;
-        material.emissiveIntensity = 0.1 + glowValue * 0.8;
-      }
-    };
-
-    loader.loadAsync('/asset/fish/jellyfish.glb').then((gltf) => {
-      if (disposed) return;
-      const visual = gltf.scene;
-      visual.traverse((child) => {
-        const mesh = child as THREE.Mesh;
-        if (!mesh.isMesh) return;
-        mesh.frustumCulled = false;
-        const source = mesh.material as THREE.MeshStandardMaterial;
-        const physical = new THREE.MeshPhysicalMaterial({
-          name: source.name,
-          map: source.map,
-          emissive: new THREE.Color(source.name === 'JF_heart' ? 0x3a2280 : 0x7a5ce6),
-          emissiveMap: source.emissiveMap,
-          emissiveIntensity: 0.45,
-          roughnessMap: source.roughnessMap,
-          metalnessMap: source.metalnessMap,
-          color: source.name === 'JF_heart' ? 0x7d9aff : source.name === 'JF_skin_in' ? 0xaa9dff : 0xc0b2ff,
-          roughness: 0.12,
-          metalness: 0,
-          transmission: 0.6,
-          thickness: 0.8,
-          ior: 1.32,
-          attenuationColor: new THREE.Color(0x8d5cff),
-          attenuationDistance: 2,
-          iridescence: 0.7,
-          iridescenceIOR: 1.3,
-          clearcoat: 1,
-          clearcoatRoughness: 0.09,
-          sheen: 0.9,
-          sheenColor: new THREE.Color(0xffc6ec),
-          transparent: true,
-          opacity: source.name === 'JF_skin_out' ? 0.72 : source.name === 'JF_skin_in' ? 0.86 : 1,
-          depthWrite: source.name === 'JF_heart',
-          envMapIntensity: 1,
-          side: THREE.FrontSide,
-        });
-        mesh.material = physical;
-        mesh.name = source.name || mesh.name;
-        meshes.set(mesh.name, mesh);
-        baseOpacity.set(mesh.name, physical.opacity);
-        mesh.renderOrder = mesh.name === 'JF_heart' ? 1 : mesh.name === 'JF_skin_in' ? 2 : 3;
-        source.dispose();
-      });
-
-      const bounds = new THREE.Box3().setFromObject(visual);
-      const size = bounds.getSize(new THREE.Vector3());
-      const center = bounds.getCenter(new THREE.Vector3());
-      const scale = 3.1 / Math.max(size.x, size.y, size.z);
-      visual.scale.setScalar(scale);
-      visual.position.sub(center.multiplyScalar(scale));
-      modelRoot.add(visual);
-
-      if (gltf.animations[0]) {
-        mixer = new THREE.AnimationMixer(visual);
-        action = mixer.clipAction(gltf.animations[0]);
-        action.play();
-        clipDuration = gltf.animations[0].duration;
-      }
-      applySelection('JF_skin_out');
-      applyOpacity();
-      applyGlow();
-      setDuration(clipDuration);
-      setReady(true);
-    }).catch((error) => {
-      console.error('YooStudio viewport failed to load', error);
-      if (!disposed) setFailed(true);
-    });
-
-    /* ------------------------------------------------------------ pointer --- */
-    const canvas = renderer.domElement;
-    canvas.style.touchAction = 'none';
-
-    const updateNdc = (event: PointerEvent) => {
-      const rect = canvas.getBoundingClientRect();
-      pointerNdc.set(
-        ((event.clientX - rect.left) / rect.width) * 2 - 1,
-        -((event.clientY - rect.top) / rect.height) * 2 + 1,
-      );
-    };
-
-    const pickMesh = () => {
-      raycaster.setFromCamera(pointerNdc, camera);
-      const hits = raycaster.intersectObjects([...meshes.values()], false);
-      return hits[0];
-    };
-
-    const onPointerDown = (event: PointerEvent) => {
-      updateNdc(event);
-      canvas.setPointerCapture(event.pointerId);
-      pointerPrevious = { x: event.clientX, y: event.clientY };
-
-      if (currentTool === 'annotate') {
-        const hit = pickMesh();
-        if (hit) {
-          const local = hit.object.worldToLocal(hit.point.clone());
-          annotationCounter.current += 1;
-          const id = `note-${annotationCounter.current}`;
-          annotationPoints.set(id, { local, host: hit.object });
-          setAnnotations((current) => [
-            ...current,
-            { id, label: `Ghi chú ${current.length + 1}`, target: hit.object.name },
-          ]);
-          applySelection(hit.object.name);
-          setSelected(hit.object.name);
-        }
-        return;
-      }
-
-      if (currentSelection && currentTool !== 'select') {
-        raycaster.setFromCamera(pointerNdc, camera);
-        const handleHits = raycaster.intersectObjects(handles, false);
-        if (handleHits[0]) {
-          const target = meshes.get(currentSelection);
-          if (target) {
-            dragAxis = handleHits[0].object.userData.axis as number;
-            dragging = true;
-            objectStartPosition.copy(target.position);
-            objectStartScale.copy(target.scale);
-            objectStartQuaternion.copy(target.quaternion);
-            dragPlane.setFromNormalAndCoplanarPoint(
-              camera.getWorldDirection(new THREE.Vector3()).negate(),
-              gizmo.position,
-            );
-            raycaster.ray.intersectPlane(dragPlane, dragStart);
-            return;
-          }
-        }
-      }
-
-      const hit = pickMesh();
-      if (hit) {
-        applySelection(hit.object.name);
-        setSelected(hit.object.name);
-        return;
-      }
-      orbiting = true;
-      applySelection(null);
-      setSelected(null);
-    };
-
-    const onPointerMove = (event: PointerEvent) => {
-      const deltaX = event.clientX - pointerPrevious.x;
-      const deltaY = event.clientY - pointerPrevious.y;
-      pointerPrevious = { x: event.clientX, y: event.clientY };
-      updateNdc(event);
-
-      if (dragging && currentSelection) {
-        const target = meshes.get(currentSelection);
-        if (!target) return;
-        const axis = axisVectors[dragAxis];
-        if (currentTool === 'move') {
-          raycaster.setFromCamera(pointerNdc, camera);
-          if (raycaster.ray.intersectPlane(dragPlane, dragPoint)) {
-            const travel = dragPoint.clone().sub(dragStart).dot(axis);
-            target.position.copy(objectStartPosition).addScaledVector(axis, travel);
-          }
-        } else if (currentTool === 'rotate') {
-          const amount = (deltaX + deltaY) * 0.01;
-          target.quaternion.copy(objectStartQuaternion);
-          objectStartQuaternion.copy(target.quaternion);
-          target.rotateOnAxis(axis, amount);
-        } else if (currentTool === 'scale') {
-          const amount = 1 + (deltaX - deltaY) * 0.006;
-          const next = objectStartScale.clone();
-          next.setComponent(dragAxis, Math.max(0.15, next.getComponent(dragAxis) * amount));
-          objectStartScale.copy(next);
-          target.scale.copy(next);
-        }
-        return;
-      }
-
-      if (orbiting || event.buttons === 1) {
-        orbitYaw -= deltaX * 0.006;
-        orbitPitch = THREE.MathUtils.clamp(orbitPitch + deltaY * 0.004, -0.55, 1.05);
-      }
-    };
-
-    const onPointerUp = (event: PointerEvent) => {
-      if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
-      dragging = false;
-      orbiting = false;
-      dragAxis = -1;
-      emitTransform();
-    };
-
-    const onWheel = (event: WheelEvent) => {
-      event.preventDefault();
-      orbitRadius = THREE.MathUtils.clamp(orbitRadius + event.deltaY * 0.0045, 3.2, 12);
-    };
-
-    canvas.addEventListener('pointerdown', onPointerDown);
-    canvas.addEventListener('pointermove', onPointerMove);
-    canvas.addEventListener('pointerup', onPointerUp);
-    canvas.addEventListener('pointercancel', onPointerUp);
-    canvas.addEventListener('wheel', onWheel, { passive: false });
-
-    /* ------------------------------------------------------------- resize --- */
-    const resize = () => {
-      const width = Math.max(host.clientWidth, 1);
-      const height = Math.max(host.clientHeight, 1);
-      camera.aspect = width / height;
-      camera.updateProjectionMatrix();
-      renderer.setSize(width, height, false);
-    };
-    const resizeObserver = new ResizeObserver(resize);
-    resizeObserver.observe(host);
-    resize();
-
-    const gate = createVisibilityGate(host, 160);
-    const visible = () => gate.visible();
-    let documentVisible = document.visibilityState !== 'hidden';
-    const onDocumentVisibility = () => { documentVisible = document.visibilityState !== 'hidden'; };
-    document.addEventListener('visibilitychange', onDocumentVisibility);
-
-    /* --------------------------------------------------------------- loop --- */
-    let playingNow = true;
-    let requestedTime: number | null = null;
-    const projected = new THREE.Vector3();
-    const timer = new THREE.Timer();
-
-    renderer.setAnimationLoop(() => {
-      timer.update();
-      const delta = Math.min(timer.getDelta(), 0.05);
-      if (!visible() || !documentVisible) return;
-
-      camera.position.set(
-        orbitTarget.x + Math.sin(orbitYaw) * Math.cos(orbitPitch) * orbitRadius,
-        orbitTarget.y + Math.sin(orbitPitch) * orbitRadius,
-        orbitTarget.z + Math.cos(orbitYaw) * Math.cos(orbitPitch) * orbitRadius,
-      );
-      camera.lookAt(orbitTarget);
-
-      if (mixer) {
-        if (requestedTime !== null) {
-          mixer.setTime(requestedTime);
-          requestedTime = null;
-        } else if (playingNow && !reduceMotion) {
-          mixer.update(delta);
-        }
-        transformSignalTimer += delta;
-        if (transformSignalTimer > 0.1) {
-          transformSignalTimer = 0;
-          setTime(action ? action.time : 0);
-        }
-      }
-
-      const target = currentSelection ? meshes.get(currentSelection) : undefined;
-      if (target) {
-        target.updateWorldMatrix(true, false);
-        const worldPosition = new THREE.Vector3().setFromMatrixPosition(target.matrixWorld);
-        gizmo.position.copy(worldPosition);
-        const gizmoScale = camera.position.distanceTo(worldPosition) * 0.26;
-        gizmo.scale.setScalar(gizmoScale);
-        selectionBox.box.setFromObject(target);
-        selectionBox.updateMatrixWorld(true);
-      }
-
-      if (annotationPoints.size) {
-        const rect = renderer.domElement.getBoundingClientRect();
-        for (const [id, point] of annotationPoints) {
-          const element = annotationElements.get(id);
-          if (!element) continue;
-          if (!annotationsShown) {
-            element.style.opacity = '0';
-            continue;
-          }
-          projected.copy(point.local);
-          point.host.updateWorldMatrix(true, false);
-          projected.applyMatrix4(point.host.matrixWorld).project(camera);
-          const x = (projected.x * 0.5 + 0.5) * rect.width;
-          const y = (-projected.y * 0.5 + 0.5) * rect.height;
-          element.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
-          element.style.opacity = projected.z > 1 ? '0' : '1';
-        }
-      }
-
-      renderer.render(scene, camera);
-    });
-
-    apiRef.current = {
-      setTool: (next) => {
-        currentTool = next;
-        gizmo.visible = Boolean(currentSelection) && next !== 'select' && next !== 'annotate';
-        canvas.style.cursor = next === 'annotate' ? 'crosshair' : next === 'select' ? 'default' : 'move';
-      },
-      select: (name) => { applySelection(name); },
-      setPlaying: (value) => { playingNow = value; },
-      setTime: (value) => { requestedTime = value; },
-      setOpacity: (value) => { opacityValue = value; applyOpacity(); },
-      setGlow: (value) => { glowValue = value; applyGlow(); },
-      setAnnotationsVisible: (value) => { annotationsShown = value; },
-      removeAnnotation: (id) => {
-        annotationPoints.delete(id);
-        const element = annotationElements.get(id);
-        if (element) element.style.opacity = '0';
-        annotationElements.delete(id);
-      },
-      bindAnnotationElement: (id, element) => {
-        if (element) annotationElements.set(id, element);
-        else annotationElements.delete(id);
-      },
-      frameSelection: () => {
-        orbitYaw = 0.62;
-        orbitPitch = 0.2;
-        orbitRadius = 6.4;
-      },
-    };
-
-    return () => {
-      disposed = true;
-      apiRef.current = null;
-      renderer.setAnimationLoop(null);
-      canvas.removeEventListener('pointerdown', onPointerDown);
-      canvas.removeEventListener('pointermove', onPointerMove);
-      canvas.removeEventListener('pointerup', onPointerUp);
-      canvas.removeEventListener('pointercancel', onPointerUp);
-      canvas.removeEventListener('wheel', onWheel);
-      resizeObserver.disconnect();
-      gate.dispose();
-      document.removeEventListener('visibilitychange', onDocumentVisibility);
-      mixer?.stopAllAction();
-      const geometries = new Set<THREE.BufferGeometry>();
-      const materials = new Set<THREE.Material>();
-      scene.traverse((child) => {
-        const mesh = child as THREE.Mesh;
-        if (mesh.isMesh || (child as THREE.Line).isLine) {
-          if (mesh.geometry) geometries.add(mesh.geometry);
-          const list = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-          for (const material of list) if (material) materials.add(material);
-        }
-      });
-      for (const geometry of geometries) geometry.dispose();
-      for (const material of materials) material.dispose();
-      environment.dispose();
-      renderer.dispose();
-      renderer.domElement.remove();
-    };
-  }, []);
-
-  /* ------------------------------------------------------- state -> engine --- */
-  useEffect(() => { apiRef.current?.setTool(tool); }, [tool]);
-  useEffect(() => { apiRef.current?.select(selected); }, [selected]);
-  useEffect(() => { apiRef.current?.setPlaying(playing); }, [playing]);
-  useEffect(() => { apiRef.current?.setOpacity(opacity / 100); }, [opacity]);
-  useEffect(() => { apiRef.current?.setGlow(glow / 100); }, [glow]);
-  useEffect(() => { apiRef.current?.setAnnotationsVisible(annotationsVisible); }, [annotationsVisible]);
-
-  const scrub = useCallback((ratio: number) => {
-    const next = THREE.MathUtils.clamp(ratio, 0, 1) * duration;
+  const scrub = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const ratio = THREE.MathUtils.clamp((event.clientX - rect.left) / rect.width, 0, 1);
+    setTime(ratio * duration);
     setPlaying(false);
-    setTime(next);
-    apiRef.current?.setTime(next);
-  }, [duration]);
-
-  const trackPointer = useRef(false);
-  const onTrackPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    trackPointer.current = true;
-    event.currentTarget.setPointerCapture(event.pointerId);
-    const rect = event.currentTarget.getBoundingClientRect();
-    scrub((event.clientX - rect.left) / rect.width);
   };
-  const onTrackPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!trackPointer.current) return;
-    const rect = event.currentTarget.getBoundingClientRect();
-    scrub((event.clientX - rect.left) / rect.width);
-  };
-  const onTrackPointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
-    trackPointer.current = false;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-  };
-
-  const removeAnnotation = (id: string) => {
-    apiRef.current?.removeAnnotation(id);
-    setAnnotations((current) => current.filter((item) => item.id !== id));
-  };
-
-  const progress = duration > 0 ? Math.min(1, time / duration) : 0;
-  const selectedLayer = useMemo(() => LAYERS.find((layer) => layer.name === selected), [selected]);
 
   return (
-    <div className="studio" id="yoostudio">
-      <div className="studio-topbar">
-        <div className="studio-doc">
-          <span className="studio-doc-mark" aria-hidden="true">Y</span>
-          <b>Sinh học 6 · Cấu tạo con sứa</b>
-          <small>Đã lưu</small>
-        </div>
-        <div className="studio-steps" role="group" aria-label="Không gian bài học">
-          <button type="button" className="is-active">Space 1: Sứa</button>
-          <button type="button">Space 2: Cấu tạo</button>
-        </div>
-        <div className="studio-actions">
-          <button type="button" onClick={() => apiRef.current?.frameSelection()}>Đặt góc nhìn</button>
-          <button type="button" className="is-primary">Xem trước</button>
-        </div>
-      </div>
-
-      <div className="studio-body">
-        <aside className="studio-rail" aria-label="Bộ công cụ YooStudio">
-          {MODULES.map((module) => (
-            <button
-              type="button"
-              key={module.id}
-              className={activeModule === module.id ? 'is-active' : ''}
-              aria-pressed={activeModule === module.id}
-              onClick={() => {
-                setActiveModule(module.id);
-                if (module.id === 'text') setTool('annotate');
-                else if (module.id === 'model') setTool('move');
-                else if (module.id === 'hotspot') setTool('annotate');
-                else setTool('select');
-              }}
-            >
-              <span aria-hidden="true">{module.glyph}</span>
-              {module.label}
+    <div className="studio studio--figma" data-mode={mode}>
+      <aside className="studio-main-rail" aria-label="Điều hướng chính YooLab">
+        <button className="studio-main-logo" aria-label="Trang chủ YooLab" onClick={() => setActiveMain('create')} type="button">
+          <img alt="" src={`${EDITOR_ASSET_ROOT}/logo.svg`} />
+          <img alt="" className="studio-main-logo-mark" src={`${EDITOR_ASSET_ROOT}/canvas-logo-mark.svg`} />
+          <span>YooLab</span>
+        </button>
+        <div className="studio-main-tools">
+          {MAIN_TOOLS.map((item) => (
+            <button className={activeMain === item.id ? 'is-active' : ''} key={item.id} onClick={() => setActiveMain(item.id)} type="button">
+              <span className="studio-tool-icon" aria-hidden="true"><img alt="" src={`${EDITOR_ASSET_ROOT}/${item.asset}`} /></span>
+              <span>{item.label}</span>
             </button>
           ))}
-        </aside>
-
-        <div className="studio-tree">
-          <div className="studio-panel-label"><span>Đối tượng</span><b>{annotations.length ? `${annotations.length} ghi chú` : '3 lớp'}</b></div>
-          <button
-            type="button"
-            className={`studio-tree-row studio-tree-row--group${selected === null ? ' is-selected' : ''}`}
-            onClick={() => setSelected(null)}
-          >
-            <i className="studio-swatch studio-swatch--group" />Jellyfish_group
-          </button>
-          {LAYERS.map((layer) => (
-            <button
-              type="button"
-              key={layer.name}
-              className={`studio-tree-row${selected === layer.name ? ' is-selected' : ''}`}
-              onClick={() => setSelected(layer.name)}
-            >
-              <i className="studio-swatch" />
-              <span>{layer.label}<small>{layer.note}</small></span>
-            </button>
-          ))}
-          {annotations.map((item) => (
-            <div className="studio-tree-row studio-tree-row--note" key={item.id}>
-              <i className="studio-swatch studio-swatch--note" />
-              <span>{item.label}<small>{labelFor(item.target)}</small></span>
-              <button type="button" onClick={() => removeAnnotation(item.id)} aria-label={`Xoá ${item.label}`}>×</button>
-            </div>
-          ))}
         </div>
+        <div className="studio-main-footer" aria-label="Tài khoản và ngôn ngữ">
+          <button aria-label="Thông báo" type="button"><img alt="" src={`${FIGMA_ASSET_ROOT}/bell.svg`} /><i>10</i></button>
+          <button aria-label="Ngôn ngữ: Tiếng Việt" type="button"><img alt="" src={`${FIGMA_ASSET_ROOT}/language.svg`} /><span>VNI</span></button>
+          <button className="studio-avatar" aria-label="Tài khoản" type="button"><img alt="" src={`${FIGMA_ASSET_ROOT}/avatar.png`} /></button>
+        </div>
+      </aside>
 
-        <div className="studio-viewport">
-          <div className="studio-viewport-bar">
-            <div className="studio-tools" role="group" aria-label="Công cụ biến đổi">
-              {([
-                ['select', 'Chọn', '➤'],
-                ['move', 'Di chuyển', '✥'],
-                ['rotate', 'Xoay', '⟳'],
-                ['scale', 'Tỷ lệ', '⤢'],
-                ['annotate', 'Ghi chú', '＋'],
-              ] as const).map(([id, label, glyph]) => (
-                <button
-                  type="button"
-                  key={id}
-                  className={tool === id ? 'is-active' : ''}
-                  aria-pressed={tool === id}
-                  title={label}
-                  onClick={() => setTool(id)}
-                >
-                  <span aria-hidden="true">{glyph}</span>{label}
-                </button>
-              ))}
+      <main className="studio-workspace">
+        <header className="studio-editor-topbar">
+          <div className="studio-document-title">
+            <b>Giới thiệu về loài Ong</b>
+            <button aria-label="Đổi tên bài học" type="button"><img alt="" src={`${FIGMA_ASSET_ROOT}/edit.svg`} /></button>
+          </div>
+          <img alt="Đang đồng bộ" className="studio-sync" src={`${FIGMA_ASSET_ROOT}/loading.svg`} />
+          <div className="studio-editor-actions" aria-label="Hành động dự án">
+            <button className="is-purple" aria-label="Mô hình 3D" onClick={() => setTrack('model')} type="button"><img alt="" src={`${FIGMA_ASSET_ROOT}/ar.svg`} /></button>
+            <button className="is-peach" aria-label="Công cụ AI" type="button"><img alt="" src={`${FIGMA_ASSET_ROOT}/ai.svg`} /><img alt="" className="studio-chevron" src={`${FIGMA_ASSET_ROOT}/chevron.svg`} /></button>
+            <button className="is-blue" aria-label="Toàn màn hình" onClick={() => setShowGrid((value) => !value)} type="button"><img alt="" src={`${FIGMA_ASSET_ROOT}/fullscreen.svg`} /></button>
+            <button className="is-teal" aria-label="Chia sẻ" aria-pressed={shared} onClick={() => setShared((value) => !value)} type="button"><img alt="" src={`${EDITOR_ASSET_ROOT}/share.svg`} /></button>
+          </div>
+        </header>
+
+        <section className="studio-viewport" aria-label="Không gian dựng bài học">
+          <div className="studio-canvas">
+            <CarViewport explode={mode === 'assemble' ? 68 : 0} light={58} mode={mode} onError={handleError} onReady={handleReady} playing={playing} resetKey={resetKey} showGrid={showGrid} />
+            <button className="studio-canvas-menu" onClick={() => setActiveMain('decor')} type="button">
+              <img alt="" src={`${EDITOR_ASSET_ROOT}/menu.svg`} /><span>Menu</span>
+            </button>
+            <div className="studio-canvas-brand" aria-label="YooLab">
+              <img alt="" src={`${EDITOR_ASSET_ROOT}/canvas-logo-mark.svg`} />
+              <img alt="YooLab" src={`${EDITOR_ASSET_ROOT}/canvas-logo-word.svg`} />
             </div>
-            <div className="studio-viewport-meta">
-              <span>Phối cảnh</span>
-              <span>{selectedLayer ? selectedLayer.label : 'Toàn bộ mô hình'}</span>
+            <div className="studio-canvas-actions" role="group" aria-label="Điều khiển khung nhìn">
+              <button aria-label={muted ? 'Bật âm thanh' : 'Tắt âm thanh'} aria-pressed={muted} onClick={() => setMuted((value) => !value)} type="button"><img alt="" src={`${FIGMA_ASSET_ROOT}/canvas-silent.svg`} /></button>
+              <button aria-label="Âm lượng" onClick={() => setMuted((value) => !value)} type="button"><img alt="" src={`${FIGMA_ASSET_ROOT}/canvas-volume.svg`} /></button>
+              <button aria-label="Đặt lại góc nhìn" onClick={() => setResetKey((value) => value + 1)} type="button"><img alt="" src={`${FIGMA_ASSET_ROOT}/canvas-reset.svg`} /></button>
+              <button aria-label="Khung chọn" aria-pressed={showGrid} onClick={() => setShowGrid((value) => !value)} type="button"><img alt="" src={`${FIGMA_ASSET_ROOT}/canvas-frame.svg`} /></button>
+              <button aria-label="Chế độ VR" onClick={() => chooseMode('drive')} type="button"><img alt="" src={`${FIGMA_ASSET_ROOT}/canvas-vr.svg`} /></button>
+              <button aria-label="Chia sẻ khung nhìn" onClick={() => setShared((value) => !value)} type="button"><img alt="" src={`${FIGMA_ASSET_ROOT}/canvas-share.svg`} /></button>
+              <button aria-label="Đóng chế độ xem" onClick={() => chooseMode('inspect')} type="button"><img alt="" src={`${FIGMA_ASSET_ROOT}/canvas-close.svg`} /></button>
+            </div>
+            <div className="studio-canvas-side-actions">
+              <button type="button"><img alt="" src={`${FIGMA_ASSET_ROOT}/upload.svg`} /><span>Upload</span></button>
+              <button onClick={() => setResetKey((value) => value + 1)} type="button"><img alt="" src={`${FIGMA_ASSET_ROOT}/set-view.svg`} /><span>SET VIEW</span></button>
+            </div>
+            {!ready && !failed && <div className="studio-loader"><i />Đang tải mô hình xe thật…</div>}
+            {failed && <div className="studio-loader studio-loader--error">Không thể tải mô hình xe.</div>}
+            <div className="studio-canvas-playback" aria-label="Điều khiển phát">
+              <button className="studio-play" aria-label={playing ? 'Tạm dừng timeline' : 'Phát timeline'} onClick={() => setPlaying((value) => !value)} type="button">
+                {playing ? <span className="studio-pause-bars" aria-hidden="true" /> : <img alt="" src={`${EDITOR_ASSET_ROOT}/play.svg`} />}
+              </button>
+              <b>{formatTime(time)}</b><small>/ 00:10.30</small>
+              <div className="studio-playback-scrub" onPointerDown={scrub} role="slider" aria-label="Tiến trình phát" aria-valuemax={duration} aria-valuemin={0} aria-valuenow={time} tabIndex={0}>
+                <span style={{ width: `${progress}%` }} /><i style={{ left: `${progress}%` }} />
+              </div>
+            </div>
+            <button className="studio-canvas-timeline-toggle" type="button"><span aria-hidden="true" />Timeline<i aria-hidden="true" /></button>
+          </div>
+        </section>
+
+        <section className="studio-timeline" aria-label="Timeline bài học">
+          <div className="studio-timeline-side" aria-label="Công cụ timeline">
+            <button aria-label="Hoàn tác" type="button"><span className="studio-timeline-glyph studio-timeline-glyph--undo" /></button>
+            <button aria-label="Làm lại" type="button"><span className="studio-timeline-glyph studio-timeline-glyph--redo" /></button>
+            <button aria-label="Xóa đối tượng" type="button"><span className="studio-timeline-glyph studio-timeline-glyph--delete" /></button>
+            <button aria-label="Khớp thời lượng" type="button"><span className="studio-timeline-glyph studio-timeline-glyph--fit" /></button>
+            <button aria-label="Nhóm đối tượng" type="button"><span className="studio-timeline-glyph studio-timeline-glyph--folder" /></button>
+            <button aria-label="Sao chép đối tượng" type="button"><span className="studio-timeline-glyph studio-timeline-glyph--copy" /></button>
+            <button aria-label="Thu gọn timeline" type="button"><span className="studio-timeline-glyph studio-timeline-glyph--collapse" /></button>
+          </div>
+          <div className="studio-timeline-tabs">
+            <div>
+              <button className={mode === 'inspect' ? 'is-active' : ''} onClick={() => chooseMode('inspect')} type="button">Space 1: Bee</button>
+              <button className={mode === 'assemble' ? 'is-active' : ''} onClick={() => chooseMode('assemble')} type="button">Space 2: Cấu tạo</button>
+              <button className="studio-add-space" aria-label="Thêm không gian" onClick={() => chooseMode('drive')} type="button"><span aria-hidden="true" /></button>
             </div>
           </div>
-
-          <div className="studio-canvas" ref={hostRef}>
-            {annotations.map((item) => (
-              <div
-                className="studio-annotation"
-                key={item.id}
-                ref={(element) => { apiRef.current?.bindAnnotationElement(item.id, element); }}
-              >
-                <i />
-                <b>{item.label}</b>
-                <small>{labelFor(item.target)}</small>
+          <div className="studio-stepbar">
+            <button onClick={() => chooseMode('drive')} type="button">Tạo Step</button>
+            <button className="studio-timeline-customize" type="button"><img alt="" src={`${EDITOR_ASSET_ROOT}/settings.svg`} />Tùy chỉnh</button>
+          </div>
+          <div className="studio-timeline-commandbar">
+            <button className="studio-timeline-display" type="button">Timeline hiển thị</button>
+            <div className="studio-range-readout"><span>Start</span><b>0</b><span>End</span><b>0</b></div>
+            <div className="studio-transport" aria-label="Điều khiển timeline">
+              <button aria-label="Về đầu" onClick={() => setTime(0)} type="button"><span className="to-start" /></button>
+              <button aria-label="Phát" onClick={() => setPlaying(true)} type="button"><span className="play-forward" /></button>
+              <button aria-label="Tới cuối" onClick={() => setTime(duration)} type="button"><span className="to-end" /></button>
+              <button aria-label="Lùi một bước" onClick={() => setTime((value) => Math.max(0, value - 1))} type="button"><span className="step-back" /></button>
+              <button aria-label="Tiến một bước" onClick={() => setTime((value) => Math.min(duration, value + 1))} type="button"><span className="step-forward" /></button>
+            </div>
+            <button className="studio-step-select" type="button">Bước 1 (Step - 1) · Mở cửa<span aria-hidden="true" /></button>
+          </div>
+          <div className="studio-timeline-grid">
+            <div className="studio-timeline-ruler"><span>Đối tượng</span><div>{[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150].map((value) => <i key={value}>{value}</i>)}</div></div>
+            {TRACKS.map((item) => (
+              <div className={`studio-track${track === item.id ? ' is-active' : ''}`} key={item.id}>
+                <button className="studio-track-name" onClick={() => { setTrack(item.id); setActiveDetail(item.id === 'model' ? 'space' : item.id); }} type="button"><img alt="" src={`${EDITOR_ASSET_ROOT}/${item.asset}`} /><span>{item.label}</span><em aria-hidden="true" /></button>
+                <div className="studio-track-lane" onPointerDown={scrub} role="slider" aria-label={`Timeline ${item.label}`} aria-valuemax={duration} aria-valuemin={0} aria-valuenow={time} tabIndex={0}>
+                  <span className={`studio-clip studio-clip--${item.id}`} style={{ background: item.color, left: `${item.start * 100}%`, width: `${item.length * 100}%` }}><b>Title</b><small>Sub-title</small>{item.id === 'audio' && <img alt="" src={`${FIGMA_ASSET_ROOT}/timeline-wave.svg`} />}</span>
+                  <span className="studio-playhead" style={{ left: `${progress}%` }} />
+                </div>
               </div>
             ))}
-            {!ready && !failed && <div className="studio-loader"><i />Đang mở không gian 3D…</div>}
-            {failed && <div className="studio-loader studio-loader--error">Không tải được mô hình 3D.</div>}
           </div>
+        </section>
+      </main>
 
-          <p className="studio-hint">
-            {tool === 'annotate'
-              ? 'Nhấp lên mô hình để đặt ghi chú.'
-              : tool === 'select'
-                ? 'Nhấp để chọn một lớp, kéo nền để xoay, cuộn để phóng.'
-                : 'Kéo mũi neo màu để biến đổi lớp đang chọn.'}
-          </p>
-        </div>
-
-        <aside className="studio-properties">
-          <div className="studio-panel-label"><span>Thuộc tính</span><b>{track === 'model' ? 'Model' : TRACKS.find((item) => item.id === track)?.label}</b></div>
-
-          {track === 'model' && (
-            <>
-              <h4>{selectedLayer ? selectedLayer.label : 'Chưa chọn lớp'}</h4>
-              <small>{selectedLayer ? selectedLayer.note : 'Nhấp vào mô hình trong khung 3D'}</small>
-              <div className="studio-group">
-                <b>Chuyển đổi tỷ lệ</b>
-                <div className="studio-vector">
-                  <span>Vị trí</span>
-                  {transform.position.map((value, index) => (
-                    <i key={`p${index}`}>{value.toFixed(2)}</i>
-                  ))}
-                </div>
-                <div className="studio-vector">
-                  <span>Xoay</span>
-                  {transform.rotation.map((value, index) => (
-                    <i key={`r${index}`}>{value.toFixed(0)}°</i>
-                  ))}
-                </div>
-                <div className="studio-vector">
-                  <span>Tỷ lệ</span>
-                  {transform.scale.map((value, index) => (
-                    <i key={`s${index}`}>{value.toFixed(2)}</i>
-                  ))}
-                </div>
-              </div>
-              <div className="studio-group">
-                <b>Vật liệu</b>
-                <label className="studio-slider">
-                  Độ trong <span>{opacity}%</span>
-                  <input
-                    type="range"
-                    min={10}
-                    max={100}
-                    value={opacity}
-                    onChange={(event) => setOpacity(Number(event.target.value))}
-                    disabled={!selectedLayer}
-                    aria-label="Độ trong của lớp đang chọn"
-                  />
-                </label>
-              </div>
-            </>
-          )}
-
-          {track === 'text' && (
-            <>
-              <h4>Ghi chú trên mô hình</h4>
-              <small>{annotations.length ? `${annotations.length} ghi chú đang gắn` : 'Chưa có ghi chú nào'}</small>
-              <div className="studio-group">
-                <b>Hiển thị</b>
-                <label className="studio-toggle">
-                  <input
-                    type="checkbox"
-                    checked={annotationsVisible}
-                    onChange={(event) => setAnnotationsVisible(event.target.checked)}
-                  />
-                  Hiện ghi chú trong khung 3D
-                </label>
-                <button type="button" className="studio-inline-button" onClick={() => setTool('annotate')}>
-                  Thêm ghi chú mới
-                </button>
-              </div>
-            </>
-          )}
-
-          {track === 'audio' && (
-            <>
-              <h4>Âm thanh</h4>
-              <small>Bản demo này chưa kèm tệp âm thanh.</small>
-              <div className="studio-group is-empty">
-                <b>Nguồn</b>
-                <p>Trong YooStudio, lớp âm thanh nhận tệp thu sẵn hoặc thuyết minh trực tiếp.</p>
-              </div>
-            </>
-          )}
-
-          {track === 'effect' && (
-            <>
-              <h4>Hiệu ứng ánh sáng</h4>
-              <small>Điều chỉnh ngay trên khung 3D bên cạnh.</small>
-              <div className="studio-group">
-                <b>Cường độ</b>
-                <label className="studio-slider">
-                  Ánh sáng nhấn <span>{glow}%</span>
-                  <input
-                    type="range"
-                    min={0}
-                    max={100}
-                    value={glow}
-                    onChange={(event) => setGlow(Number(event.target.value))}
-                    aria-label="Cường độ ánh sáng nhấn"
-                  />
-                </label>
-              </div>
-            </>
-          )}
-        </aside>
-      </div>
-
-      <div className="studio-timeline">
-        <div className="studio-timeline-head">
-          <button
-            type="button"
-            className="studio-play"
-            onClick={() => setPlaying((value) => !value)}
-            aria-label={playing ? 'Tạm dừng' : 'Phát'}
-          >
-            {playing ? '❚❚' : '▶'}
+      <aside className="studio-detail-rail" aria-label="Công cụ nội dung">
+        {DETAIL_TOOLS.map((item) => (
+          <button className={activeDetail === item.id ? 'is-active' : ''} key={item.id} onClick={() => setActiveDetail(item.id)} type="button">
+            <span className="studio-tool-icon" aria-hidden="true"><img alt="" src={`${EDITOR_ASSET_ROOT}/${item.asset}`} /></span><span>{item.label}</span>
           </button>
-          <b>{formatTime(time)}</b>
-          <small>/ {formatTime(duration)}</small>
-        </div>
-        <div className="studio-timeline-tracks">
-          {TRACKS.map((item) => (
-            <div className={`studio-track${track === item.id ? ' is-active' : ''}`} key={item.id}>
-              <button type="button" className="studio-track-name" onClick={() => setTrack(item.id)}>
-                <i style={{ background: item.color }} />{item.label}
-              </button>
-              <div
-                className="studio-track-lane"
-                onPointerDown={onTrackPointerDown}
-                onPointerMove={onTrackPointerMove}
-                onPointerUp={onTrackPointerUp}
-                onPointerCancel={onTrackPointerUp}
-              >
-                <span
-                  className="studio-clip"
-                  style={{
-                    background: item.color,
-                    left: `${item.start * 100}%`,
-                    width: `${item.length * 100}%`,
-                  }}
-                >
-                  {item.label}
-                </span>
-                <i className="studio-playhead" style={{ left: `${progress * 100}%` }} />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+        ))}
+      </aside>
+
+      <aside className="studio-properties" aria-label="Thiết lập văn bản">
+        <h4>Thiết lập văn bản</h4>
+        <section className="studio-property-section studio-transform-group">
+          <h5>Chuyển đổi tỷ lệ</h5>
+          <div className="studio-vector"><span>Vị trí</span><i>0<small>X</small></i><i>0<small>Y</small></i><i>0<small>Z</small></i></div>
+          <div className="studio-vector"><span>Xoay</span><i>0<small>X</small></i><i>0<small>Y</small></i><i>0<small>Z</small></i></div>
+          <div className="studio-vector"><span>Tỷ lệ</span><i>0<small>X</small></i><i>0<small>Y</small></i><i>0<small>Z</small></i></div>
+        </section>
+        <div className="studio-note-tabs"><button type="button">Văn Bản</button><button className="is-active" type="button">Ghi Chú</button></div>
+        <section className="studio-property-section">
+          <h5>Tùy chỉnh phong cách</h5>
+          <label className="studio-field-label">Hướng hiển thị</label>
+          <div className="studio-note-directions">{Array.from({ length: 6 }, (_, index) => <button className={index === 2 ? 'is-active' : ''} aria-label={`Hướng ghi chú ${index + 1}`} key={index} type="button"><span /></button>)}</div>
+          <div className="studio-property-row"><span>Màu sắc đường ghi chú</span><button className="studio-color-well" aria-label="Chọn màu" type="button" /></div>
+          <label className="studio-slider studio-slider--figma">Độ dài đường ghi chú <span>{noteLength}</span><input aria-label="Độ dài đường ghi chú" max="160" min="20" onChange={(event) => setNoteLength(Number(event.target.value))} type="range" value={noteLength} /></label>
+          <label className="studio-slider studio-slider--figma">Độ dày đường chú thích <span>{noteWidth} px</span><input aria-label="Độ dày đường chú thích" max="100" min="1" onChange={(event) => setNoteWidth(Number(event.target.value))} type="range" value={noteWidth} /></label>
+          <label className="studio-slider studio-slider--figma">Opacity đường chú thích <span>{noteOpacity}%</span><input aria-label="Độ trong đường chú thích" max="100" min="10" onChange={(event) => setNoteOpacity(Number(event.target.value))} type="range" value={noteOpacity} /></label>
+          <div className="studio-size-settings"><b>Thiết lập kích thước</b><div><span>Cao</span><i><button aria-label="Giảm chiều cao" type="button" /><b>0</b><button aria-label="Tăng chiều cao" type="button" /></i><span>Rộng</span><i><button aria-label="Giảm chiều rộng" type="button" /><b>0</b><button aria-label="Tăng chiều rộng" type="button" /></i></div></div>
+          <div className="studio-view-settings"><b>Thiết lập góc nhìn</b><button onClick={() => setResetKey((value) => value + 1)} type="button"><img alt="" src={`${FIGMA_ASSET_ROOT}/set-view.svg`} />Thiết lập góc nhìn</button></div>
+        </section>
+        <section className="studio-property-section studio-animation-settings">
+          <h5>Hiển thị theo Animation</h5>
+          <label>Chế độ hiển thị<select defaultValue="step"><option value="step">Theo Bước (Step)</option></select></label>
+          <label>Animation áp dụng<select defaultValue="choose"><option value="choose">Chọn Bước (Step)</option></select></label>
+          <h5>Cách hiển thị</h5>
+          <label>Bắt đầu từ bước<select defaultValue="first"><option value="first">Chọn bước</option></select></label>
+        </section>
+      </aside>
     </div>
   );
 }

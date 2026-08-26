@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import * as THREE from 'three';
 import {
   createBeeCreature,
@@ -40,9 +40,31 @@ import type { CreatureId, ModelFraming } from '../../lib/library/types';
 type CreatureStageProps = {
   creature: CreatureId;
   framing?: ModelFraming;
+  /** Whether the stage begins its idle orbit. Defaults to the Library's on state. */
+  initialSpin?: boolean;
+  /** External lesson mode used by the bridge step controls. */
+  mode?: CreatureStageMode;
+  /** Controlled idle orbit for the bridge's 360° lesson. */
+  autoSpin?: boolean;
+  /** Controlled bee clip: 0 idle, 1 hover, 2 forward flight. */
+  motionState?: number;
+  /** Semantic region isolated by the bee shader; null keeps the whole model. */
+  isolatedPart?: BeePartKey | null;
+  /** The richer bridge room is opt-in; Library viewers keep their calibrated look. */
+  appearance?: 'library' | 'bridge';
+  /** A real world-space learning grid beneath the specimen. */
+  floorGrid?: boolean;
+  /** Lets the bridge toolbar toggle the real scene grid without rebuilding. */
+  gridVisible?: boolean;
+  /** Screen-space UI that needs the stage's projected anchor CSS variables. */
+  children?: ReactNode;
   /** Announced to screen readers, since the canvas itself is decorative. */
   label: string;
 };
+
+export type CreatureStageMode = 'rotate' | 'structure' | 'motion' | 'annotation';
+export type BeePartKey = 'head' | 'thorax' | 'wing' | 'abdomen';
+type BeeAnchorKey = 'head' | 'thorax' | 'wing' | 'abdomen';
 
 /* ------------------------------------------------------------------ icons --- */
 
@@ -110,11 +132,95 @@ const FLIGHT_ICONS = ['rest', 'hover', 'fly'] as const;
 /** The specimen opens hovering: wings beating, body still, nothing leaving frame. */
 const DEFAULT_FLIGHT = 1;
 
-export function CreatureStage({ creature, framing, label }: CreatureStageProps) {
+const gridVertex = /* glsl */ `
+  varying vec2 vGridPosition;
+  void main() {
+    vGridPosition = position.xy;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+const gridFragment = /* glsl */ `
+  precision highp float;
+  varying vec2 vGridPosition;
+  uniform vec3 uMinor;
+  uniform vec3 uMajor;
+
+  float gridLine(vec2 point, float spacing) {
+    vec2 coordinate = point / spacing;
+    vec2 width = max(fwidth(coordinate), vec2(0.0001));
+    vec2 distanceToLine = abs(fract(coordinate - 0.5) - 0.5) / width;
+    return 1.0 - min(min(distanceToLine.x, distanceToLine.y), 1.0);
+  }
+
+  void main() {
+    float minor = gridLine(vGridPosition, 0.34);
+    float major = gridLine(vGridPosition, 1.70);
+    float fade = 1.0 - smoothstep(2.7, 4.55, length(vGridPosition));
+    float alpha = max(minor * 0.16, major * 0.34) * fade;
+    vec3 color = mix(uMinor, uMajor, major);
+    gl_FragColor = vec4(color, alpha);
+  }
+`;
+
+function createLearningGrid() {
+  const geometry = new THREE.PlaneGeometry(9.2, 9.2);
+  const material = new THREE.ShaderMaterial({
+    name: 'yoolab_learning_grid',
+    vertexShader: gridVertex,
+    fragmentShader: gridFragment,
+    uniforms: {
+      uMinor: { value: new THREE.Color(0xbfa9d8) },
+      uMajor: { value: new THREE.Color(0xe18f83) },
+    },
+    transparent: true,
+    depthWrite: false,
+    toneMapped: true,
+  });
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.name = 'yoolab_learning_grid';
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.renderOrder = -940;
+  mesh.frustumCulled = false;
+
+  return {
+    mesh,
+    fit: (box: THREE.Box3) => {
+      const center = box.getCenter(new THREE.Vector3());
+      const size = box.getSize(new THREE.Vector3());
+      mesh.position.set(center.x, box.min.y - Math.max(0.06, size.y * 0.12), center.z);
+    },
+    dispose: () => {
+      mesh.removeFromParent();
+      geometry.dispose();
+      material.dispose();
+    },
+  };
+}
+
+export function CreatureStage({
+  creature,
+  framing,
+  initialSpin = true,
+  mode,
+  autoSpin = true,
+  motionState = DEFAULT_FLIGHT,
+  isolatedPart = null,
+  appearance = 'library',
+  floorGrid = false,
+  gridVisible = true,
+  children,
+  label,
+}: CreatureStageProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<HTMLDivElement>(null);
   const orbitRef = useRef<OrbitRig | null>(null);
   const flightRef = useRef<((next: number) => void) | null>(null);
+  const opticsRef = useRef<BeeMaterialSet | null>(null);
+  const learningGridRef = useRef<ReturnType<typeof createLearningGrid> | null>(null);
+  const isolatedPartRef = useRef<BeePartKey | null>(isolatedPart);
+  const gridVisibleRef = useRef(gridVisible);
+  const canSpinRef = useRef(true);
   const [state, setState] = useState<'loading' | 'ready' | 'failed'>('loading');
   const [spinning, setSpinning] = useState(false);
   const [flight, setFlight] = useState(DEFAULT_FLIGHT);
@@ -124,6 +230,20 @@ export function CreatureStage({ creature, framing, label }: CreatureStageProps) 
   // then kept in an effect, because writing a ref during render is not allowed.
   const framingRef = useRef(framing);
   useEffect(() => { framingRef.current = framing; }, [framing]);
+  useEffect(() => {
+    isolatedPartRef.current = isolatedPart;
+    const partIndex: Record<BeePartKey, number> = { head: 0, thorax: 1, wing: 2, abdomen: 3 };
+    if (opticsRef.current) opticsRef.current.isolatePart.value = isolatedPart ? partIndex[isolatedPart] : -1;
+    const orbit = orbitRef.current;
+    if (orbit) {
+      orbit.reset();
+      if (isolatedPart) orbit.zoomBy(0.58);
+    }
+  }, [isolatedPart]);
+  useEffect(() => {
+    gridVisibleRef.current = gridVisible;
+    if (learningGridRef.current) learningGridRef.current.mesh.visible = gridVisible;
+  }, [gridVisible]);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -135,16 +255,17 @@ export function CreatureStage({ creature, framing, label }: CreatureStageProps) 
     setFlightCount(0);
 
     const shot = framingRef.current ?? {};
-    const stage = createLibraryStage(host, { mount });
+    const stage = createLibraryStage(host, { mount, appearance });
+    canSpinRef.current = !stage.reduceMotion;
     const orbit = createOrbitRig(host, {
       yaw: shot.yaw ?? 0.7,
       pitch: shot.pitch ?? 0.2,
       roll: shot.roll ?? 0,
-      spinning: !stage.reduceMotion,
+      spinning: initialSpin && !stage.reduceMotion,
       onSpinChange: (value) => { if (!disposed) setSpinning(value); },
     });
     orbitRef.current = orbit;
-    setSpinning(!stage.reduceMotion);
+    setSpinning(initialSpin && !stage.reduceMotion);
 
     const loader = createCreatureLoader();
     let handle: CreatureHandle | null = null;
@@ -154,6 +275,37 @@ export function CreatureStage({ creature, framing, label }: CreatureStageProps) 
     let sceneCapture: THREE.WebGLRenderTarget | null = null;
     let beeMaps: THREE.Texture[] = [];
     let flightState = DEFAULT_FLIGHT;
+    let learningGrid: ReturnType<typeof createLearningGrid> | null = null;
+    let beeAnchors: Array<{ key: BeeAnchorKey; candidates: THREE.Object3D[] }> = [];
+    const anchorWorld = new THREE.Vector3();
+    const projected = new THREE.Vector3();
+
+    const syncAnchors = () => {
+      if (!handle || !beeAnchors.length) return;
+      handle.root.updateMatrixWorld(true);
+      stage.camera.updateMatrixWorld(true);
+
+      for (const anchor of beeAnchors) {
+        let nearest: THREE.Object3D | null = null;
+        let nearestDistance = Infinity;
+        for (const candidate of anchor.candidates) {
+          candidate.getWorldPosition(anchorWorld);
+          const distance = stage.camera.position.distanceToSquared(anchorWorld);
+          if (distance < nearestDistance) {
+            nearestDistance = distance;
+            nearest = candidate;
+          }
+        }
+        if (!nearest) continue;
+        nearest.getWorldPosition(anchorWorld);
+        projected.copy(anchorWorld).project(stage.camera);
+        const visible = projected.z > -1 && projected.z < 1
+          && Math.abs(projected.x) < 1.08 && Math.abs(projected.y) < 1.08;
+        host.style.setProperty(`--anchor-${anchor.key}-x`, `${((projected.x + 1) * 50).toFixed(3)}%`);
+        host.style.setProperty(`--anchor-${anchor.key}-y`, `${((1 - projected.y) * 50).toFixed(3)}%`);
+        host.style.setProperty(`--anchor-${anchor.key}-visible`, visible ? '1' : '0');
+      }
+    };
 
     /* The shell reads its refraction from the capture with an explicit LOD, so
        the capture needs a mip chain: without it surface roughness cannot blur
@@ -197,6 +349,11 @@ export function CreatureStage({ creature, framing, label }: CreatureStageProps) 
           anchorRootMotion: true,
         });
         optics = built.materials ?? null;
+        opticsRef.current = optics;
+        if (optics) {
+          const partIndex: Record<BeePartKey, number> = { head: 0, thorax: 1, wing: 2, abdomen: 3 };
+          optics.isolatePart.value = isolatedPartRef.current ? partIndex[isolatedPartRef.current] : -1;
+        }
         opticalLayers = built.opticalLayers ?? null;
         syncCapture();
         return built;
@@ -242,7 +399,37 @@ export function CreatureStage({ creature, framing, label }: CreatureStageProps) 
         built.root.position.sub(fit.current.target);
         built.root.updateMatrixWorld(true);
         orbit.setFit(fit.current);
-        stage.shadow.fit(fit.box.clone().translate(fit.current.target.clone().negate()));
+        const fittedBox = fit.box.clone().translate(fit.current.target.clone().negate());
+        stage.shadow.fit(fittedBox);
+
+        if (floorGrid) {
+          learningGrid = createLearningGrid();
+          learningGrid.fit(fittedBox);
+          learningGrid.mesh.visible = gridVisibleRef.current;
+          learningGridRef.current = learningGrid;
+          stage.scene.add(learningGrid.mesh);
+        }
+
+        if (creature === 'bee') {
+          const bones: THREE.Object3D[] = [];
+          built.root.traverse((object) => {
+            if ((object as THREE.Bone).isBone) bones.push(object);
+          });
+          // Blender/glTF exporters can append numeric suffixes to otherwise
+          // stable joint names. Match the semantic stem so the callouts stay
+          // attached across re-exports of the same YooLab bee rig.
+          const candidates = (...stems: string[]) => bones.filter((bone) => {
+            const name = bone.name.toLowerCase();
+            return stems.some((stem) => name.includes(stem));
+          });
+          beeAnchors = [
+            { key: 'head', candidates: candidates('antenna_jnt01', 'head_jnt') },
+            { key: 'thorax', candidates: candidates('thorax_jnt') },
+            { key: 'wing', candidates: candidates('wingroot_jnt') },
+            { key: 'abdomen', candidates: candidates('abdomen_jnt04', 'abdomen_jnt03') },
+          ].filter((anchor) => anchor.candidates.length > 0);
+          syncAnchors();
+        }
         setState('ready');
       })
       .catch((error) => {
@@ -289,6 +476,7 @@ export function CreatureStage({ creature, framing, label }: CreatureStageProps) 
 
       orbit.apply(stage.camera, delta);
       if (animating) handle?.mixer?.update(delta);
+      syncAnchors();
       if (optics) {
         optics.optical.uTime.value = elapsed;
         // The glass and the inner body are lit analytically from one direction,
@@ -316,19 +504,43 @@ export function CreatureStage({ creature, framing, label }: CreatureStageProps) 
       stage.renderer.setAnimationLoop(null);
       orbitRef.current = null;
       flightRef.current = null;
+      opticsRef.current = null;
+      learningGridRef.current = null;
       orbit.dispose();
       handle?.dispose();
+      learningGrid?.dispose();
       sceneCapture?.dispose();
       for (const map of beeMaps) map.dispose();
       loader.dispose();
       stage.dispose();
+      for (const key of ['head', 'thorax', 'wing', 'abdomen'] as BeeAnchorKey[]) {
+        host.style.removeProperty(`--anchor-${key}-x`);
+        host.style.removeProperty(`--anchor-${key}-y`);
+        host.style.removeProperty(`--anchor-${key}-visible`);
+      }
     };
-  }, [creature]);
+  }, [appearance, creature, floorGrid, initialSpin]);
+
+  useEffect(() => {
+    if (state !== 'ready' || !mode) return;
+    const orbit = orbitRef.current;
+    if (!orbit) return;
+
+    if (mode === 'rotate') {
+      flightRef.current?.(1);
+      orbit.setSpinning(autoSpin && canSpinRef.current);
+      return;
+    }
+
+    orbit.reset();
+    if (mode === 'motion') flightRef.current?.(motionState);
+    else flightRef.current?.(0);
+  }, [autoSpin, mode, motionState, state]);
 
   const ready = state === 'ready';
 
   return (
-    <div className="stage" ref={hostRef}>
+    <div className="stage" data-state={state} ref={hostRef}>
       {/*
         The canvas gets its own labelled box. An element with role="img" hides its
         whole subtree from assistive technology, so the control rail cannot live
@@ -348,6 +560,8 @@ export function CreatureStage({ creature, framing, label }: CreatureStageProps) 
           {state === 'failed' ? 'Không tải được mô hình 3D.' : 'Đang tải mô hình…'}
         </div>
       )}
+
+      {children}
 
       {ready && (
         <>

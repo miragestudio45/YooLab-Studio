@@ -329,7 +329,9 @@ function FormulaCanvas({
     const carTarget = new THREE.Vector3();
     const rollQuaternion = new THREE.Quaternion();
     const steeringQuaternion = new THREE.Quaternion();
-    const rollAxis = new THREE.Vector3(0, 0, 1);
+    // The wheel nodes are authored with a 90° Y rotation, so their axle is
+    // local X. Rolling around local Z made the tyres yaw/wobble instead of spin.
+    const rollAxis = new THREE.Vector3(1, 0, 0);
     const steerAxis = new THREE.Vector3(0, 1, 0);
     let hudElapsed = 0;
     const timer = new THREE.Timer();

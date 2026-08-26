@@ -52,7 +52,7 @@ const TARGETS = [
    * would mean 9 px type and thumbnail-sized evidence. The tablet regime (1000)
    * is where the two-column sections stack.
    */
-  { id: 'tu-kham-pha-den-tao', must: '.bridge-flow', label: 'Bridge flow', fitAbove: 700 },
+  { id: 'tu-kham-pha-den-tao', must: '.bridge-layout', label: 'Bridge layout', fitAbove: 860 },
   { id: 'cong-cu', must: '.studio', label: 'YooStudio editor', fitAbove: 700 },
   { id: 'thu-vien', must: '.library-app', label: 'Library workspace' },
   { id: 'thuc-hanh', must: '.practice-grid', label: 'Practice grid', fitAbove: 1000 },

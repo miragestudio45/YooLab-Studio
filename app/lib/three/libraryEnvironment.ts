@@ -1,6 +1,12 @@
 import * as THREE from 'three';
 import { createProceduralEnvironment, type EnvironmentPalette } from './environment';
-import { createContactShadow, createStudioBackdrop, type ContactShadow, type StudioBackdrop } from './studioBackdrop';
+import {
+  createContactShadow,
+  createStudioBackdrop,
+  type BackdropPalette,
+  type ContactShadow,
+  type StudioBackdrop,
+} from './studioBackdrop';
 import { createVisibilityGate } from './visibility';
 
 /**
@@ -25,6 +31,31 @@ export const libraryEnvironmentPalette: EnvironmentPalette = {
 
 /** Backstop behind the backdrop plate, from --color-surface. */
 export const LIBRARY_CLEAR_COLOR = 0xfffdf9;
+
+/**
+ * The bridge viewer is still the same warm YooLab room, but with enough tonal
+ * separation for the bee's colourless optical shell to stay legible. The
+ * Library remains untouched; this preset is opt-in from the bridge only.
+ */
+const bridgeEnvironmentPalette: EnvironmentPalette = {
+  zenith: 0xfff7f2,
+  horizon: 0xeadde8,
+  ground: 0xdccfd9,
+  keyColor: 0xffe9df,
+  keyStrength: 4.15,
+  rimColor: 0xd8c7ff,
+  rimStrength: 1.45,
+  fillColor: 0xf1bec1,
+  fillStrength: 0.72,
+};
+
+const bridgeBackdropPalette: BackdropPalette = {
+  center: 0xfbf1eb,
+  mid: 0xeee2e8,
+  edge: 0xded7e7,
+};
+
+const BRIDGE_CLEAR_COLOR = 0xe9dfe5;
 
 export type LibraryStage = {
   renderer: THREE.WebGLRenderer;
@@ -57,6 +88,8 @@ export type LibraryStageOptions = {
    */
   mount?: HTMLElement;
   fov?: number;
+  /** Opt-in tonal preset for the YooLab bridge; Library callers keep default. */
+  appearance?: 'library' | 'bridge';
 };
 
 /**
@@ -72,6 +105,7 @@ export type LibraryStageOptions = {
 export function createLibraryStage(host: HTMLElement, options: LibraryStageOptions = {}): LibraryStage {
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const compact = window.matchMedia('(max-width: 900px)').matches;
+  const bridgeAppearance = options.appearance === 'bridge';
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(options.fov ?? 30, 1, 0.05, 200);
@@ -91,8 +125,8 @@ export function createLibraryStage(host: HTMLElement, options: LibraryStageOptio
   });
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.0;
-  renderer.setClearColor(LIBRARY_CLEAR_COLOR, 1);
+  renderer.toneMappingExposure = bridgeAppearance ? 0.86 : 1.0;
+  renderer.setClearColor(bridgeAppearance ? BRIDGE_CLEAR_COLOR : LIBRARY_CLEAR_COLOR, 1);
   let pixelRatio = Math.min(window.devicePixelRatio, compact ? 1.4 : 1.75);
   renderer.setPixelRatio(pixelRatio);
   renderer.domElement.setAttribute('aria-hidden', 'true');
@@ -101,27 +135,45 @@ export function createLibraryStage(host: HTMLElement, options: LibraryStageOptio
   renderer.domElement.style.display = 'block';
   (options.mount ?? host).appendChild(renderer.domElement);
 
-  const environment = createProceduralEnvironment(renderer, libraryEnvironmentPalette);
+  const environment = createProceduralEnvironment(
+    renderer,
+    bridgeAppearance ? bridgeEnvironmentPalette : libraryEnvironmentPalette,
+  );
   scene.environment = environment.texture;
 
   /* Four lights, in the hero's proportions: a broad hemisphere fill, a strong
      warm key over the left shoulder, a cool-warm rim from behind and below to
      separate the silhouette from the plate, and a soft point on the camera side
      so the near surfaces are not carried by the environment alone. */
-  const hemisphere = new THREE.HemisphereLight(0xfff6ec, 0xe4d5c4, 1.25);
+  const hemisphere = new THREE.HemisphereLight(
+    bridgeAppearance ? 0xffeee8 : 0xfff6ec,
+    bridgeAppearance ? 0xd5c8d4 : 0xe4d5c4,
+    bridgeAppearance ? 0.92 : 1.25,
+  );
   scene.add(hemisphere);
-  const keyLight = new THREE.DirectionalLight(0xfff4e8, 2.5);
+  const keyLight = new THREE.DirectionalLight(0xfff4e8, bridgeAppearance ? 1.9 : 2.5);
   keyLight.position.set(-3.2, 4.4, 5.0);
   scene.add(keyLight);
-  const rimLight = new THREE.DirectionalLight(0xffd9c6, 1.5);
+  const rimLight = new THREE.DirectionalLight(
+    bridgeAppearance ? 0xd5c2ff : 0xffd9c6,
+    bridgeAppearance ? 1.15 : 1.5,
+  );
   rimLight.position.set(4.0, -0.6, -4.0);
   scene.add(rimLight);
-  const fillLight = new THREE.PointLight(0xe4d9f6, 5, 18, 2);
+  const fillLight = new THREE.PointLight(
+    bridgeAppearance ? 0xf1c6ca : 0xe4d9f6,
+    bridgeAppearance ? 3.15 : 5,
+    18,
+    2,
+  );
   fillLight.position.set(2.4, 1.6, 3.0);
   scene.add(fillLight);
 
-  const backdrop = createStudioBackdrop(camera);
-  const shadow = createContactShadow();
+  const backdrop = createStudioBackdrop(camera, bridgeAppearance ? bridgeBackdropPalette : undefined);
+  const shadow = createContactShadow({
+    color: bridgeAppearance ? 0x6e4a55 : undefined,
+    strength: bridgeAppearance ? 0.21 : undefined,
+  });
   scene.add(shadow.mesh);
 
   const renderSize = new THREE.Vector2(1, 1);
