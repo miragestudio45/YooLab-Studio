@@ -72,28 +72,24 @@ export default function Home() {
           <div className="tool-stage">
             <div className="shell">
               {/*
-                Four children on one two-row grid, not two stacked blocks.
-                The kicker and the lede share row one, the heading and the link
-                share row two, and each row aligns on a baseline — so the two
-                halves of the band are locked to each other's type rather than to
-                a bottom edge that happened to line up at one width.
+                Three children, one shared baseline: the lede's last line sits on
+                the heading's. There is no "Xem thư viện học liệu" here — the
+                narrative column below ends with exactly that link, and one band
+                asking twice for the same click is the duplication PRODUCT.md
+                calls out ("a stop says its one thing once").
               */}
               <div className="section-heading tool-heading" data-reveal>
                 <p className="section-kicker section-kicker--light">Công cụ YooLab</p>
-                <p className="tool-heading-lede">Chọn mô hình, thêm nội dung, âm thanh và tương tác — không cần lập trình.</p>
                 <h2 id="tool-title">Từ kiến thức <em>thành bài học.</em></h2>
-                <a className="tool-heading-link" href="#thu-vien">Xem thư viện học liệu <span aria-hidden="true">→</span></a>
+                <p className="tool-heading-lede">Chọn mô hình, thêm nội dung, âm thanh và tương tác — không cần lập trình.</p>
               </div>
             </div>
 
-            {/* The glass bezel the editor is mounted in. It is a frame, not a wash:
-                the blur happens in a 10 px rim around the card, so the pool of
-                light behind the section bends at the edge the way it would round
-                a real cover glass, and the editor keeps its own crisp surface. */}
+            {/* No bezel. The editor carries the glass itself — the same material
+                as the narrative column beside it — so the row is two panes, not
+                a framed device next to a card. */}
             <div className="shell tool-workspace" data-reveal>
-              <div className="tool-frame">
-                <StudioDemo />
-              </div>
+              <StudioDemo />
             </div>
 
             <div className="shell tool-feature-shell" data-reveal>

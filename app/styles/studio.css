@@ -135,19 +135,52 @@
  * band therefore sit on two shared rules that hold at every width, and neither
  * one depends on the other's box height.
  */
+/*
+ * The lede sits on the heading's baseline. That is the whole composition.
+ *
+ * Two rows, and row 2 is the one that matters: it holds the heading and the lede,
+ * and both are `align-self: last baseline`, so the paragraph's LAST line lands on
+ * the heading's baseline — measured at 0 px of difference from 1024 to 1920. A
+ * 54 px display line and a 13 px paragraph sharing one bottom rule is the
+ * alignment the band was missing; an earlier version put the lede in row 1 and it
+ * floated at the top of an empty column ("tự nhiên nó nhảy vọt lên").
+ *
+ * Nothing else is in here. Two passes added things to this band — a fading rule
+ * across the gap, another above a call-to-action, and the call-to-action itself —
+ * and all three came back out. The band's job is one heading and one sentence.
+ */
 .tool-heading {
   display: grid;
-  gap: clamp(4px, 0.9vh, 10px) clamp(28px, 4vw, 76px);
-  grid-template-columns: minmax(0, 1fr) clamp(250px, 26vw, 470px);
+  gap: clamp(4px, 0.9vh, 10px) clamp(28px, 3.4vw, 68px);
+  grid-template-columns: minmax(0, 1fr) clamp(250px, 30vw, 500px);
   grid-template-rows: auto auto;
 }
 
-.tool-heading > .section-kicker,
-.tool-heading > .tool-heading-lede { align-self: baseline; }
-.tool-heading > h2,
-.tool-heading > .tool-heading-link { align-self: last baseline; }
+.tool-heading > .section-kicker { grid-area: 1 / 1; align-self: baseline; }
+.tool-heading > h2 { grid-area: 2 / 1; align-self: last baseline; }
+.tool-heading > .tool-heading-lede { grid-area: 2 / 2; align-self: last baseline; }
 
-.tool-heading .section-kicker { margin: 0; font-size: clamp(8px, 0.52vw, 10px); letter-spacing: 0.12em; }
+.tool-heading .section-kicker { display: flex; align-items: center; margin: 0; font-size: clamp(8px, 0.52vw, 10px); gap: clamp(7px, 0.6vw, 11px); letter-spacing: 0.12em; }
+
+/*
+ * The kicker was a label floating over a 54 px heading with nothing holding it.
+ * The tick is the same device as the rule below, at the other end of the band.
+ *
+ * `display: block` is load-bearing: `globals.css` carries a site-wide
+ * `.section-kicker::before { display: none }`, so this more specific rule wins
+ * only for the properties it actually declares — leave `display` out and the
+ * `none` still applies and the tick never paints. This is a local exception to
+ * that reset, scoped to this band; every other kicker on the page stays bare.
+ */
+.tool-heading .section-kicker::before {
+  display: block;
+  width: clamp(14px, 1.2vw, 22px);
+  height: 1px;
+  flex: none;
+  background: currentColor;
+  content: '';
+  opacity: 0.5;
+}
 
 .tool-heading h2 {
   margin: 0;
@@ -158,66 +191,92 @@
   white-space: nowrap;
 }
 
-.tool-heading-lede { max-width: 46ch; margin: 0; color: var(--ink-2); font-size: clamp(11px, 0.72vw, 13.5px); line-height: 1.5; }
-
-.tool-heading-link {
-  display: inline-flex;
-  width: fit-content;
-  align-items: center;
-  gap: clamp(8px, 0.7vw, 14px);
-  color: var(--brand-deep);
-  font-size: clamp(10px, 0.66vw, 12.5px);
-  font-weight: 650;
-  transition: gap 0.24s var(--ease-reveal);
+/*
+ * One line, and the measure is why it was not.
+ *
+ * The sentence needs 469 px at 13.5 px and 382 px at 11 px — measured, not
+ * guessed — and the column had 1006 px of room to give it. What was breaking the
+ * line was `max-width: 46ch` on the paragraph itself, which resolves to 455 px:
+ * fourteen pixels short, so "trình." dropped to a line of its own. 50ch clears it
+ * at every step of the clamp (494 px at 13.5, 403 px at 11) and is still a short
+ * measure for a one-sentence lede.
+ *
+ * `text-wrap: pretty` is the guard for the widths where it genuinely cannot fit
+ * (1024 and below): the browser then avoids leaving a single word on the last
+ * line instead of producing the same orphan again.
+ */
+.tool-heading-lede {
+  max-width: 50ch;
+  margin: 0;
+  color: var(--ink-2);
+  font-size: clamp(11px, 0.72vw, 13.5px);
+  line-height: 1.5;
+  /* Flush right, so its right edge is the shell's right edge — the same line the
+     editor and the narrative column end on. Left-aligned in a column 31 px wider
+     than the sentence, it ended short of that line for no reason. */
+  margin-left: auto;
+  text-align: right;
+  text-wrap: pretty;
 }
 
-.tool-heading-link:hover { gap: clamp(12px, 1.1vw, 20px); }
-.tool-heading-link span { color: var(--brand-accent); }
 
 .tool-workspace { grid-area: workspace; display: flex; min-width: 0; min-height: 0; }
 .tool-feature-shell { grid-area: story; min-width: 0; min-height: 0; }
 
 /*
- * The glass the editor is mounted behind.
+ * One glass, two panes — and no bezel.
  *
- * Asked for in review as "1 khung dạng liquid glass bao quanh". The rule that
- * keeps it a material instead of a decorative wash: the blur happens only in the
- * rim, so the section's pool of light bends through a band of cover glass at the
- * edge of the card and the editor's own surface stays perfectly crisp. Four
- * layers do it — a vertical tint that is brightest at the top where a real sheet
- * of glass catches the room, a 1 px specular top edge, a darker inner shade at
- * the bottom where the sheet's thickness shows, and a wide outer ambient that
- * puts the whole assembly above the paper.
+ * The editor was mounted inside a separate glass frame (`.tool-frame`, a 6-12 px
+ * rim around the card) while the narrative column beside it was its own pane, so
+ * the row read as a framed device next to a card. The frame is gone: the editor
+ * now carries the material directly, in the same declaration as the column, at the
+ * same radius. Two panes, one set.
  *
- * `--frame-pad` is the glass's thickness; the outer radius is the editor's own
- * radius plus that thickness, so the two curves stay concentric at every width.
+ * Defining the material once and letting each surface set its own intensity is the
+ * only way "the same" stays true — copy-pasted gradient stacks drift apart the
+ * moment one of them is tuned.
+ *
+ *   --glass-radius  the pane's corner
+ *   --glass-tint    alpha of the top stop — how much sheet there is to see
+ *   --glass-blur    how hard the ground behind it bends
+ *   --glass-lift    multiplier on the outer shadows; 0 keeps a pane flat on the
+ *                   paper, 1 lifts it into the room
+ *
+ * The heading band is deliberately NOT one of them. It was tried and taken back
+ * out: a pane behind 54 px display type greys out the gradient it exists to show,
+ * and a rim there either pads the type off the shell edge that DESIGN.md holds
+ * every band to, or has to bleed into the gutter to avoid doing so.
  */
-.tool-frame {
-  --frame-pad: clamp(6px, 0.62vw, 12px);
-
-  position: relative;
-  display: flex;
-  min-width: 0;
-  min-height: 0;
-  flex: 1;
-  padding: var(--frame-pad);
-  border-radius: calc(clamp(14px, 1.15vw, 22px) + var(--frame-pad));
-  background:
-    linear-gradient(178deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.34) 38%, rgba(214, 236, 234, 0.3) 100%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.95),
-    inset 0 -1px 0 rgba(255, 255, 255, 0.5),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.55),
-    0 0 0 1px rgba(23, 78, 79, 0.09),
-    0 26px 60px -28px rgba(28, 62, 61, 0.26),
-    0 60px 120px -70px rgba(16, 88, 90, 0.45);
-  backdrop-filter: blur(22px) saturate(150%);
+.tool-stage {
+  --glass-radius: clamp(14px, 1.15vw, 22px);
+  --glass-tint: 0.72;
+  --glass-blur: 22px;
+  --glass-lift: 1;
 }
 
-/* The specular sweep. It sits inside the rim, over the tint and under the card,
-   and is clipped to the top third so it reads as a highlight on a curved edge
-   rather than as a gradient poured over the whole frame. */
-.tool-frame::before {
+.studio,
+.tool-story {
+  position: relative;
+  border-radius: var(--glass-radius);
+  background: linear-gradient(178deg,
+    rgba(255, 255, 255, var(--glass-tint)) 0%,
+    rgba(255, 255, 255, calc(var(--glass-tint) * 0.47)) 38%,
+    rgba(214, 236, 234, calc(var(--glass-tint) * 0.42)) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, calc(0.85 * var(--glass-tint) / 0.72)),
+    inset 0 -1px 0 rgba(255, 255, 255, calc(0.4 * var(--glass-tint) / 0.72)),
+    inset 0 0 0 1px rgba(255, 255, 255, calc(0.4 * var(--glass-tint) / 0.72)),
+    0 0 0 1px rgba(23, 78, 79, calc(0.055 * var(--glass-lift))),
+    0 26px 60px -30px rgba(28, 62, 61, calc(0.16 * var(--glass-lift))),
+    0 60px 120px -76px rgba(16, 88, 90, calc(0.3 * var(--glass-lift)));
+  backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+}
+
+/* The specular sweep. It sits over the tint and under the content, and is masked
+   to the top third so it reads as a highlight on a curved edge rather than as a
+   gradient poured over the whole pane. */
+.studio::before,
+.tool-story::before {
   position: absolute;
   z-index: 0;
   inset: 0;
@@ -225,13 +284,16 @@
   background: linear-gradient(102deg, rgba(255, 255, 255, 0.86) 0%, rgba(255, 255, 255, 0) 26%, rgba(255, 255, 255, 0) 74%, rgba(255, 255, 255, 0.6) 100%);
   content: '';
   mask-image: linear-gradient(180deg, #000 0%, transparent 34%);
+  opacity: calc(var(--glass-tint) / 0.72);
   pointer-events: none;
 }
 
-.tool-frame > * { position: relative; z-index: 1; }
+.tool-story > * { position: relative; z-index: 1; }
+
 
 @supports not (backdrop-filter: blur(2px)) {
-  .tool-frame { background: linear-gradient(178deg, rgba(255, 255, 255, 0.9), rgba(226, 240, 238, 0.75)); }
+  .studio,
+  .tool-story { background: linear-gradient(178deg, rgba(255, 255, 255, 0.9), rgba(226, 240, 238, 0.75)); }
 }
 
 /* ======================================================== the editor card === */
@@ -260,12 +322,24 @@
   --ed-teal-deep: #50c9c3;     /* Color/Gradient Brand, dark stop */
   --ed-ink: #1c1c1c;           /* Dark/Black Grey 1 */
   --ed-ink-2: #5d7e81;         /* Color/Brand Menu */
-  --ed-line: #d9d9d9;          /* Light/Grey Sup 2 */
+  --ed-line: #d9d9d9;          /* Light/Grey Sup 2 — control borders */
+  --ed-divider: #eeeeee;       /* Light/Grey Offical — panel boundaries */
   --ed-line-soft: #f0f1f3;     /* Light/White Blur2 */
-  --ed-fill: #f0f1f3;          /* Light/White Blur2 */
+  --ed-fill: rgba(255, 255, 255, 0.62);   /* the chip tint on the glass */
   --ed-red: #ad172b;           /* Others/red — the playhead */
-  --ed-canvas: #232628;
+  --ed-canvas: #4d5052;        /* the plate behind the sweep, one step under it */
 
+  /*
+   * One sheet, not five.
+   *
+   * The card, both rails, the workspace column and the inspector were five opaque
+   * `#fff` boxes, so the section's warm ground stopped dead at the card's edge and
+   * the whole instrument read as a white cut-out on a cream page. Only `.studio`
+   * carries a surface now — it takes the shared glass below — and every panel
+   * inside it is transparent, so the ground reads through all of it at one value.
+   * That is also the only way the glass reads as glass: five translucent layers
+   * stacked would each multiply the tint and the panels would show as bands.
+   */
   container-type: inline-size;
   position: relative;
   display: grid;
@@ -279,32 +353,29 @@
     clamp(64px, 5%, 104px)
     clamp(196px, 16.7%, 348px);
   grid-template-rows: minmax(0, 1fr);
-  border-radius: clamp(14px, 1.15vw, 22px);
   color: var(--ed-ink);
-  background: #fff;
   font-family: var(--font-sans);
   /*
-   * The card now sits inside `.tool-frame`, and the frame carries the room: the
-   * wide ambient and the cool spill moved out there. What is left here is what
-   * belongs to the card itself — a hairline that keeps white off white, and a
-   * tight contact shadow that sets it down on the glass. Keeping both sets was
-   * two lifts stacked, and it read as a card floating over another card.
+   * The surface, the radius, the specular and the shadow all come from the shared
+   * glass block above — the same declaration the narrative column uses. Only the
+   * intensity is local: a lower tint than the column, because this pane holds
+   * dense UI that has to stay readable over the section's ground.
    */
-  box-shadow:
-    0 0 0 1px rgba(23, 78, 79, 0.11),
-    0 1px 2px rgba(35, 51, 50, 0.07),
-    0 8px 18px -10px rgba(35, 51, 50, 0.2);
+  --glass-tint: 0.5;
+  --glass-lift: 0.72;
 }
 
 .studio[data-timeline='closed'] { --tl-row: auto; }
 
-/* A soft rim of light along the top edge, as on a real device bezel. */
+/* The pane's own top edge catching the light. The glass block draws the same
+   thing, but this one sits ABOVE every panel in the card, so the highlight is not
+   painted over by the rails and the inspector. */
 .studio::after {
   position: absolute;
   z-index: 40;
   inset: 0;
   border-radius: inherit;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), inset 0 0 0 1px rgba(255, 255, 255, 0.34);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
   content: '';
   pointer-events: none;
 }
@@ -333,7 +404,7 @@
   flex-direction: column;
   align-items: stretch;
   overflow: hidden auto;
-  background: #fff;
+  background: transparent;
   scrollbar-width: none;
 }
 
@@ -343,7 +414,7 @@
 .studio-main-rail {
   grid-column: 1;
   padding: calc(14 * var(--u)) calc(6 * var(--u));
-  border-right: 1px solid var(--ed-line);
+  border-right: 1px solid var(--ed-divider);
   gap: calc(2 * var(--u));
 }
 
@@ -352,8 +423,8 @@
   justify-content: flex-start;
   overflow: visible auto;
   padding: calc(16 * var(--u)) calc(4 * var(--u));
-  border-right: 1px solid var(--ed-line);
-  border-left: 1px solid var(--ed-line);
+  border-right: 1px solid var(--ed-divider);
+  border-left: 1px solid var(--ed-divider);
   gap: calc(4 * var(--u));
 }
 
@@ -376,7 +447,7 @@
   place-items: center;
   border-radius: calc(11 * var(--u)) 0 0 calc(11 * var(--u));
   background: #fff;
-  box-shadow: -1px 0 3px rgba(0, 0, 0, 0.16);
+  box-shadow: -1px 0 3px rgba(0, 0, 0, 0.08);
 }
 
 .studio-rail-handle::before {
@@ -511,12 +582,11 @@
 }
 
 .studio-rail-item.is-active { color: var(--ed-teal); }
-.studio-rail-item.is-active .studio-rail-label { font-weight: 700; }
+.studio-rail-item.is-active .studio-rail-label { font-weight: 500; }
 
 .studio-rail-item.is-active .studio-rail-glyph {
   color: #fff;
   background: var(--ed-teal);
-  box-shadow: 0 calc(4 * var(--u)) calc(11 * var(--u)) rgba(25, 86, 88, 0.26);
 }
 
 .studio-rail-label {
@@ -537,7 +607,6 @@
   height: calc(44 * var(--u));
   border-radius: 50%;
   background: none;
-  box-shadow: 0 calc(4 * var(--u)) calc(12 * var(--u)) rgba(80, 201, 195, 0.34);
   font-size: calc(44 * var(--u));
 }
 
@@ -566,7 +635,7 @@
 }
 
 .studio-rail-mini:hover { color: var(--ed-teal); }
-.studio-rail-mini small { font-size: calc(13 * var(--t)); font-weight: 600; }
+.studio-rail-mini small { font-size: calc(13 * var(--t)); font-weight: 500; }
 
 .studio-rail-mini i {
   position: absolute;
@@ -619,7 +688,6 @@
   min-height: 0;
   grid-column: 2;
   grid-template-rows: auto minmax(calc(120 * var(--u)), 1fr) var(--tl-row);
-  background: #fff;
 }
 
 /* ------------------------------------------------------------- topbar --- */
@@ -689,10 +757,12 @@
 }
 
 .studio-chip:hover { filter: saturate(1.08); transform: translateY(-1px); }
-.studio-chip--violet { background: linear-gradient(90deg, #d487ff 0%, #b47dff 100%); box-shadow: 0 calc(4 * var(--u)) calc(10 * var(--u)) rgba(180, 125, 255, 0.28); }
-.studio-chip--peach { background: linear-gradient(90deg, #ffecd2 0%, #fcb69f 100%); box-shadow: 0 calc(4 * var(--u)) calc(10 * var(--u)) rgba(252, 182, 159, 0.34); }
-.studio-chip--sky { background: linear-gradient(90deg, #a1c4fd 0%, #9fe1ff 100%); box-shadow: 0 calc(4 * var(--u)) calc(10 * var(--u)) rgba(161, 196, 253, 0.32); }
-.studio-chip--teal { background: linear-gradient(90deg, #96deda 0%, #50c9c3 100%); box-shadow: 0 calc(4 * var(--u)) calc(10 * var(--u)) rgba(80, 201, 195, 0.32); }
+/* Flat, as in the frame. A coloured drop shadow under a 22 px chip is the one
+   thing on the topbar that has no counterpart in the design. */
+.studio-chip--violet { background: linear-gradient(90deg, #d487ff 0%, #b47dff 100%); }
+.studio-chip--peach { background: linear-gradient(90deg, #ffecd2 0%, #fcb69f 100%); }
+.studio-chip--sky { background: linear-gradient(90deg, #a1c4fd 0%, #9fe1ff 100%); }
+.studio-chip--teal { background: linear-gradient(90deg, #96deda 0%, #50c9c3 100%); }
 .studio-chip--wide { padding-inline: calc(11 * var(--u)); }
 .studio-chip-caret { font-size: calc(15 * var(--t)); opacity: 0.9; }
 
@@ -708,7 +778,7 @@
   isolation: isolate;
   border-radius: calc(20 * var(--u));
   background: var(--ed-canvas);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 
 .studio-car-viewport,
@@ -769,7 +839,7 @@
   transform: translateX(-50%);
 }
 
-.studio-canvas-tab { position: absolute; inset: 0; width: 100%; height: 100%; }
+.studio-canvas-tab { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
 .studio-canvas-brand img { position: relative; }
 .studio-canvas-brand img:first-of-type { width: calc(25 * var(--u)); height: auto; }
 .studio-canvas-brand img:last-of-type { width: calc(76 * var(--u)); height: auto; }
@@ -792,7 +862,7 @@
   place-items: center;
   color: #fff;
   font-size: calc(24 * var(--t));
-  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.45));
+  filter: drop-shadow(0 1px 7.5px rgba(0, 0, 0, 0.28));
   transition: color 0.18s ease, transform 0.18s ease;
 }
 
@@ -830,7 +900,7 @@
   height: calc(44 * var(--u));
   place-items: center;
   padding-top: calc(3 * var(--u));
-  border: 1px solid rgba(255, 255, 255, 0.85);
+  border: 0.6px solid rgba(255, 255, 255, 0.62);
   border-radius: calc(11 * var(--u));
   color: #fff;
   background: rgba(0, 0, 0, 0.2);
@@ -849,7 +919,7 @@
 .studio-canvas-side span {
   max-width: 100%;
   font-size: calc(7.5 * var(--t));
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: -0.015em;
   text-transform: uppercase;
   white-space: nowrap;
@@ -920,10 +990,10 @@
   color: #fff;
   font-size: calc(13 * var(--t));
   font-variant-numeric: tabular-nums;
-  font-weight: 600;
+  font-weight: 450;
 }
 
-.studio-playbar small { color: rgba(255, 255, 255, 0.55); font-size: calc(12 * var(--t)); font-weight: 500; }
+.studio-playbar small { color: rgba(255, 255, 255, 0.5); font-size: calc(12 * var(--t)); font-weight: 400; }
 
 .studio-playbar-scrub {
   position: relative;
@@ -965,9 +1035,9 @@
   border-radius: calc(7 * var(--u));
   color: #2e3434;
   background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.24);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
   font-size: calc(12 * var(--t));
-  font-weight: 550;
+  font-weight: 500;
   gap: calc(6 * var(--u));
   transition: background 0.18s ease;
 }
@@ -1003,13 +1073,13 @@
   color: var(--ed-ink);
   background: var(--ed-fill);
   font-size: calc(13.5 * var(--t));
-  font-weight: 500;
+  font-weight: 400;
   white-space: nowrap;
   transition: color 0.18s ease, background 0.18s ease, border-color 0.18s ease;
 }
 
 .studio-spaces > button:hover { border-color: var(--ed-teal-soft); color: var(--ed-teal); }
-.studio-spaces > button.is-active { border-color: var(--ed-teal-soft); color: var(--ed-teal-bright); background: #fff; font-weight: 650; }
+.studio-spaces > button.is-active { border-color: var(--ed-teal-soft); color: var(--ed-teal-bright); background: rgba(255, 255, 255, 0.78); font-weight: 600; }
 
 .studio-space-add {
   display: grid;
@@ -1039,9 +1109,8 @@
   border-radius: calc(11 * var(--u));
   color: #fff;
   background: var(--ed-teal-bright);
-  box-shadow: 0 calc(3 * var(--u)) calc(9 * var(--u)) rgba(0, 170, 171, 0.3);
   font-size: calc(12.5 * var(--t));
-  font-weight: 650;
+  font-weight: 600;
   transition: transform 0.2s var(--ease-reveal);
 }
 
@@ -1052,11 +1121,12 @@
   height: calc(30 * var(--u));
   align-items: center;
   padding-inline: calc(11 * var(--u));
-  border: 1px solid var(--ed-line);
-  border-radius: calc(7 * var(--u));
-  color: #4d5a5a;
+  border: 1px solid var(--ed-line-soft);
+  border-radius: calc(5 * var(--u));
+  color: var(--ed-ink);
+  background: var(--ed-fill);
   font-size: calc(12 * var(--t));
-  font-weight: 550;
+  font-weight: 500;
   gap: calc(6 * var(--u));
 }
 
@@ -1077,7 +1147,7 @@
   display: grid;
   min-height: 0;
   margin-top: calc(6 * var(--u));
-  border-top: 1px solid var(--ed-line);
+  border-top: 1px solid var(--ed-divider);
   grid-template-columns: calc(42 * var(--u)) minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
 }
@@ -1089,7 +1159,7 @@
   flex-direction: column;
   align-items: stretch;
   padding: calc(4 * var(--u)) 0;
-  border-right: 1px solid var(--ed-line);
+  border-right: 1px solid var(--ed-line-soft);
   gap: calc(2 * var(--u));
 }
 
@@ -1099,7 +1169,7 @@
   flex: 1;
   place-items: center;
   border-radius: calc(7 * var(--u));
-  color: #47605f;
+  color: #6c7877;
   font-size: clamp(13px, calc(21 * var(--t)), 20px);
   transition: color 0.16s ease, background 0.16s ease;
 }
@@ -1126,37 +1196,39 @@
   height: calc(30 * var(--u));
   align-items: center;
   padding-inline: calc(11 * var(--u));
-  border: 1px solid var(--ed-line);
-  border-radius: calc(7 * var(--u));
-  color: #3e4a4a;
-  background: #fff;
+  border: 1px solid transparent;
+  border-radius: calc(5 * var(--u));
+  color: #414141;
+  background: var(--ed-fill);
   font-size: calc(12 * var(--t));
   font-weight: 500;
   gap: calc(6 * var(--u));
   white-space: nowrap;
 }
 
+.studio-step-select { color: var(--ed-ink); font-weight: 400; }
+
 .studio-command-pill:hover,
 .studio-step-select:hover { border-color: var(--ed-teal-soft); }
 .studio-step-select { max-width: calc(210 * var(--u)); justify-self: end; }
 .studio-step-select span { overflow: hidden; text-overflow: ellipsis; }
-.studio-step-select svg { color: #7d8a8a; font-size: calc(15 * var(--t)); }
+.studio-step-select svg { color: #9aa4a3; font-size: calc(15 * var(--t)); }
 
 .studio-range-readout {
   display: inline-flex;
   height: calc(30 * var(--u));
   align-items: center;
   padding-inline: calc(10 * var(--u));
-  border: 1px solid var(--ed-line);
-  border-radius: calc(7 * var(--u));
-  color: #62706f;
+  border-radius: calc(5 * var(--u));
+  color: #414141;
+  background: var(--ed-fill);
   font-size: calc(12 * var(--t));
   gap: calc(6 * var(--u));
   white-space: nowrap;
 }
 
 .studio-range-readout svg { font-size: calc(15 * var(--t)); }
-.studio-range-readout b { color: #232929; font-variant-numeric: tabular-nums; font-weight: 620; }
+.studio-range-readout b { color: #1e1e1e; font-variant-numeric: tabular-nums; font-weight: 400; }
 
 .studio-transport { display: flex; align-items: center; justify-content: center; gap: calc(8 * var(--u)); }
 .studio-transport-gap { width: calc(10 * var(--u)); }
@@ -1167,7 +1239,7 @@
   height: calc(24 * var(--u));
   place-items: center;
   border-radius: calc(6 * var(--u));
-  color: #22292a;
+  color: #414141;
   font-size: calc(15 * var(--t));
   transition: color 0.16s ease, background 0.16s ease;
 }
@@ -1179,7 +1251,7 @@
 .studio-timeline-grid {
   display: grid;
   min-height: 0;
-  border-top: 1px solid var(--ed-line);
+  border-top: 1px solid var(--ed-divider);
   grid-template-rows: calc(24 * var(--u)) repeat(4, minmax(0, 1fr));
 }
 
@@ -1190,20 +1262,20 @@
   grid-template-columns: clamp(96px, calc(172 * var(--u)), 214px) minmax(0, 1fr);
 }
 
-.studio-timeline-ruler { background: var(--ed-line-soft); }
+.studio-timeline-ruler { background: var(--ed-fill); }
 
 .studio-ruler-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding-inline: calc(11 * var(--u)) calc(7 * var(--u));
-  border-right: 1px solid var(--ed-line);
+  border-right: 1px solid var(--ed-divider);
   color: #303838;
   font-size: calc(12.5 * var(--t));
-  font-weight: 620;
+  font-weight: 500;
 }
 
-.studio-ruler-head svg { color: #4a5555; font-size: calc(15 * var(--t)); }
+.studio-ruler-head svg { color: #8d9796; font-size: calc(15 * var(--t)); }
 
 .studio-ruler-scale {
   position: relative;
@@ -1218,7 +1290,7 @@
   position: relative;
   display: block;
   height: 100%;
-  border-left: 1px solid rgba(24, 52, 52, 0.16);
+  border-left: 1px solid rgba(24, 52, 52, 0.04);
   font-style: normal;
 }
 
@@ -1226,40 +1298,40 @@
   position: absolute;
   top: calc(3 * var(--u));
   left: calc(3 * var(--u));
-  color: #6a7676;
+  color: #949e9e;
   font-size: calc(10.5 * var(--t));
   font-style: normal;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
-.studio-track { border-top: 1px solid var(--ed-line-soft); }
+.studio-track { border-top: 0.5px solid rgba(170, 170, 170, 0.28); }
 
 .studio-track-name {
   display: flex;
   min-width: 0;
   align-items: center;
   padding-inline: calc(11 * var(--u)) calc(7 * var(--u));
-  border-right: 1px solid var(--ed-line);
+  border-right: 1px solid var(--ed-divider);
   color: #2b3232;
   font-size: calc(13 * var(--t));
-  font-weight: 520;
+  font-weight: 400;
   gap: calc(7 * var(--u));
   text-align: left;
   transition: background 0.16s ease;
 }
 
 .studio-track-name:hover { background: #f6f9f9; }
-.studio-track-name > svg:first-child { color: #33403f; font-size: calc(19 * var(--t)); }
+.studio-track-name > svg:first-child { color: #55605f; font-size: calc(19 * var(--t)); }
 .studio-track-name span { overflow: hidden; flex: 1; text-overflow: ellipsis; white-space: nowrap; }
-.studio-track-caret { color: #8b9797; font-size: calc(15 * var(--t)); }
-.studio-track.is-active .studio-track-name { color: var(--ed-teal); font-weight: 660; }
+.studio-track-caret { color: #aab3b2; font-size: calc(15 * var(--t)); }
+.studio-track.is-active .studio-track-name { color: var(--ed-teal); font-weight: 500; }
 .studio-track.is-active .studio-track-name > svg:first-child { color: var(--ed-teal-bright); }
 
 .studio-track-lane {
   position: relative;
   min-width: 0;
-  background-image: linear-gradient(90deg, rgba(24, 52, 52, 0.07) 1px, transparent 1px);
+  background-image: linear-gradient(90deg, rgba(24, 52, 52, 0.022) 1px, transparent 1px);
   background-position-x: calc(6 * var(--u));
   background-size: calc((100% - 12 * var(--u)) / 16) 100%;
   cursor: pointer;
@@ -1276,12 +1348,12 @@
   padding-inline: calc(16 * var(--u));
   border-radius: calc(8 * var(--u));
   color: #fff;
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.16), 0 1px 3px rgba(0, 0, 0, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1);
   gap: calc(9 * var(--u));
 }
 
-.studio-clip b { font-size: calc(12.5 * var(--t)); font-weight: 700; }
-.studio-clip small { font-size: calc(12 * var(--t)); font-weight: 450; opacity: 0.94; }
+.studio-clip b { font-size: calc(12.5 * var(--t)); font-weight: 500; }
+.studio-clip small { font-size: calc(12 * var(--t)); font-weight: 400; opacity: 0.9; }
 .studio-clip img { height: 62%; min-width: 0; flex: 1; object-fit: none; object-position: left center; opacity: 0.92; }
 
 /* The drag handles at each end of a clip — three dots on a lighter field. */
@@ -1292,10 +1364,10 @@
   left: 0;
   width: calc(9 * var(--u));
   background:
-    radial-gradient(circle at 50% 30%, rgba(255, 255, 255, 0.85) 32%, transparent 34%),
-    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.85) 32%, transparent 34%),
-    radial-gradient(circle at 50% 70%, rgba(255, 255, 255, 0.85) 32%, transparent 34%),
-    rgba(255, 255, 255, 0.24);
+    radial-gradient(circle at 50% 30%, rgba(255, 255, 255, 0.7) 32%, transparent 34%),
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.7) 32%, transparent 34%),
+    radial-gradient(circle at 50% 70%, rgba(255, 255, 255, 0.7) 32%, transparent 34%),
+    rgba(255, 255, 255, 0.18);
   background-repeat: no-repeat;
   background-position: 0 8%, 0 50%, 0 92%, 0 0;
   background-size: 100% 34%, 100% 34%, 100% 34%, 100% 100%;
@@ -1328,16 +1400,27 @@
 /* ========================================================== properties === */
 
 /*
- * The panel scrolls; the scrollbar does not show.
+ * The panel scrolls and shows nothing for it. Wheel, trackpad and keyboard only.
  *
- * `scrollbar-width: thin` is not thin on Windows — Chromium still paints a ~11 px
- * grey trough with a grey thumb, and inside a 320 px inspector that is a full
- * column of chrome running the height of the editor. It is the only element on
- * the page wearing an OS widget, which is exactly why it stood out enough to be
- * reported. The source frame shows no scrollbar at all, and neither do the two
- * rails, which have hidden theirs since they were written. A hover-revealed
- * overlay thumb replaces it: nothing at rest, a 4 px teal thumb while the
- * pointer is in the panel, and the wheel and keyboard work throughout.
+ * Do not put a scrollbar back here. Three versions were tried and rejected:
+ *
+ *   1. `scrollbar-width: thin` plus a 4 px `::-webkit-scrollbar`. Chromium treats
+ *      the standard `scrollbar-width` / `scrollbar-color` properties and the
+ *      legacy pseudo-elements as MUTUALLY EXCLUSIVE — set either standard
+ *      property to anything but `auto` and the whole `::-webkit-scrollbar-*`
+ *      block is discarded. The 4 px was ignored and Chromium drew its own
+ *      "thin": measured at 10 px of gutter, grey trough, panel-height thumb.
+ *   2. Resetting those to `auto` and sizing the pseudo-elements properly. That
+ *      measured 0 px of gutter, because this Chromium draws OVERLAY scrollbars
+ *      which decide for themselves when to paint and how wide to be.
+ *   3. Hiding the native bar and drawing a 3 px thumb from `scrollTop /
+ *      scrollHeight`. Precise, photographable — and rejected on sight: an
+ *      indicator on a panel nobody has trouble scrolling is one more mark in a
+ *      column that is already dense. "Kệ user tự biết để scroll."
+ *
+ * So: hidden the one way every engine agrees on (`scrollbar-width: none` and
+ * `display: none` say the same thing, so nothing has to choose), and no
+ * replacement. The source frame shows no scrollbar either.
  */
 .studio-properties {
   display: block;
@@ -1345,34 +1428,23 @@
   min-height: 0;
   overflow: hidden auto;
   padding: calc(20 * var(--u)) calc(20 * var(--u)) calc(28 * var(--u));
-  background: #fff;
   grid-column: 4;
   overscroll-behavior: contain;
-  scrollbar-color: transparent transparent;
-  scrollbar-gutter: stable;
-  scrollbar-width: thin;
-  transition: scrollbar-color 0.2s ease;
+  scrollbar-width: none;
 }
 
-.studio-properties:hover,
-.studio-properties:focus-within { scrollbar-color: rgba(25, 86, 88, 0.28) transparent; }
-
-.studio-properties::-webkit-scrollbar { width: calc(4 * var(--u)); }
-.studio-properties::-webkit-scrollbar-track { background: transparent; }
-.studio-properties::-webkit-scrollbar-thumb { border-radius: 999px; background: transparent; transition: background 0.2s ease; }
-.studio-properties:hover::-webkit-scrollbar-thumb,
-.studio-properties:focus-within::-webkit-scrollbar-thumb { background: rgba(25, 86, 88, 0.28); }
+.studio-properties::-webkit-scrollbar { display: none; }
 
 .studio-properties h4 {
   margin: 0 0 calc(16 * var(--u));
   color: var(--ed-teal);
   font-size: calc(19 * var(--t));
-  font-weight: 660;
+  font-weight: 500;
   letter-spacing: -0.02em;
 }
 
 .studio-prop-block + .studio-prop-block { margin-top: calc(18 * var(--u)); }
-.studio-prop-block h5 { margin: 0 0 calc(12 * var(--u)); color: #1f2626; font-size: calc(15 * var(--t)); font-weight: 660; letter-spacing: -0.015em; }
+.studio-prop-block h5 { margin: 0 0 calc(12 * var(--u)); color: var(--ed-ink); font-size: calc(15 * var(--t)); font-weight: 500; letter-spacing: -0.01em; }
 .studio-field-label { margin: 0 0 calc(9 * var(--u)); color: #5f6d6c; font-size: calc(13.5 * var(--t)); }
 .studio-prop-block > * + .studio-field-label { margin-top: calc(16 * var(--u)); }
 
@@ -1419,7 +1491,7 @@
   border-radius: 999px;
   color: #4a5555;
   font-size: calc(13.5 * var(--t));
-  font-weight: 550;
+  font-weight: 400;
   transition: color 0.2s ease, background 0.2s ease;
 }
 
@@ -1427,8 +1499,7 @@
   border: 1px solid var(--ed-teal-soft);
   color: #fff;
   background: linear-gradient(90deg, var(--ed-teal-soft) 0%, var(--ed-teal-deep) 100%);
-  box-shadow: 0 calc(2 * var(--u)) calc(7 * var(--u)) rgba(80, 201, 195, 0.3);
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .studio-note-directions { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: calc(6 * var(--u)); }
@@ -1445,7 +1516,7 @@
 }
 
 .studio-note-directions button:hover { background: #e9f6f5; }
-.studio-note-directions button.is-active { border-color: var(--ed-teal-soft); background: #fff; }
+.studio-note-directions button.is-active { border-color: var(--ed-teal-soft); background: rgba(255, 255, 255, 0.72); }
 /* 2:1, the leader line's own ratio — a square box stretched it. */
 .studio-note-directions svg { width: calc(28 * var(--u)); height: calc(14 * var(--u)); }
 
@@ -1480,7 +1551,7 @@
 }
 
 .studio-slider > span { color: #333c3c; font-size: calc(13.5 * var(--t)); }
-.studio-slider > b { color: #1d2424; font-size: calc(13.5 * var(--t)); font-variant-numeric: tabular-nums; font-weight: 620; text-align: right; }
+.studio-slider > b { color: #414141; font-size: calc(13.5 * var(--t)); font-variant-numeric: tabular-nums; font-weight: 400; text-align: right; }
 
 .studio-slider input[type='range'] {
   width: 100%;
@@ -1502,19 +1573,19 @@
   min-height: 11px;
   margin-top: calc((2px - 14 * var(--u)) / 2);
   appearance: none;
-  border: 1px solid #c8cfcf;
+  border: 1px solid #dfe4e4;
   border-radius: 50%;
   background: #fff;
-  box-shadow: 0 1px 3px rgba(28, 45, 44, 0.18);
+  box-shadow: 0 1px 2px rgba(28, 45, 44, 0.1);
 }
 
 .studio-slider input[type='range']::-moz-range-thumb {
   width: calc(14 * var(--u));
   height: calc(14 * var(--u));
-  border: 1px solid #c8cfcf;
+  border: 1px solid #dfe4e4;
   border-radius: 50%;
   background: #fff;
-  box-shadow: 0 1px 3px rgba(28, 45, 44, 0.18);
+  box-shadow: 0 1px 2px rgba(28, 45, 44, 0.1);
 }
 
 .studio-slider--swatch { grid-template-columns: minmax(0, 1fr) auto auto; }
@@ -1554,7 +1625,7 @@
 
 .studio-stepper button { display: grid; width: calc(20 * var(--u)); place-items: center; color: #56625f; font-size: calc(14 * var(--t)); }
 .studio-stepper button:hover { color: var(--ed-teal); }
-.studio-stepper i > b { color: #232a2a; font-size: calc(13 * var(--t)); font-variant-numeric: tabular-nums; font-weight: 620; }
+.studio-stepper i > b { color: var(--ed-ink); font-size: calc(13 * var(--t)); font-variant-numeric: tabular-nums; font-weight: 500; }
 
 .studio-primary-button {
   display: flex;
@@ -1566,14 +1637,13 @@
   border-radius: calc(10 * var(--u));
   color: var(--ed-teal);
   background: linear-gradient(90deg, var(--ed-teal-soft) 0%, var(--ed-teal-deep) 100%);
-  box-shadow: 0 calc(4 * var(--u)) calc(12 * var(--u)) rgba(80, 201, 195, 0.28);
   font-size: calc(13.5 * var(--t));
-  font-weight: 650;
+  font-weight: 500;
   gap: calc(8 * var(--u));
   transition: transform 0.2s var(--ease-reveal), box-shadow 0.2s ease;
 }
 
-.studio-primary-button:hover { box-shadow: 0 calc(6 * var(--u)) calc(16 * var(--u)) rgba(22, 184, 176, 0.36); transform: translateY(-1px); }
+.studio-primary-button:hover { filter: saturate(1.06); transform: translateY(-1px); }
 .studio-primary-button svg { font-size: calc(17 * var(--t)); }
 
 /* -------------------------------------------------------------- selects --- */
@@ -1610,25 +1680,23 @@
 
 /* ==================================================== narrative column === */
 
+/* The narrative column already carried its own padding for the copy inside it, so
+   that padding is its rim — nothing extra is added, only the surface changes. */
 .tool-story {
+  --glass-tint: 0.62;
+  --glass-lift: 0.62;
+
   container-type: inline-size;
-  position: relative;
+  border-radius: var(--glass-radius);
   display: grid;
   overflow: hidden;
   height: 100%;
   min-height: 0;
   padding: clamp(17px, 1.45vw, 28px);
-  border-radius: calc(clamp(14px, 1.15vw, 22px) + clamp(6px, 0.62vw, 12px));
-  background: linear-gradient(168deg, rgba(255, 255, 255, 0.96) 0%, rgba(250, 252, 251, 0.9) 100%);
-  box-shadow:
-    0 0 0 1px rgba(23, 78, 79, 0.09),
-    0 1px 2px rgba(35, 51, 50, 0.05),
-    0 22px 48px -22px rgba(28, 62, 61, 0.22);
-  backdrop-filter: blur(18px) saturate(115%);
   grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
-.tool-story__intro { position: relative; z-index: 1; padding-bottom: clamp(10px, 1.5vh, 17px); border-bottom: 1px solid rgba(30, 84, 82, 0.11); }
+.tool-story__intro { position: relative; z-index: 1; padding-bottom: clamp(10px, 1.5vh, 17px); border-bottom: 1px solid rgba(30, 84, 82, 0.07); }
 
 /*
  * No width cap, and `balance` instead of a guess.
@@ -1713,15 +1781,15 @@
   border-radius: 50%;
   color: #2c6764;
   background: #fff;
-  box-shadow: 0 0 0 1px rgba(30, 84, 82, 0.17), 0 4px 11px rgba(35, 70, 68, 0.08);
+  box-shadow: 0 0 0 1px rgba(30, 84, 82, 0.11), 0 3px 9px rgba(35, 70, 68, 0.05);
   font-size: clamp(14px, 0.98vw, 18px);
   transition: color 0.24s var(--ease-reveal), box-shadow 0.24s var(--ease-reveal);
 }
 
 .tool-story__node svg { width: 1em; height: 1em; }
-.tool-story__list li:hover .tool-story__node { color: #17504f; box-shadow: 0 0 0 1px rgba(30, 84, 82, 0.3), 0 6px 15px rgba(35, 70, 68, 0.13); }
+.tool-story__list li:hover .tool-story__node { color: #17504f; box-shadow: 0 0 0 1px rgba(30, 84, 82, 0.2), 0 5px 12px rgba(35, 70, 68, 0.09); }
 
-.tool-story__copy { display: grid; min-width: 0; align-content: center; padding: clamp(8px, 1.15vh, 13px) 0; border-bottom: 1px solid rgba(30, 84, 82, 0.09); }
+.tool-story__copy { display: grid; min-width: 0; align-content: center; padding: clamp(8px, 1.15vh, 13px) 0; border-bottom: 1px solid rgba(30, 84, 82, 0.06); }
 .tool-story__list li:last-child .tool-story__copy { border-bottom: 0; }
 
 .tool-story__copy h4 {
@@ -1731,7 +1799,7 @@
   margin: 0;
   color: var(--ink);
   font-size: clamp(12.5px, 0.9vw, 16.5px);
-  font-weight: 670;
+  font-weight: 600;
   gap: 10px;
   letter-spacing: -0.022em;
   line-height: 1.16;
@@ -1741,10 +1809,10 @@
    column of their own. `tnum` because 01 and 04 must occupy the same width. */
 .tool-story__copy h4 b {
   flex: none;
-  color: #9fb0ae;
+  color: #a9b8b6;
   font-size: clamp(8px, 0.52vw, 9.5px);
   font-variant-numeric: tabular-nums;
-  font-weight: 700;
+  font-weight: 500;
   letter-spacing: 0.08em;
 }
 
@@ -1753,9 +1821,9 @@
 /* Which panel of the editor this beat happens in — the column's whole job. */
 .tool-story__panel {
   margin-top: clamp(4px, 0.6vh, 7px);
-  color: #1f8a86;
+  color: #2a908c;
   font-size: clamp(8.5px, 0.56vw, 10.5px);
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -1776,10 +1844,10 @@
   align-items: center;
   justify-content: space-between;
   padding-top: clamp(11px, 1.6vh, 18px);
-  border-top: 1px solid rgba(30, 84, 82, 0.11);
+  border-top: 1px solid rgba(30, 84, 82, 0.07);
   color: #17504f;
   font-size: clamp(11px, 0.74vw, 14px);
-  font-weight: 680;
+  font-weight: 600;
   gap: 12px;
   text-decoration: none;
 }
@@ -1793,11 +1861,11 @@
   place-items: center;
   border-radius: 50%;
   background: #ef7b67;
-  box-shadow: 0 6px 15px rgba(214, 91, 73, 0.24);
+  box-shadow: 0 5px 12px rgba(214, 91, 73, 0.18);
   transition: transform 0.24s var(--ease-reveal), box-shadow 0.24s var(--ease-reveal);
 }
 
-.tool-story__cta:hover > i { box-shadow: 0 9px 20px rgba(214, 91, 73, 0.32); transform: translateX(3px); }
+.tool-story__cta:hover > i { box-shadow: 0 7px 16px rgba(214, 91, 73, 0.26); transform: translateX(3px); }
 .tool-story__cta > i > span { position: relative; width: 12px; height: 1.4px; border-radius: 1px; background: #fff; }
 
 .tool-story__cta > i > span::after {
@@ -1831,7 +1899,7 @@
     gap: 14px;
   }
 
-  .tool-heading { grid-template-columns: minmax(0, 1fr) minmax(240px, 34%); }
+  .tool-heading { grid-template-columns: minmax(0, 1fr) minmax(240px, 42%); }
   .tool-heading h2 { font-size: clamp(30px, 4.4vw, 46px); }
 
   .tool-story {
@@ -1865,7 +1933,7 @@
   .studio-range-readout { display: none; }
 
   .tool-story { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto; gap: 12px; }
-  .tool-story__intro { align-self: stretch; padding: 0 0 12px; border-right: 0; border-bottom: 1px solid rgba(30, 84, 82, 0.11); }
+  .tool-story__intro { align-self: stretch; padding: 0 0 12px; border-right: 0; border-bottom: 1px solid rgba(30, 84, 82, 0.07); }
   .tool-story__list li { padding: 4px 0; }
   .tool-story__list li:nth-child(odd) { padding-right: 14px; }
   .tool-story__list li:nth-child(even) { padding-left: 14px; }
@@ -1877,12 +1945,19 @@
 
   /* One column: the two-baseline grid becomes reading order, and the heading has
      to come back above the sentence that qualifies it. */
-  .tool-heading { grid-template-columns: minmax(0, 1fr); }
+  /* One column: reading order, and the measure has no void left to fill.
+     Explicit `grid-area` beats `order`, so the rows are reassigned rather than
+     reordered. */
+  /* One column: the shared baseline has nothing to share with, so the three parts
+     simply stack in reading order. */
+  .tool-heading { grid-template-columns: minmax(0, 1fr); grid-template-rows: repeat(3, auto); }
   .tool-heading h2 { white-space: normal; }
-  .tool-heading > .section-kicker { order: 1; }
-  .tool-heading > h2 { order: 2; align-self: start; margin-bottom: 4px; }
-  .tool-heading > .tool-heading-lede { order: 3; align-self: start; }
-  .tool-heading > .tool-heading-link { order: 4; align-self: start; }
+  .tool-heading > .section-kicker { grid-area: 1 / 1; align-self: start; }
+  .tool-heading > h2 { grid-area: 2 / 1; align-self: start; margin-bottom: 4px; }
+  /* Flush right earns its keep only while there is a right column sharing the
+     shell's right edge. In one column it is a ragged paragraph under a
+     left-aligned heading, so it goes back to reading order. */
+  .tool-heading > .tool-heading-lede { grid-area: 3 / 1; align-self: start; margin-left: 0; text-align: left; }
 
   .studio { --u: clamp(0.62px, 0.088cqi, 0.86px); --t: clamp(0.74px, 0.088cqi, 0.86px); border-radius: 14px; }
 
@@ -1945,8 +2020,7 @@
   .studio-sync img { animation: none; }
 
   .studio *,
-  .tool-story__cta,
-  .tool-heading-link { transition-duration: 0.01ms !important; }
+  .tool-story__cta { transition-duration: 0.01ms !important; }
 
   .studio-brand:hover,
   .studio-chip:hover,

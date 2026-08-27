@@ -219,9 +219,33 @@ Light/White Blur2 `#F0F1F3`, Light/Grey Sup 2 `#D9D9D9`, Others/red `#AD172B`),
 not neighbours picked by eye. Being four units off on each of nine tokens is not
 visible one at a time and is completely visible all at once.
 
+**Two greys, not one.** The frame separates `Light/Grey Offical #EEEEEE`, which
+draws every PANEL boundary, from `Light/Grey Sup 2 #D9D9D9`, which draws CONTROL
+borders. This sheet had collapsed both into `--ed-line`, so every rail edge, lane
+divider and column rule wore the control grey — the single largest reason the
+editor read heavier than the design. They are now `--ed-divider` and `--ed-line`,
+and using the wrong one is the bug to look for when the editor feels "đậm".
+
+**The weight ladder is Roboto's, three steps only.** The frame uses Regular 400
+for every value, field label and secondary line; Medium 500 for section labels,
+rail labels, the doc title, the clip title and panel headings; SemiBold 600 for
+exactly three things — the active space chip, "Tạo Step" and the active segment.
+Nothing in the editor is 700. A variable font makes 520/620/670 available and
+this sheet had drifted into all of them; if a rule here reads `font-weight: 6xx`
+and it is not one of those three controls, it is drift.
+
+**Filled, not outlined.** Where the frame wants a quiet chip it fills `#F0F1F3`
+and draws no keyline at all — the command bar's three pills, the Start/End
+readout, "Tùy chỉnh", the leader-direction buttons. An outline plus a fill is one
+edge more than the design has.
+
 Geometry is the one place the frame is not copied literally. `--u` and `--t`
 diverge below a ~1000 px editor on purpose (see above), so a control's *size* is
-adapted while its shape, radius ratio and colour are not.
+adapted while its shape, radius ratio and colour are not. The generator's
+`STROKE_SCALE` is the same kind of adaptation for the same reason: a 1.5 stroke
+drawn at 24 px is soft, and the same stroke at 15 px falls under one device pixel
+and snaps to a hard line, so it is scaled to hold the frame's optical weight
+rather than its literal number.
 
 ### The workspace glass
 

@@ -137,6 +137,23 @@ const SHOTS = [
   { name: 'studio-canvas-chrome', at: '#cong-cu', settle: 2400, clipOf: { sel: '.studio-canvas', inset: [0, 0, 380, 0], scale: 2.4 } },
   { name: 'studio-timeline-detail', at: '#cong-cu', settle: 2000, clipOf: { sel: '.studio-timeline', scale: 2.4 } },
   { name: 'studio-props', at: '#cong-cu', settle: 2000, clipOf: { sel: '.studio-properties', scale: 2.6 } },
+  /*
+   * The inspector's right edge, mid-scroll. It must stay empty: this panel
+   * deliberately shows no scrollbar and no indicator of any kind, and the two
+   * previous rounds of an OS trough leaking through were only ever caught by
+   * looking at this strip. Use w1366, where the panel actually overflows.
+   */
+  {
+    name: 'studio-props-edge',
+    at: '#cong-cu',
+    settle: 1800,
+    run: `
+      const panel = document.querySelector('.studio-properties');
+      panel.scrollTop = Math.round((panel.scrollHeight - panel.clientHeight) * 0.35);
+      await new Promise((r) => setTimeout(r, 320));
+    `,
+    clipOf: { sel: '.studio-properties', fromRight: 26, scale: 6 },
+  },
   { name: 'studio-detail-rail', at: '#cong-cu', settle: 2000, clipOf: { sel: '.studio-detail-rail', scale: 3.2 } },
   { name: 'studio-story', at: '#cong-cu', settle: 2000, clipOf: { sel: '.tool-story', scale: 2.4 } },
   { name: 'studio-head', at: '#cong-cu', settle: 1400, clipOf: { sel: '.tool-heading', scale: 2.2 } },
@@ -555,7 +572,7 @@ try {
        */
       let clip = shot.clip;
       if (shot.clipOf) {
-        const { sel, inset = [0, 0, 0, 0], scale = 2.4 } = shot.clipOf;
+        const { sel, inset = [0, 0, 0, 0], scale = 2.4, fromRight } = shot.clipOf;
         const box = await evaluate(`
           const node = document.querySelector(${JSON.stringify(sel)});
           if (!node) return null;
@@ -564,13 +581,20 @@ try {
         `);
         if (!box) throw new Error(`clipOf selector not found: ${sel}`);
         const [top, right, bottom, left] = inset;
-        clip = {
-          x: Math.round(box.x + left),
-          y: Math.round(box.y + top),
-          width: Math.round(box.width - left - right),
-          height: Math.round(box.height - top - bottom),
-          scale,
-        };
+        /* `fromRight: n` takes the rightmost n px of the element — the only way to
+           frame a scrollbar or a resize handle without hard-coding a width that
+           changes with the viewport. A left inset computed from the outside can go
+           negative, and CDP hangs rather than erroring on a negative clip. */
+        clip = fromRight
+          ? { x: Math.round(box.x + box.width - fromRight), y: Math.round(box.y + top), width: fromRight, height: Math.round(box.height - top - bottom), scale }
+          : {
+            x: Math.round(box.x + left),
+            y: Math.round(box.y + top),
+            width: Math.round(box.width - left - right),
+            height: Math.round(box.height - top - bottom),
+            scale,
+          };
+        if (clip.width <= 0 || clip.height <= 0) throw new Error(`clipOf produced an empty box for ${sel}: ${JSON.stringify(clip)}`);
       }
 
       const capture = await send('Page.captureScreenshot', {

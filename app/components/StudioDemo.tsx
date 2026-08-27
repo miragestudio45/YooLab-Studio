@@ -233,20 +233,40 @@ function CarViewport({ mode, explode, playing, light, showGrid, resetKey, onRead
             vDir = normalize(position);
             gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
           }`,
+        /*
+         * A light studio sweep — and this one is deliberately BRIGHTER than the
+         * source frame.
+         *
+         * Everything else in this editor is held to the Figma frame, so the
+         * deviation is worth naming. The frame paints this viewport as a radial
+         * ramp from #5D5D5D through #4A4A4A to #373737, and an earlier version of
+         * these stops hit that exactly: measured #5D5F63 at the horizon. The
+         * review's reference image is lighter than that again — a pale silver
+         * cyclorama around #A8 rather than a mid grey — and that is what was
+         * asked for, so that is what these stops target.
+         *
+         * Note for anyone re-tuning them: this is a raw `ShaderMaterial` writing
+         * `gl_FragColor` directly, so three's `tonemapping_fragment` and
+         * `colorspace_fragment` chunks are NOT injected. The numbers below are
+         * therefore not linear-light values that can be converted from a hex with
+         * a gamma formula — they are closer to encoded output, and the only
+         * reliable way to change them is to measure the result. Sample the
+         * composited canvas rather than reasoning about the colour space.
+         */
         fragmentShader: `
           uniform float uLift;
           varying vec3 vDir;
           void main() {
             vec3 d = normalize(vDir);
             float h = smoothstep(-0.42, 0.62, d.y);
-            vec3 low  = vec3(0.043, 0.049, 0.055);
-            vec3 mid  = vec3(0.128, 0.145, 0.156);
-            vec3 high = vec3(0.055, 0.063, 0.071);
+            vec3 low  = vec3(0.150, 0.157, 0.166);
+            vec3 mid  = vec3(0.430, 0.442, 0.455);
+            vec3 high = vec3(0.215, 0.226, 0.242);
             vec3 c = mix(low, mid, smoothstep(0.0, 0.55, h));
             c = mix(c, high, smoothstep(0.55, 1.0, h));
             /* A soft pool of light behind the subject, centred on -Z. */
             float pool = smoothstep(0.55, 1.0, dot(d, normalize(vec3(0.0, 0.12, -1.0))));
-            c += vec3(0.075, 0.088, 0.092) * pool * uLift;
+            c += vec3(0.085, 0.094, 0.100) * pool * uLift;
             gl_FragColor = vec4(c, 1.0);
           }`,
       }),
@@ -291,9 +311,23 @@ function CarViewport({ mode, explode, playing, light, showGrid, resetKey, onRead
     const world = new THREE.Group();
     scene.add(world);
     const floorY = -1.22;
+    /*
+     * The floor, not the backdrop, is what makes this viewport dark.
+     *
+     * Worth recording because it cost a measurement round: raising the backdrop
+     * sphere's stops lifted the sky and changed the lower half of the frame by
+     * literally zero — sampled #5d5f63 before and after — because everything
+     * below the horizon is this circle, and it was `0x0d1113`. Near-black paint
+     * under a bright key reads as mid grey, which is exactly the "nền tối" the
+     * reference is replacing.
+     *
+     * Lower roughness and a stronger `envMapIntensity` along with it: the
+     * reference floor carries a soft reflection of the car, and a matte floor
+     * cannot, however light its albedo.
+     */
     const floor = new THREE.Mesh(
       new THREE.CircleGeometry(16, 96),
-      new THREE.MeshStandardMaterial({ color: 0x0d1113, roughness: 0.62, metalness: 0.06, envMapIntensity: 0.42 }),
+      new THREE.MeshStandardMaterial({ color: 0x30363a, roughness: 0.44, metalness: 0.08, envMapIntensity: 0.72 }),
     );
     floor.rotation.x = -Math.PI / 2;
     floor.position.y = floorY;
@@ -327,11 +361,11 @@ function CarViewport({ mode, explode, playing, light, showGrid, resetKey, onRead
     const grid = new THREE.GridHelper(26, 34, 0x59a09c, 0x39464a);
     grid.position.y = floorY + 0.012;
     const gridMaterials = Array.isArray(grid.material) ? grid.material : [grid.material];
-    gridMaterials.forEach((material) => { material.transparent = true; material.opacity = 0.19; material.depthWrite = false; });
+    gridMaterials.forEach((material) => { material.transparent = true; material.opacity = 0.11; material.depthWrite = false; });
     world.add(grid);
     const ring = new THREE.Mesh(
       new THREE.RingGeometry(3.62, 3.66, 160),
-      new THREE.MeshBasicMaterial({ color: 0x69c6c0, transparent: true, opacity: 0.28, side: THREE.DoubleSide }),
+      new THREE.MeshBasicMaterial({ color: 0x69c6c0, transparent: true, opacity: 0.16, side: THREE.DoubleSide }),
     );
     ring.rotation.x = -Math.PI / 2;
     ring.position.y = floorY + 0.02;
@@ -576,6 +610,7 @@ export function StudioDemo() {
     setPlaying(false);
   };
 
+
   return (
     <div className="studio" data-mode={mode} data-timeline={timelineOpen ? 'open' : 'closed'}>
       {/* ------------------------------------------------------- main rail --- */}
@@ -664,7 +699,12 @@ export function StudioDemo() {
 
             <div className="studio-canvas-brand" aria-label="YooLab">
               <svg className="studio-canvas-tab" viewBox="0 0 193.182 34" aria-hidden="true" focusable="false">
-                <path d={CANVAS_TAB_PATH} fill="#fff" />
+                {/* Glass, not paper. A solid white tab on a light-grey sky was the
+                    one hard-edged white shape left in a card made of glass, which
+                    is what the review is pointing at. The fill and the hairline are
+                    the same value the chips inside the editor use. */}
+                <path d={CANVAS_TAB_PATH} fill="rgba(253, 250, 244, 1)" />
+                <path d={CANVAS_TAB_PATH} fill="none" stroke="rgba(255, 255, 255, 0.34)" strokeWidth="1" />
               </svg>
               <img alt="" src={`${FIGMA_ASSET_ROOT}/canvas-logo-bird.svg`} />
               <img alt="YooLab" src={`${FIGMA_ASSET_ROOT}/canvas-logo-word.svg`} />

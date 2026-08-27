@@ -11,7 +11,9 @@
  *
  *     node scripts/build-editor-icons.mjs
  *
- * Two normalisations happen on the way in, and only two:
+ * Four normalisations happen on the way in, and only four:
+ *
+ *   0. A node export's ancestry rects are stripped — see `stripAncestry`.
  *
  *   1. `preserveAspectRatio="none"` is dropped. Figma writes it on every export
  *      because it positions each layer absolutely; in an icon slot it stretches
@@ -20,8 +22,10 @@
  *      white on the dark canvas) become `currentColor`, so the active/hover state
  *      is a colour change rather than a filter chain. Multi-colour marks — the
  *      brand gradient, the two-tone folder, the close button — keep their fills.
+ *   3. Stroke widths are scaled by `STROKE_SCALE` — an optical correction for
+ *      rendering a 24 px icon at ~15 px, explained where the constant is defined.
  *
- * Everything else — path data, stroke widths, caps, joins, masks — is verbatim.
+ * Everything else — path data, caps, joins, masks — is verbatim.
  */
 
 import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
@@ -68,7 +72,7 @@ const ICONS = [
   { name: 'IconAi', file: 'top-ai.svg', box: 24 },
   { name: 'IconFullscreen', file: 'top-fullscreen.svg', box: 24 },
   { name: 'IconShare', file: 'top-share.svg', box: 24 },
-  { name: 'IconChevronDown', file: 'top-chevron.svg', box: 16, rotate: -90 },
+  { name: 'IconChevronDown', file: 'top-chevron.svg', box: 24, rotate: -90 },
 
   /* ---------------------------------------------------------------- canvas */
   { name: 'IconMenu', file: 'canvas-menu.svg', box: 20 },
@@ -90,7 +94,7 @@ const ICONS = [
   { name: 'IconCopy', file: 'tl-copy.svg' },
   { name: 'IconDuplicate', file: 'tl-duplicate.svg' },
   { name: 'IconMirror', file: 'tl-mirror.svg' },
-  { name: 'IconCollapse', file: 'tl-chevron.svg', box: 16, rotate: -90 },
+  { name: 'IconCollapse', file: 'tl-chevron.svg', box: 24, rotate: -90 },
   { name: 'IconGrip', file: 'tl-grip.svg', box: 24 },
 
   /* ------------------------------------------------------------- transport */
@@ -108,7 +112,12 @@ const ICONS = [
   { name: 'IconTrackEffects', file: 'tl-track-effect.svg' },
 
   /* ------------------------------------------------------------ detail rail */
-  { name: 'IconLabels', file: ['tag-body.svg', 'tag-strap.svg'], box: 24, offsets: [[5.25, 0.25], [-2, 6.5]] },
+  /* One composite, not two layers stacked by hand. The frame rotates the second
+     tag 34.59 degrees and the generator has no per-layer rotation, so the two
+     pieces landed unrotated on top of each other and the icon read as a garbled
+     double tag. This export has Figma's own transform already baked into the
+     path data. */
+  { name: 'IconLabels', file: 'detail-labels.svg' },
   { name: 'IconSpace', file: 'detail-space.svg' },
   { name: 'IconSteps', file: 'detail-steps.svg' },
   { name: 'IconText', file: 'detail-text.svg' },
@@ -161,6 +170,28 @@ function namespaceIds(body, prefix) {
   return out;
 }
 
+/*
+ * Strip the ancestry a node export drags in with it.
+ *
+ * `download_assets` renders a node with its whole parent chain, so a 24-unit icon
+ * arrives behind an opaque 24x24 `#0D0D0D` base plus every ancestor frame's white
+ * fill — the slide, the panel, the rail. Clipped to the viewBox they are
+ * invisible in isolation, which is exactly why this is easy to ship by accident:
+ * the icon simply renders as a black or white square with the glyph lost in it.
+ *
+ * Only painting rects are removed. Rects inside `<defs>` are left alone, because
+ * a `<clipPath>` is defined by one and deleting it would clip the icon to nothing.
+ */
+function stripAncestry(body) {
+  const cut = body.indexOf('<defs');
+  const head = cut < 0 ? body : body.slice(0, cut);
+  const tail = cut < 0 ? '' : body.slice(cut);
+  const cleaned = head
+    .replace(/<rect\b[^>]*\btransform="translate\([^)]*\)"[^>]*\/>\s*/g, '')
+    .replace(/<rect\b(?=[^>]*\bfill="#0D0D0D")[^>]*\/>\s*/gi, '');
+  return cleaned + tail;
+}
+
 function tintInk(body) {
   return body
     .split('\n')
@@ -179,6 +210,30 @@ function tintInk(body) {
     .join('\n');
 }
 
+/*
+ * Optical stroke correction — the one place a number is changed, and why.
+ *
+ * The frame draws its icons at 24 px with a 1.5 stroke: a ratio of 0.0625, and
+ * 1.5 device pixels is wide enough that the renderer gives it soft edges. This
+ * editor draws the same 24-unit icon at about 15 px, where that stroke becomes
+ * 0.94 px — under one device pixel, so the rasteriser snaps it up to a full
+ * crisp line. The ratio comes out ~7% heavier AND loses its antialiased edge, so
+ * a rail of sixty icons reads harder than the frame does at the same apparent
+ * size. Scaling each stroke by its own factor (rather than clamping every icon
+ * to one value) keeps the relative weights inside the set intact.
+ *
+ * Multi-colour marks are excluded with `tint: false`: their strokes carry brand
+ * geometry, not UI weight.
+ */
+const STROKE_SCALE = 0.84;
+
+function thinStrokes(body) {
+  return body.replace(/stroke-width="([\d.]+)"/g, (whole, value) => {
+    const next = Number((Number.parseFloat(value) * STROKE_SCALE).toFixed(3));
+    return `stroke-width="${next}"`;
+  });
+}
+
 /* SVG is XML, JSX is not: hyphenated presentation attributes need camelCase. */
 function toJsx(body) {
   return body.replace(/\s([a-z]+(?:-[a-z]+)+)="/g, (whole, attr) => {
@@ -195,8 +250,8 @@ function build(icon) {
   const prefix = icon.name.replace(/^Icon/, '').toLowerCase();
 
   const layers = parts.map((part, index) => {
-    let body = namespaceIds(part.body, files.length > 1 ? `${prefix}${index}` : prefix);
-    if (icon.tint !== false) body = tintInk(body);
+    let body = namespaceIds(stripAncestry(part.body), files.length > 1 ? `${prefix}${index}` : prefix);
+    if (icon.tint !== false) body = thinStrokes(tintInk(body));
     body = toJsx(body);
 
     const [ox, oy] = icon.offsets?.[index] ?? [(box - part.width) / 2, (box - part.height) / 2];
