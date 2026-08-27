@@ -1,0 +1,1691 @@
+/* ==========================================================================
+   YooStudio — the authoring section (#cong-cu)
+
+   ONE file, one layer.
+
+   What this replaces: five stacked blocks in `globals.css` ("Figma v2" through
+   "fidelity v5"), about 2,300 lines, each written to patch the one before it.
+   By the end they disagreed with each other and with the markup — `v2` was
+   still styling `.studio-body`, `.studio-tree` and `.studio-topbar`, none of
+   which the component had rendered for three rounds — and every new fix had to
+   out-specify four older ones. That is why the same visual notes kept coming
+   back. There is now exactly one place to change this section.
+
+   ------------------------------------------------------------------------
+   The scale system
+   ------------------------------------------------------------------------
+   The source frame (Figma 48976:106200) is 1920 x 1237, and inside it every
+   control has a real pixel size. On this page the editor is never 1920 wide, so
+   the whole frame is expressed as *Figma pixels multiplied by one unit*:
+
+       --u   one Figma pixel of geometry, in real pixels
+       --t   one Figma pixel of type, in real pixels
+
+   so `calc(15 * var(--u))` is literally "the 15 px control from the source" and
+   `calc(15 * var(--t))` is "the 15 px label". Both track the editor's own width
+   through `cqi`; they differ only in their floor, because a 34 px control can
+   become a 22 px control and still be a control, while 15 px type cannot become
+   7 px type and still be type. Below roughly a 1000 px-wide editor the two
+   diverge, and that is the whole reason the rails stay readable on a 1366.
+
+   The alternative — which the deleted layers tried three separate ways — was to
+   derive the editor's WIDTH from the viewport height to preserve the frame's
+   aspect ratio. That is what put a 622 px narrative column next to a 1122 px
+   editor on a 911 px-tall browser window: the section's proportions became a
+   function of how tall the visitor's window happened to be. Width is now width,
+   height is height, and only the workspace stretches.
+   ========================================================================== */
+
+/* ------------------------------------------------------------- the band --- */
+
+.tool-section {
+  position: relative;
+  z-index: 4;
+  display: flex;
+  overflow: clip;
+  min-height: 100svh;
+  flex-direction: column;
+  justify-content: center;
+  padding: calc(var(--header-h) + clamp(12px, 2vh, 26px)) 0 clamp(12px, 2vh, 26px);
+  color: var(--ink);
+  scroll-margin-top: 0;
+  background: var(--color-bg);
+}
+
+/*
+ * The ground the editor stands on.
+ *
+ * The section used to be a flat vertical ramp, and a white editor on an almost
+ * white page has no edge — the product read as part of the paper. Four layers
+ * fix that without turning the band dark: a deeper cream field, a wide pool of
+ * near-white light centred exactly where the editor sits, the two house accents
+ * blurred far enough to be atmosphere rather than shapes, and a corner vignette
+ * that closes the composition.
+ */
+.tool-section::before {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  background:
+    radial-gradient(112% 72% at 50% 47%, rgba(255, 255, 255, 1) 0%, rgba(255, 252, 246, 0.86) 28%, rgba(250, 242, 231, 0) 66%),
+    radial-gradient(44% 40% at 90% 6%, rgba(84, 199, 191, 0.2), transparent 66%),
+    radial-gradient(50% 44% at 4% 94%, rgba(238, 122, 101, 0.17), transparent 68%),
+    radial-gradient(132% 104% at 50% 50%, transparent 40%, rgba(116, 92, 68, 0.13) 100%),
+    linear-gradient(178deg, #fbf6ef 0%, #f4ede2 54%, #f9f4ec 100%);
+  content: '';
+  pointer-events: none;
+}
+
+/*
+ * No texture on the paper.
+ *
+ * A hairline drafting grid was tried here and removed. The argument for it was
+ * that this stop is the one where YooLab is a *tool*, so a measured surface says
+ * so — but the editor card already contains a real measuring surface: the
+ * timeline's ruler ticks and the vertical gridlines in its four lanes. Painting
+ * a decorative version of the same motif on the paper directly behind it puts a
+ * fake ruler beside a real one, and the real one is what loses. The card is
+ * lifted by the pool of light, the vignette and its own five-layer shadow; that
+ * is the whole of "làm nổi bật phần workspace", and it does not need help from
+ * a pattern. See DESIGN.md 4: section grounds are steps of value, not textures.
+ */
+
+/* ------------------------------------------------------------ the stage --- */
+
+/*
+ * Heading across the top; workspace and narrative side by side under it.
+ *
+ * The narrative column is a bounded width, not a fraction — it holds four short
+ * paragraphs and a link, and past about 344 px it is just a wider paragraph. The
+ * workspace takes literally everything else, at every viewport, which is the
+ * whole of "chỉ kéo dãn phần workspace thôi".
+ */
+.tool-stage {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: var(--shell);
+  height: calc(100svh - var(--header-h) - clamp(24px, 4vh, 52px));
+  min-height: 0;
+  max-height: 1080px;
+  margin-inline: auto;
+  grid-template-areas:
+    'heading heading'
+    'workspace story';
+  grid-template-columns: minmax(0, 1fr) clamp(250px, 18.6vw, 344px);
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: clamp(10px, 1.05vw, 20px);
+}
+
+.tool-stage > .shell { width: auto; min-width: 0; margin-inline: 0; }
+.tool-stage > .shell:first-child { grid-area: heading; }
+
+.tool-heading {
+  display: grid;
+  align-items: end;
+  gap: clamp(12px, 1.4vw, 30px);
+  grid-template-columns: minmax(0, 1fr) clamp(250px, 26vw, 470px);
+}
+
+.tool-heading > div:first-child { min-width: 0; }
+.tool-heading .section-kicker { margin-bottom: clamp(2px, 0.5vh, 7px); font-size: clamp(8px, 0.52vw, 10px); letter-spacing: 0.12em; }
+
+.tool-heading h2 {
+  margin: 0;
+  font-size: clamp(30px, min(3.1vw, 5.4vh), 54px);
+  font-weight: 700;
+  letter-spacing: -0.048em;
+  line-height: 0.96;
+  white-space: nowrap;
+}
+
+.tool-heading-copy { display: block; padding-bottom: clamp(2px, 0.6vh, 8px); }
+.tool-heading-copy > p { max-width: 46ch; margin: 0; color: var(--ink-2); font-size: clamp(11px, 0.72vw, 13.5px); line-height: 1.5; }
+
+.tool-heading-copy a {
+  display: inline-flex;
+  align-items: center;
+  gap: clamp(8px, 0.7vw, 14px);
+  margin-top: clamp(5px, 0.9vh, 11px);
+  color: var(--brand-deep);
+  font-size: clamp(10px, 0.66vw, 12.5px);
+  font-weight: 650;
+  transition: gap 0.24s var(--ease-reveal);
+}
+
+.tool-heading-copy a:hover { gap: clamp(12px, 1.1vw, 20px); }
+.tool-heading-copy a span { color: var(--brand-accent); }
+
+.tool-workspace { grid-area: workspace; display: flex; min-width: 0; min-height: 0; }
+.tool-feature-shell { grid-area: story; min-width: 0; min-height: 0; }
+
+/* ======================================================== the editor card === */
+
+.studio {
+  --u: clamp(0.60px, 0.0522cqi, 0.95px);
+  --t: clamp(0.72px, 0.0522cqi, 0.95px);
+
+  /* The timeline band, as a share of the editor: the source frame gives it 337
+     of 1237. The outer `max()` is a floor so the four track rows stay usable;
+     the inner `min()` is what makes a short window spend its pixels on the
+     canvas rather than on the timeline. */
+  --tl-row: max(calc(228 * var(--u)), min(calc(352 * var(--u)), 34%));
+
+  --ed-teal: #10585a;
+  --ed-teal-bright: #12b3ac;
+  --ed-teal-soft: #7ddcd5;
+  --ed-ink: #1d2322;
+  --ed-ink-2: #48605f;
+  --ed-line: #e3e8e7;
+  --ed-line-soft: #eff2f2;
+  --ed-fill: #f2f4f4;
+  --ed-canvas: #232628;
+
+  container-type: inline-size;
+  position: relative;
+  display: grid;
+  overflow: hidden;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  grid-template-columns:
+    clamp(70px, 5.42%, 116px)
+    minmax(0, 1fr)
+    clamp(64px, 5%, 104px)
+    clamp(196px, 16.7%, 348px);
+  grid-template-rows: minmax(0, 1fr);
+  border-radius: clamp(14px, 1.15vw, 22px);
+  color: var(--ed-ink);
+  background: #fff;
+  font-family: var(--font-sans);
+  /*
+   * Five layers, each doing a different job: a hairline that keeps the white
+   * card off the white page, a tight contact shadow that sets it down, a mid
+   * shadow that gives it thickness, a wide ambient one that gives it a room,
+   * and a cool spill that ties it to the teal in the band. This is the
+   * "làm nổi bật phần workspace" in one rule.
+   */
+  box-shadow:
+    0 0 0 1px rgba(23, 78, 79, 0.1),
+    0 1px 2px rgba(35, 51, 50, 0.06),
+    0 10px 22px -8px rgba(35, 51, 50, 0.14),
+    0 34px 70px -26px rgba(28, 62, 61, 0.28),
+    0 60px 120px -60px rgba(16, 88, 90, 0.4);
+}
+
+.studio[data-timeline='closed'] { --tl-row: auto; }
+
+/* A soft rim of light along the top edge, as on a real device bezel. */
+.studio::after {
+  position: absolute;
+  z-index: 40;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), inset 0 0 0 1px rgba(255, 255, 255, 0.34);
+  content: '';
+  pointer-events: none;
+}
+
+/*
+ * `:where()` on purpose.
+ *
+ * `.studio button {...}` is (0,1,1) and beat every (0,1,0) class that came
+ * after it: the brand tile, the four topbar chips, "Tạo Step", the colour well
+ * and the primary button all rendered with `background: transparent` and read as
+ * empty white boxes. `:where()` contributes nothing to specificity, so this
+ * stays a reset instead of becoming a rule that has to be fought.
+ */
+.studio :where(button) { border: 0; color: inherit; background: transparent; cursor: pointer; font: inherit; }
+.studio :where(img) { display: block; max-width: 100%; }
+.studio :where(svg) { display: block; width: 1em; height: 1em; flex: none; }
+.studio :focus-visible { outline: 2px solid var(--ed-teal-bright); outline-offset: 2px; border-radius: 6px; }
+
+/* --------------------------------------------------------- shared rails --- */
+
+.studio-main-rail,
+.studio-detail-rail {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  align-items: stretch;
+  overflow: hidden auto;
+  background: #fff;
+  scrollbar-width: none;
+}
+
+.studio-main-rail::-webkit-scrollbar,
+.studio-detail-rail::-webkit-scrollbar { display: none; }
+
+.studio-main-rail {
+  grid-column: 1;
+  padding: calc(14 * var(--u)) calc(6 * var(--u));
+  border-right: 1px solid var(--ed-line);
+  gap: calc(2 * var(--u));
+}
+
+.studio-detail-rail {
+  grid-column: 3;
+  justify-content: flex-start;
+  overflow: visible auto;
+  padding: calc(16 * var(--u)) calc(4 * var(--u));
+  border-right: 1px solid var(--ed-line);
+  border-left: 1px solid var(--ed-line);
+  gap: calc(4 * var(--u));
+}
+
+/*
+ * The collapse handle that sits on the panel boundary in the source frame.
+ *
+ * It lives on the canvas rather than on the content rail because the rail is a
+ * scroll container, and a scroll container cannot let a child overhang its own
+ * edge — `overflow: visible auto` computes to `auto auto`, and the handle was
+ * simply clipped away.
+ */
+.studio-rail-handle {
+  position: absolute;
+  z-index: 6;
+  top: 38%;
+  right: calc(-1 * var(--u));
+  display: grid;
+  width: calc(14 * var(--u));
+  height: calc(44 * var(--u));
+  place-items: center;
+  border-radius: calc(11 * var(--u)) 0 0 calc(11 * var(--u));
+  background: #fff;
+  box-shadow: -1px 0 3px rgba(0, 0, 0, 0.16);
+}
+
+.studio-rail-handle::before {
+  width: calc(5 * var(--u));
+  margin-right: calc(2 * var(--u));
+  height: calc(5 * var(--u));
+  border-top: 1.4px solid var(--ed-teal);
+  border-right: 1.4px solid var(--ed-teal);
+  content: '';
+  transform: rotate(45deg) translate(-1px, 1px);
+}
+
+/* -------------------------------------------------------------- brand --- */
+
+.studio-brand {
+  display: grid;
+  width: calc(58 * var(--u));
+  height: calc(58 * var(--u));
+  flex: none;
+  align-content: center;
+  justify-items: center;
+  margin: 0 auto calc(16 * var(--u));
+  padding: 0;
+  border-radius: calc(17 * var(--u));
+  background: linear-gradient(158deg, #17696a 0%, #0d4a4d 100%);
+  box-shadow: 0 calc(5 * var(--u)) calc(14 * var(--u)) rgba(13, 74, 77, 0.28);
+  gap: calc(2 * var(--u));
+  transition: transform 0.24s var(--ease-reveal), box-shadow 0.24s var(--ease-reveal);
+}
+
+.studio-brand:hover { box-shadow: 0 calc(8 * var(--u)) calc(18 * var(--u)) rgba(13, 74, 77, 0.34); transform: translateY(-1px); }
+
+.studio-brand img {
+  width: calc(26 * var(--u));
+  height: auto;
+  filter: brightness(0) invert(1);
+}
+
+.studio-brand span {
+  color: #fff;
+  font-size: calc(11.5 * var(--t));
+  font-weight: 720;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+/* ---------------------------------------------------------- rail items --- */
+
+.studio-main-tools { display: flex; min-height: 0; flex: 1; flex-direction: column; gap: calc(2 * var(--u)); }
+
+.studio-rail-item {
+  position: relative;
+  display: flex;
+  min-height: 0;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: calc(7 * var(--u)) calc(2 * var(--u)) calc(8 * var(--u));
+  border-radius: calc(12 * var(--u));
+  color: var(--ed-ink-2);
+  gap: calc(5 * var(--u));
+  text-align: center;
+  transition: color 0.18s ease, background-color 0.18s ease;
+}
+
+.studio-rail-item:hover { color: var(--ed-teal); background: #f3f9f8; }
+
+.studio-rail-glyph {
+  display: grid;
+  width: calc(38 * var(--u));
+  height: calc(38 * var(--u));
+  flex: none;
+  place-items: center;
+  border-radius: calc(12 * var(--u));
+  font-size: calc(24 * var(--t));
+  transition: color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.studio-rail-item.is-active { color: var(--ed-teal); }
+.studio-rail-item.is-active .studio-rail-label { font-weight: 700; }
+
+.studio-rail-item.is-active .studio-rail-glyph {
+  color: #fff;
+  background: linear-gradient(158deg, #17696a 0%, #0d4a4d 100%);
+  box-shadow: 0 calc(4 * var(--u)) calc(11 * var(--u)) rgba(13, 74, 77, 0.26);
+}
+
+.studio-rail-label {
+  display: block;
+  max-width: 100%;
+  font-size: calc(14.5 * var(--t));
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  line-height: 1.18;
+  white-space: pre-line;
+}
+
+/* "Tạo mới Dự án" is the one primary action on the rail and reads as a button. */
+.studio-rail-item--create .studio-rail-glyph {
+  width: calc(42 * var(--u));
+  height: calc(42 * var(--u));
+  border-radius: 50%;
+  color: #fff;
+  background: linear-gradient(150deg, #8fe4dd 0%, #2ec3ba 100%);
+  box-shadow: 0 calc(4 * var(--u)) calc(12 * var(--u)) rgba(46, 195, 186, 0.34);
+  font-size: calc(26 * var(--t));
+}
+
+.studio-rail-item--create.is-active .studio-rail-glyph { background: linear-gradient(150deg, #8fe4dd 0%, #2ec3ba 100%); }
+.studio-rail-item--create:hover .studio-rail-glyph { transform: scale(1.05); }
+
+/* ---------------------------------------------------------- rail footer --- */
+
+.studio-main-footer {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  padding-top: calc(10 * var(--u));
+  gap: calc(12 * var(--u));
+}
+
+.studio-rail-mini {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  color: var(--ed-ink-2);
+  font-size: calc(21 * var(--t));
+  gap: calc(2 * var(--u));
+  transition: color 0.18s ease;
+}
+
+.studio-rail-mini:hover { color: var(--ed-teal); }
+.studio-rail-mini small { font-size: calc(13 * var(--t)); font-weight: 600; }
+
+.studio-rail-mini i {
+  position: absolute;
+  top: calc(-5 * var(--u));
+  left: 55%;
+  display: grid;
+  min-width: calc(17 * var(--u));
+  height: calc(17 * var(--u));
+  place-items: center;
+  padding-inline: calc(4 * var(--u));
+  border-radius: 999px;
+  color: #fff;
+  background: var(--ed-teal-bright);
+  font-size: calc(9.5 * var(--t));
+  font-style: normal;
+  font-weight: 700;
+}
+
+.studio-avatar {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  width: calc(40 * var(--u));
+  height: calc(40 * var(--u));
+  flex: none;
+  border-radius: 50%;
+  box-shadow: 0 0 0 calc(2.5 * var(--u)) #eef3f2;
+}
+
+.studio-avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+/* ===================================================== workspace column === */
+
+.studio-workspace {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-column: 2;
+  grid-template-rows: auto minmax(calc(120 * var(--u)), 1fr) var(--tl-row);
+  background: #fff;
+}
+
+/* ------------------------------------------------------------- topbar --- */
+
+.studio-topbar {
+  display: flex;
+  height: calc(64 * var(--u));
+  align-items: center;
+  padding-inline: calc(14 * var(--u));
+  gap: calc(12 * var(--u));
+}
+
+.studio-doc-title {
+  display: inline-flex;
+  height: calc(38 * var(--u));
+  min-width: 0;
+  max-width: calc(280 * var(--u));
+  align-items: center;
+  padding: 0 calc(10 * var(--u)) 0 calc(14 * var(--u));
+  border-radius: calc(10 * var(--u));
+  background: var(--ed-fill);
+  gap: calc(8 * var(--u));
+}
+
+.studio-doc-title b {
+  overflow: hidden;
+  color: #383d3d;
+  font-size: calc(14.5 * var(--t));
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.studio-doc-title button { display: grid; place-items: center; color: #5b6767; font-size: calc(18 * var(--t)); }
+.studio-doc-title button:hover { color: var(--ed-teal); }
+
+.studio-sync {
+  display: grid;
+  width: calc(38 * var(--u));
+  height: calc(38 * var(--u));
+  flex: none;
+  place-items: center;
+  border: 1px solid #cfeae8;
+  border-radius: calc(10 * var(--u));
+  background: #fff;
+}
+
+.studio-sync img { width: calc(20 * var(--u)); height: calc(20 * var(--u)); animation: studio-sync-spin 2.4s linear infinite; }
+
+@keyframes studio-sync-spin { to { transform: rotate(360deg); } }
+
+.studio-topbar-actions { display: flex; align-items: center; margin-left: auto; gap: calc(9 * var(--u)); }
+.studio-topbar-divider { width: 1px; height: calc(24 * var(--u)); background: var(--ed-line); }
+
+.studio-chip {
+  display: inline-flex;
+  height: calc(38 * var(--u));
+  min-width: calc(38 * var(--u));
+  align-items: center;
+  justify-content: center;
+  padding-inline: calc(8 * var(--u));
+  border-radius: calc(10 * var(--u));
+  color: #fff;
+  font-size: calc(20 * var(--t));
+  gap: calc(4 * var(--u));
+  transition: transform 0.2s var(--ease-reveal), filter 0.2s ease;
+}
+
+.studio-chip:hover { filter: saturate(1.08); transform: translateY(-1px); }
+.studio-chip--violet { background: linear-gradient(150deg, #c08bfb 0%, #9c55f2 100%); box-shadow: 0 calc(4 * var(--u)) calc(10 * var(--u)) rgba(156, 85, 242, 0.28); }
+.studio-chip--peach { background: linear-gradient(100deg, #ffd6b4 0%, #ffa98d 100%); box-shadow: 0 calc(4 * var(--u)) calc(10 * var(--u)) rgba(255, 169, 141, 0.34); }
+.studio-chip--sky { background: linear-gradient(150deg, #9fd0ff 0%, #5aa6f5 100%); box-shadow: 0 calc(4 * var(--u)) calc(10 * var(--u)) rgba(90, 166, 245, 0.3); }
+.studio-chip--teal { background: linear-gradient(150deg, #7fdcd5 0%, #17b0a8 100%); box-shadow: 0 calc(4 * var(--u)) calc(10 * var(--u)) rgba(23, 176, 168, 0.32); }
+.studio-chip--wide { padding-inline: calc(11 * var(--u)); }
+.studio-chip-caret { font-size: calc(15 * var(--t)); opacity: 0.9; }
+
+/* ------------------------------------------------------------- canvas --- */
+
+.studio-viewport { position: relative; min-width: 0; min-height: 0; padding: 0 calc(14 * var(--u)); }
+
+.studio-canvas {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
+  isolation: isolate;
+  border-radius: calc(16 * var(--u));
+  background: var(--ed-canvas);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.studio-car-viewport,
+.studio-car-viewport canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.studio-car-viewport canvas { display: block; }
+
+.studio-canvas-menu {
+  position: absolute;
+  z-index: 3;
+  top: calc(13 * var(--u));
+  left: calc(13 * var(--u));
+  display: inline-flex;
+  height: calc(34 * var(--u));
+  align-items: center;
+  padding-inline: calc(14 * var(--u));
+  border-radius: 999px;
+  color: #fff;
+  background: rgba(24, 27, 28, 0.72);
+  backdrop-filter: blur(10px);
+  font-size: calc(15 * var(--t));
+  gap: calc(9 * var(--u));
+  transition: background 0.2s ease;
+}
+
+.studio-canvas-menu:hover { background: rgba(24, 27, 28, 0.9); }
+.studio-canvas-menu svg { font-size: calc(18 * var(--t)); }
+
+/*
+ * The brand tab.
+ *
+ * In the source it is not a floating pill: it is cut OUT of the canvas's top
+ * edge, so the dark surface curves up into a white tab. The two pseudo-elements
+ * are those fillets, and a radial-gradient is the exact shape — a white square
+ * with a quarter-disc of transparency bitten out of the corner nearest the tab.
+ * Getting this wrong is what made the old version read as a label stuck on top
+ * of the viewport.
+ */
+.studio-canvas-brand {
+  position: absolute;
+  z-index: 4;
+  top: 0;
+  left: 50%;
+  display: flex;
+  height: calc(34 * var(--u));
+  align-items: center;
+  padding-inline: calc(20 * var(--u));
+  border-radius: 0 0 calc(16 * var(--u)) calc(16 * var(--u));
+  background: #fff;
+  gap: calc(7 * var(--u));
+  transform: translateX(-50%);
+}
+
+.studio-canvas-brand img:first-child { width: calc(19 * var(--u)); height: auto; }
+.studio-canvas-brand img:last-child { width: calc(58 * var(--u)); height: auto; }
+
+.studio-canvas-brand::before,
+.studio-canvas-brand::after {
+  position: absolute;
+  top: 0;
+  width: calc(15 * var(--u));
+  height: calc(15 * var(--u));
+  content: '';
+}
+
+.studio-canvas-brand::before {
+  right: 100%;
+  background: radial-gradient(circle at 0 100%, transparent calc(15 * var(--u) - 0.5px), #fff calc(15 * var(--u)));
+}
+
+.studio-canvas-brand::after {
+  left: 100%;
+  background: radial-gradient(circle at 100% 100%, transparent calc(15 * var(--u) - 0.5px), #fff calc(15 * var(--u)));
+}
+
+.studio-canvas-tools {
+  position: absolute;
+  z-index: 3;
+  top: calc(15 * var(--u));
+  right: calc(14 * var(--u));
+  display: flex;
+  align-items: center;
+  gap: calc(11 * var(--u));
+}
+
+.studio-canvas-tools button {
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: calc(21 * var(--t));
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.45));
+  transition: color 0.18s ease, transform 0.18s ease;
+}
+
+.studio-canvas-tools button:hover { color: var(--ed-teal-soft); transform: translateY(-1px); }
+.studio-canvas-tools button[aria-pressed='true'] { color: var(--ed-teal-soft); }
+
+.studio-canvas-close {
+  width: calc(26 * var(--u));
+  height: calc(26 * var(--u));
+  border-radius: 50%;
+  color: #2c3131 !important;
+  background: rgba(255, 255, 255, 0.92);
+  font-size: calc(16 * var(--t)) !important;
+}
+
+.studio-canvas-close:hover { background: #fff; }
+
+.studio-canvas-side {
+  position: absolute;
+  z-index: 3;
+  top: calc(58 * var(--u));
+  right: calc(14 * var(--u));
+  display: grid;
+  gap: calc(8 * var(--u));
+}
+
+.studio-canvas-side button {
+  display: grid;
+  width: calc(46 * var(--u));
+  height: calc(42 * var(--u));
+  place-items: center;
+  padding-top: calc(3 * var(--u));
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: calc(9 * var(--u));
+  color: #fff;
+  background: rgba(24, 27, 28, 0.68);
+  backdrop-filter: blur(8px);
+  font-size: calc(16 * var(--t));
+  gap: calc(1 * var(--u));
+  transition: background 0.2s ease;
+}
+
+.studio-canvas-side button:hover { background: rgba(24, 27, 28, 0.9); }
+.studio-canvas-side span { font-size: calc(9 * var(--t)); font-weight: 600; letter-spacing: 0.01em; text-transform: uppercase; white-space: nowrap; }
+
+.studio-loader {
+  position: absolute;
+  z-index: 5;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: calc(13 * var(--t));
+  gap: calc(9 * var(--u));
+  transform: translate(-50%, -50%);
+}
+
+.studio-loader i {
+  display: block;
+  width: calc(15 * var(--u));
+  height: calc(15 * var(--u));
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  border-top-color: var(--ed-teal-soft);
+  border-radius: 50%;
+  animation: studio-sync-spin 0.9s linear infinite;
+}
+
+.studio-loader--error { color: #ffb4a6; }
+
+/* ------------------------------------------------------- playback bar --- */
+
+.studio-playbar {
+  position: absolute;
+  z-index: 3;
+  bottom: calc(16 * var(--u));
+  left: 50%;
+  display: flex;
+  width: min(calc(730 * var(--u)), 86%);
+  height: calc(44 * var(--u));
+  align-items: center;
+  padding-inline: calc(12 * var(--u)) calc(18 * var(--u));
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: calc(14 * var(--u));
+  background: rgba(20, 23, 24, 0.72);
+  backdrop-filter: blur(14px);
+  gap: calc(12 * var(--u));
+  transform: translateX(-50%);
+}
+
+.studio-playbar-play {
+  display: grid;
+  width: calc(28 * var(--u));
+  height: calc(28 * var(--u));
+  flex: none;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.14);
+  font-size: calc(13 * var(--t));
+  transition: background 0.18s ease;
+}
+
+.studio-playbar-play:hover { background: rgba(255, 255, 255, 0.26); }
+
+.studio-playbar b {
+  flex: none;
+  color: #fff;
+  font-size: calc(13 * var(--t));
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.studio-playbar small { color: rgba(255, 255, 255, 0.55); font-size: calc(12 * var(--t)); font-weight: 500; }
+
+.studio-playbar-scrub {
+  position: relative;
+  height: calc(5 * var(--u));
+  min-height: 4px;
+  flex: 1;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  cursor: pointer;
+  touch-action: none;
+}
+
+.studio-playbar-scrub > span { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 999px; background: var(--ed-teal-bright); }
+
+.studio-playbar-scrub > i {
+  position: absolute;
+  top: 50%;
+  width: calc(12 * var(--u));
+  height: calc(12 * var(--u));
+  min-width: 9px;
+  min-height: 9px;
+  border-radius: 50%;
+  background: var(--ed-teal-bright);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  transform: translate(-50%, -50%);
+}
+
+/* ----------------------------------------------------- timeline toggle --- */
+
+.studio-timeline-chip {
+  position: absolute;
+  z-index: 3;
+  right: calc(14 * var(--u));
+  bottom: calc(14 * var(--u));
+  display: inline-flex;
+  height: calc(28 * var(--u));
+  align-items: center;
+  padding-inline: calc(8 * var(--u)) calc(6 * var(--u));
+  border-radius: calc(7 * var(--u));
+  color: #2e3434;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.24);
+  font-size: calc(12 * var(--t));
+  font-weight: 550;
+  gap: calc(6 * var(--u));
+  transition: background 0.18s ease;
+}
+
+.studio-timeline-chip:hover { background: #fff; }
+.studio-timeline-chip svg:first-child { color: #97a3a3; font-size: calc(14 * var(--t)); }
+.studio-timeline-chip-caret { font-size: calc(15 * var(--t)); transition: transform 0.26s var(--ease-reveal); }
+.studio[data-timeline='closed'] .studio-timeline-chip-caret { transform: rotate(180deg); }
+
+/* ============================================================= timeline === */
+
+.studio-timeline {
+  display: grid;
+  min-height: 0;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  padding: calc(10 * var(--u)) 0 calc(9 * var(--u));
+}
+
+.studio[data-timeline='closed'] .studio-timeline { grid-template-rows: auto auto; }
+
+.studio-spaces {
+  display: flex;
+  align-items: center;
+  padding-inline: calc(14 * var(--u));
+  gap: calc(8 * var(--u));
+}
+
+.studio-spaces > button {
+  height: calc(34 * var(--u));
+  padding-inline: calc(15 * var(--u));
+  border: 1px solid transparent;
+  border-radius: calc(8 * var(--u));
+  color: #5d6b6b;
+  background: var(--ed-fill);
+  font-size: calc(13.5 * var(--t));
+  font-weight: 550;
+  white-space: nowrap;
+  transition: color 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+}
+
+.studio-spaces > button:hover { color: var(--ed-teal); }
+.studio-spaces > button.is-active { border-color: var(--ed-teal-bright); color: var(--ed-teal-bright); background: #fff; font-weight: 680; }
+
+.studio-space-add {
+  display: grid;
+  width: calc(34 * var(--u));
+  height: calc(34 * var(--u));
+  flex: none;
+  place-items: center;
+  padding: 0;
+  color: #4b5757;
+  font-size: calc(17 * var(--t));
+}
+
+.studio-stepbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: calc(9 * var(--u)) calc(14 * var(--u));
+  gap: calc(10 * var(--u));
+}
+
+.studio-step-create {
+  height: calc(30 * var(--u));
+  padding-inline: calc(14 * var(--u));
+  border-radius: calc(7 * var(--u));
+  color: #fff;
+  background: linear-gradient(150deg, #2fc6bd 0%, #0fa79f 100%);
+  box-shadow: 0 calc(3 * var(--u)) calc(9 * var(--u)) rgba(15, 167, 159, 0.3);
+  font-size: calc(12.5 * var(--t));
+  font-weight: 680;
+  transition: transform 0.2s var(--ease-reveal);
+}
+
+.studio-step-create:hover { transform: translateY(-1px); }
+
+.studio-step-customize {
+  display: inline-flex;
+  height: calc(30 * var(--u));
+  align-items: center;
+  padding-inline: calc(11 * var(--u));
+  border: 1px solid var(--ed-line);
+  border-radius: calc(7 * var(--u));
+  color: #4d5a5a;
+  font-size: calc(12 * var(--t));
+  font-weight: 550;
+  gap: calc(6 * var(--u));
+}
+
+.studio-step-customize svg { font-size: calc(15 * var(--t)); }
+.studio-step-customize:hover { border-color: var(--ed-teal-soft); color: var(--ed-teal); }
+
+/*
+ * The collapsible half. `hidden` does the hiding; this keeps the grid honest.
+ *
+ * `grid-template-rows: minmax(0, 1fr)` is load-bearing, not decoration. Without
+ * it the panel has one IMPLICIT `auto` row, and an auto row never shrinks below
+ * its content — so on a 1024 x 768, where the band is 162 px and the tracks want
+ * 194, the row grew and the last two tracks were laid out past the bottom of the
+ * card. An explicit `minmax(0, 1fr)` row is allowed to be smaller than its
+ * contents, which is what lets the four tracks share whatever height is left.
+ */
+.studio-timeline-panel {
+  display: grid;
+  min-height: 0;
+  margin-top: calc(6 * var(--u));
+  border-top: 1px solid var(--ed-line);
+  grid-template-columns: calc(42 * var(--u)) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.studio-timeline-panel[hidden] { display: none; }
+
+.studio-timeline-tools {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  padding: calc(4 * var(--u)) 0;
+  border-right: 1px solid var(--ed-line);
+  gap: calc(2 * var(--u));
+}
+
+.studio-timeline-tools button {
+  display: grid;
+  min-height: 0;
+  flex: 1;
+  place-items: center;
+  border-radius: calc(7 * var(--u));
+  color: #47605f;
+  font-size: clamp(13px, calc(21 * var(--t)), 20px);
+  transition: color 0.16s ease, background 0.16s ease;
+}
+
+.studio-timeline-tools button:hover { color: var(--ed-teal); background: #f2f8f7; }
+.studio-timeline-collapse { color: var(--ed-teal) !important; }
+
+.studio-timeline-body { display: grid; min-width: 0; min-height: 0; overflow: hidden; grid-template-rows: auto minmax(0, 1fr); }
+
+/* ---------------------------------------------------------- command bar --- */
+
+.studio-commandbar {
+  display: grid;
+  height: calc(46 * var(--u));
+  align-items: center;
+  padding-inline: calc(12 * var(--u));
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  gap: calc(10 * var(--u));
+}
+
+.studio-command-pill,
+.studio-step-select {
+  display: inline-flex;
+  height: calc(30 * var(--u));
+  align-items: center;
+  padding-inline: calc(11 * var(--u));
+  border: 1px solid var(--ed-line);
+  border-radius: calc(7 * var(--u));
+  color: #3e4a4a;
+  background: #fff;
+  font-size: calc(12 * var(--t));
+  font-weight: 500;
+  gap: calc(6 * var(--u));
+  white-space: nowrap;
+}
+
+.studio-command-pill:hover,
+.studio-step-select:hover { border-color: var(--ed-teal-soft); }
+.studio-step-select { max-width: calc(210 * var(--u)); justify-self: end; }
+.studio-step-select span { overflow: hidden; text-overflow: ellipsis; }
+.studio-step-select svg { color: #7d8a8a; font-size: calc(15 * var(--t)); }
+
+.studio-range-readout {
+  display: inline-flex;
+  height: calc(30 * var(--u));
+  align-items: center;
+  padding-inline: calc(10 * var(--u));
+  border: 1px solid var(--ed-line);
+  border-radius: calc(7 * var(--u));
+  color: #62706f;
+  font-size: calc(12 * var(--t));
+  gap: calc(6 * var(--u));
+  white-space: nowrap;
+}
+
+.studio-range-readout svg { font-size: calc(15 * var(--t)); }
+.studio-range-readout b { color: #232929; font-variant-numeric: tabular-nums; font-weight: 620; }
+
+.studio-transport { display: flex; align-items: center; justify-content: center; gap: calc(8 * var(--u)); }
+.studio-transport-gap { width: calc(10 * var(--u)); }
+
+.studio-transport button {
+  display: grid;
+  width: calc(24 * var(--u));
+  height: calc(24 * var(--u));
+  place-items: center;
+  border-radius: calc(6 * var(--u));
+  color: #22292a;
+  font-size: calc(15 * var(--t));
+  transition: color 0.16s ease, background 0.16s ease;
+}
+
+.studio-transport button:hover { color: var(--ed-teal-bright); background: #f1f7f6; }
+
+/* --------------------------------------------------------- track grid --- */
+
+.studio-timeline-grid {
+  display: grid;
+  min-height: 0;
+  border-top: 1px solid var(--ed-line);
+  grid-template-rows: calc(24 * var(--u)) repeat(4, minmax(0, 1fr));
+}
+
+.studio-timeline-ruler,
+.studio-track {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: clamp(96px, calc(172 * var(--u)), 214px) minmax(0, 1fr);
+}
+
+.studio-timeline-ruler { background: #fafbfb; }
+
+.studio-ruler-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-inline: calc(11 * var(--u)) calc(7 * var(--u));
+  border-right: 1px solid var(--ed-line);
+  color: #303838;
+  font-size: calc(12.5 * var(--t));
+  font-weight: 620;
+}
+
+.studio-ruler-head svg { color: #4a5555; font-size: calc(15 * var(--t)); }
+
+.studio-ruler-scale {
+  position: relative;
+  display: grid;
+  align-items: end;
+  padding-inline: calc(6 * var(--u));
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+}
+
+.studio-ruler-scale i {
+  position: relative;
+  display: block;
+  height: 100%;
+  border-left: 1px solid rgba(24, 52, 52, 0.16);
+  font-style: normal;
+}
+
+.studio-ruler-scale em {
+  position: absolute;
+  top: calc(3 * var(--u));
+  left: calc(3 * var(--u));
+  color: #6a7676;
+  font-size: calc(10.5 * var(--t));
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.studio-track { border-top: 1px solid var(--ed-line-soft); }
+
+.studio-track-name {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  padding-inline: calc(11 * var(--u)) calc(7 * var(--u));
+  border-right: 1px solid var(--ed-line);
+  color: #2b3232;
+  font-size: calc(13 * var(--t));
+  font-weight: 520;
+  gap: calc(7 * var(--u));
+  text-align: left;
+  transition: background 0.16s ease;
+}
+
+.studio-track-name:hover { background: #f6f9f9; }
+.studio-track-name > svg:first-child { color: #33403f; font-size: calc(19 * var(--t)); }
+.studio-track-name span { overflow: hidden; flex: 1; text-overflow: ellipsis; white-space: nowrap; }
+.studio-track-caret { color: #8b9797; font-size: calc(15 * var(--t)); }
+.studio-track.is-active .studio-track-name { color: var(--ed-teal); font-weight: 660; }
+.studio-track.is-active .studio-track-name > svg:first-child { color: var(--ed-teal-bright); }
+
+.studio-track-lane {
+  position: relative;
+  min-width: 0;
+  background-image: linear-gradient(90deg, rgba(24, 52, 52, 0.07) 1px, transparent 1px);
+  background-position-x: calc(6 * var(--u));
+  background-size: calc((100% - 12 * var(--u)) / 16) 100%;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.studio-clip {
+  position: absolute;
+  top: 12%;
+  bottom: 12%;
+  display: flex;
+  overflow: hidden;
+  align-items: center;
+  padding-inline: calc(16 * var(--u));
+  border-radius: calc(8 * var(--u));
+  color: #fff;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.16), 0 1px 3px rgba(0, 0, 0, 0.12);
+  gap: calc(9 * var(--u));
+}
+
+.studio-clip b { font-size: calc(12.5 * var(--t)); font-weight: 700; }
+.studio-clip small { font-size: calc(12 * var(--t)); font-weight: 450; opacity: 0.94; }
+.studio-clip img { height: 62%; min-width: 0; flex: 1; object-fit: none; object-position: left center; opacity: 0.92; }
+
+/* The drag handles at each end of a clip — three dots on a lighter field. */
+.studio-clip-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: calc(9 * var(--u));
+  background:
+    radial-gradient(circle at 50% 30%, rgba(255, 255, 255, 0.85) 32%, transparent 34%),
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.85) 32%, transparent 34%),
+    radial-gradient(circle at 50% 70%, rgba(255, 255, 255, 0.85) 32%, transparent 34%),
+    rgba(255, 255, 255, 0.24);
+  background-repeat: no-repeat;
+  background-position: 0 8%, 0 50%, 0 92%, 0 0;
+  background-size: 100% 34%, 100% 34%, 100% 34%, 100% 100%;
+}
+
+.studio-clip-handle--end { right: 0; left: auto; }
+
+.studio-playhead {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  bottom: 0;
+  width: 1.5px;
+  background: #e8262f;
+  pointer-events: none;
+  transform: translateX(-0.75px);
+}
+
+.studio-timeline-grid > .studio-track:first-of-type .studio-playhead::before {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  border-top: calc(5 * var(--u)) solid #e8262f;
+  border-right: calc(4 * var(--u)) solid transparent;
+  border-left: calc(4 * var(--u)) solid transparent;
+  content: '';
+  transform: translateX(-50%);
+}
+
+/* ========================================================== properties === */
+
+.studio-properties {
+  display: block;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden auto;
+  padding: calc(20 * var(--u)) calc(20 * var(--u)) calc(28 * var(--u));
+  background: #fff;
+  grid-column: 4;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(25, 86, 88, 0.2) transparent;
+}
+
+.studio-properties h4 {
+  margin: 0 0 calc(16 * var(--u));
+  color: var(--ed-teal);
+  font-size: calc(19 * var(--t));
+  font-weight: 660;
+  letter-spacing: -0.02em;
+}
+
+.studio-prop-block + .studio-prop-block { margin-top: calc(18 * var(--u)); }
+.studio-prop-block h5 { margin: 0 0 calc(12 * var(--u)); color: #1f2626; font-size: calc(15 * var(--t)); font-weight: 660; letter-spacing: -0.015em; }
+.studio-field-label { margin: 0 0 calc(9 * var(--u)); color: #5f6d6c; font-size: calc(13.5 * var(--t)); }
+.studio-prop-block > * + .studio-field-label { margin-top: calc(16 * var(--u)); }
+
+.studio-vector {
+  display: grid;
+  align-items: center;
+  margin-bottom: calc(9 * var(--u));
+  grid-template-columns: auto minmax(0, 1fr) repeat(3, minmax(0, 1.1fr));
+  gap: calc(7 * var(--u));
+}
+
+.studio-vector > svg { color: #8c9998; font-size: calc(16 * var(--t)); }
+.studio-vector > span { color: #333c3c; font-size: calc(13.5 * var(--t)); }
+
+.studio-vector i {
+  display: flex;
+  height: calc(34 * var(--u));
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  padding-inline: calc(8 * var(--u));
+  border: 1px solid var(--ed-line);
+  border-radius: calc(8 * var(--u));
+  color: #232a2a;
+  font-size: calc(12.5 * var(--t));
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  gap: calc(3 * var(--u));
+}
+
+.studio-vector small { color: #adb6b5; font-size: calc(11.5 * var(--t)); }
+
+.studio-segment {
+  display: grid;
+  height: calc(40 * var(--u));
+  margin: calc(16 * var(--u)) 0;
+  padding: calc(3 * var(--u));
+  border: 1px solid var(--ed-line);
+  border-radius: 999px;
+  grid-template-columns: 1fr 1fr;
+}
+
+.studio-segment button {
+  border-radius: 999px;
+  color: #4a5555;
+  font-size: calc(13.5 * var(--t));
+  font-weight: 550;
+  transition: color 0.2s ease, background 0.2s ease;
+}
+
+.studio-segment button.is-active {
+  color: #fff;
+  background: linear-gradient(100deg, #7fdcd5 0%, #16b8b0 100%);
+  box-shadow: 0 calc(2 * var(--u)) calc(7 * var(--u)) rgba(22, 184, 176, 0.3);
+  font-weight: 680;
+}
+
+.studio-note-directions { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: calc(6 * var(--u)); }
+
+.studio-note-directions button {
+  display: grid;
+  height: calc(34 * var(--u));
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: calc(9 * var(--u));
+  color: #1fb3ab;
+  background: var(--ed-fill);
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+
+.studio-note-directions button:hover { background: #e9f6f5; }
+.studio-note-directions button.is-active { border-color: var(--ed-teal-bright); background: #fff; }
+.studio-note-directions svg { width: calc(22 * var(--u)); height: calc(22 * var(--u)); }
+
+.studio-prop-row { display: flex; align-items: center; justify-content: space-between; margin-top: calc(16 * var(--u)); gap: calc(10 * var(--u)); }
+.studio-prop-row span { color: #333c3c; font-size: calc(13.5 * var(--t)); }
+
+.studio-color-well {
+  width: calc(42 * var(--u));
+  height: calc(38 * var(--u));
+  flex: none;
+  border-radius: calc(10 * var(--u));
+  background: linear-gradient(135deg, #2f6bff 0%, #23c4a8 22%, #7ee034 42%, #ffe141 58%, #ff8a2b 74%, #ff3d6e 100%);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+
+/* ------------------------------------------------------------- sliders --- */
+/*
+ * The source draws these as a *uniform* rail with a white knob — there is no
+ * filled portion, because the value is printed above the rail instead. Earlier
+ * versions used the browser's default `accent-color` track, which fills to the
+ * left and reads as a progress bar; that is the "thanh kéo chỉnh chưa đúng"
+ * note. Both native pseudo-element families are styled, not just WebKit's.
+ */
+.studio-slider {
+  position: relative;
+  display: grid;
+  align-items: center;
+  margin-top: calc(14 * var(--u));
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: calc(4 * var(--u)) calc(8 * var(--u));
+}
+
+.studio-slider > span { color: #333c3c; font-size: calc(13.5 * var(--t)); }
+.studio-slider > b { color: #1d2424; font-size: calc(13.5 * var(--t)); font-variant-numeric: tabular-nums; font-weight: 620; text-align: right; }
+
+.studio-slider input[type='range'] {
+  width: 100%;
+  height: calc(16 * var(--u));
+  margin: 0;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+  grid-column: 1 / -1;
+}
+
+.studio-slider input[type='range']::-webkit-slider-runnable-track { height: 2px; border-radius: 2px; background: #e0e4e4; }
+.studio-slider input[type='range']::-moz-range-track { height: 2px; border-radius: 2px; background: #e0e4e4; }
+
+.studio-slider input[type='range']::-webkit-slider-thumb {
+  width: calc(14 * var(--u));
+  height: calc(14 * var(--u));
+  min-width: 11px;
+  min-height: 11px;
+  margin-top: calc((2px - 14 * var(--u)) / 2);
+  appearance: none;
+  border: 1px solid #c8cfcf;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(28, 45, 44, 0.18);
+}
+
+.studio-slider input[type='range']::-moz-range-thumb {
+  width: calc(14 * var(--u));
+  height: calc(14 * var(--u));
+  border: 1px solid #c8cfcf;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(28, 45, 44, 0.18);
+}
+
+.studio-slider--swatch { grid-template-columns: minmax(0, 1fr) auto auto; }
+.studio-slider--swatch input[type='range'] { grid-column: 1 / 3; }
+
+.studio-alpha-well {
+  width: calc(34 * var(--u));
+  height: calc(34 * var(--u));
+  border-radius: calc(9 * var(--u));
+  background:
+    linear-gradient(rgba(120, 132, 132, var(--alpha, 1)), rgba(120, 132, 132, var(--alpha, 1))),
+    repeating-conic-gradient(#e9ecec 0% 25%, #fff 0% 50%) 0 0 / calc(7 * var(--u)) calc(7 * var(--u));
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.07);
+  grid-row: 1 / 3;
+  grid-column: 3;
+}
+
+/* ------------------------------------------------------------ steppers --- */
+
+.studio-steppers { display: grid; grid-template-columns: 1fr 1fr; gap: calc(9 * var(--u)); }
+.studio-stepper { display: flex; min-width: 0; align-items: center; gap: calc(5 * var(--u)); }
+.studio-stepper > svg { color: #8c9998; font-size: calc(15 * var(--t)); }
+.studio-stepper em { color: #333c3c; font-size: calc(13 * var(--t)); font-style: normal; }
+
+.studio-stepper i {
+  display: flex;
+  height: calc(32 * var(--u));
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  justify-content: space-between;
+  padding-inline: calc(4 * var(--u));
+  border: 1px solid var(--ed-line);
+  border-radius: calc(8 * var(--u));
+  font-style: normal;
+}
+
+.studio-stepper button { display: grid; width: calc(20 * var(--u)); place-items: center; color: #56625f; font-size: calc(14 * var(--t)); }
+.studio-stepper button:hover { color: var(--ed-teal); }
+.studio-stepper i > b { color: #232a2a; font-size: calc(13 * var(--t)); font-variant-numeric: tabular-nums; font-weight: 620; }
+
+.studio-primary-button {
+  display: flex;
+  width: 100%;
+  height: calc(40 * var(--u));
+  align-items: center;
+  justify-content: center;
+  border-radius: calc(10 * var(--u));
+  color: #fff;
+  background: linear-gradient(100deg, #7fdcd5 0%, #16b8b0 100%);
+  box-shadow: 0 calc(4 * var(--u)) calc(12 * var(--u)) rgba(22, 184, 176, 0.28);
+  font-size: calc(13.5 * var(--t));
+  font-weight: 650;
+  gap: calc(8 * var(--u));
+  transition: transform 0.2s var(--ease-reveal), box-shadow 0.2s ease;
+}
+
+.studio-primary-button:hover { box-shadow: 0 calc(6 * var(--u)) calc(16 * var(--u)) rgba(22, 184, 176, 0.36); transform: translateY(-1px); }
+.studio-primary-button svg { font-size: calc(17 * var(--t)); }
+
+/* -------------------------------------------------------------- selects --- */
+
+.studio-select { display: block; margin-top: calc(14 * var(--u)); }
+.studio-select > span { display: block; margin-bottom: calc(7 * var(--u)); color: #5f6d6c; font-size: calc(13 * var(--t)); }
+.studio-select i { position: relative; display: block; font-style: normal; }
+
+.studio-select select {
+  width: 100%;
+  height: calc(40 * var(--u));
+  padding-inline: calc(12 * var(--u)) calc(32 * var(--u));
+  appearance: none;
+  border: 1px solid var(--ed-line);
+  border-radius: calc(10 * var(--u));
+  color: #262e2e;
+  background: #fff;
+  font-family: inherit;
+  font-size: calc(13.5 * var(--t));
+  cursor: pointer;
+}
+
+.studio-select select:hover { border-color: var(--ed-teal-soft); }
+
+.studio-select i > svg {
+  position: absolute;
+  top: 50%;
+  right: calc(10 * var(--u));
+  color: #7d8a8a;
+  font-size: calc(17 * var(--t));
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+/* ==================================================== narrative column === */
+
+.tool-story {
+  container-type: inline-size;
+  position: relative;
+  display: grid;
+  overflow: hidden;
+  height: 100%;
+  min-height: 0;
+  padding: clamp(15px, 1.25vw, 24px);
+  border-radius: clamp(14px, 1.15vw, 22px);
+  background: linear-gradient(168deg, rgba(255, 255, 255, 0.96) 0%, rgba(250, 252, 251, 0.9) 100%);
+  box-shadow:
+    0 0 0 1px rgba(23, 78, 79, 0.09),
+    0 1px 2px rgba(35, 51, 50, 0.05),
+    0 22px 48px -22px rgba(28, 62, 61, 0.22);
+  backdrop-filter: blur(18px) saturate(115%);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.tool-story__intro { position: relative; z-index: 1; padding-bottom: clamp(10px, 1.5vh, 17px); border-bottom: 1px solid rgba(30, 84, 82, 0.11); }
+.tool-story__intro > div { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+
+.tool-story__intro h3 {
+  max-width: 14ch;
+  margin: 0;
+  color: var(--ink);
+  font-size: clamp(16px, 1.12vw, 21px);
+  font-weight: 680;
+  letter-spacing: -0.035em;
+  line-height: 1.06;
+}
+
+.tool-story__intro span { flex: none; color: #1f8a86; font-size: clamp(8px, 0.52vw, 9.5px); font-variant-numeric: tabular-nums; font-weight: 700; letter-spacing: 0.09em; }
+.tool-story__intro p { max-width: 34ch; margin: clamp(5px, 0.9vh, 9px) 0 0; color: var(--ink-3); font-size: clamp(9.5px, 0.62vw, 11.5px); line-height: 1.5; }
+
+.tool-story__list {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  grid-template-rows: repeat(4, minmax(0, 1fr));
+  list-style: none;
+}
+
+/* The spine that makes four items read as one sequence. */
+.tool-story__list::before {
+  position: absolute;
+  top: 12%;
+  bottom: 12%;
+  left: clamp(15px, 1.05vw, 19px);
+  width: 1.5px;
+  background: linear-gradient(180deg, rgba(239, 122, 102, 0.5) 0%, rgba(166, 120, 210, 0.5) 46%, rgba(85, 189, 183, 0.55) 100%);
+  content: '';
+}
+
+.tool-story__list li {
+  position: relative;
+  display: grid;
+  min-height: 0;
+  align-items: stretch;
+  grid-template-columns: clamp(30px, 2.1vw, 38px) minmax(0, 1fr);
+  gap: clamp(9px, 0.8vw, 14px);
+}
+
+.tool-story__node {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: clamp(30px, 2.1vw, 38px);
+  height: clamp(30px, 2.1vw, 38px);
+  align-self: center;
+  place-items: center;
+  border-radius: 50%;
+  color: #c85e50;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(229, 112, 92, 0.24), 0 5px 13px rgba(170, 85, 74, 0.11);
+  font-size: clamp(15px, 1.05vw, 19px);
+}
+
+.tool-story__node svg { width: 1em; height: 1em; }
+.tool-story__list li:nth-child(2) .tool-story__node { color: #8659b2; box-shadow: 0 0 0 1px rgba(155, 115, 199, 0.26), 0 5px 13px rgba(120, 85, 170, 0.1); }
+.tool-story__list li:nth-child(3) .tool-story__node,
+.tool-story__list li:nth-child(4) .tool-story__node { color: #1f7d79; box-shadow: 0 0 0 1px rgba(60, 156, 150, 0.28), 0 5px 13px rgba(45, 130, 125, 0.1); }
+
+.tool-story__copy { display: grid; min-width: 0; align-content: center; padding: clamp(8px, 1.15vh, 13px) 0; border-bottom: 1px solid rgba(30, 84, 82, 0.09); }
+.tool-story__list li:last-child .tool-story__copy { border-bottom: 0; }
+
+.tool-story__meta { display: flex; align-items: center; justify-content: space-between; margin-bottom: 3px; gap: 8px; }
+.tool-story__meta span { color: #1f8a86; font-size: clamp(8.5px, 0.55vw, 10px); font-weight: 680; }
+.tool-story__meta em { flex: none; color: #8b9998; font-size: clamp(6.5px, 0.42vw, 8px); font-style: normal; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+
+.tool-story__copy h4 { margin: 0; color: var(--ink); font-size: clamp(11.5px, 0.78vw, 14.5px); font-weight: 670; letter-spacing: -0.022em; line-height: 1.16; }
+.tool-story__copy p { margin: 3px 0 0; color: var(--ink-3); font-size: clamp(9px, 0.58vw, 10.8px); line-height: 1.42; }
+
+.tool-story__cta {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  min-height: clamp(48px, 4.4vh, 60px);
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 9px 9px 14px;
+  border-radius: clamp(11px, 0.85vw, 15px);
+  color: #17504f;
+  background: linear-gradient(104deg, rgba(106, 207, 199, 0.16), rgba(255, 255, 255, 0.6));
+  box-shadow: inset 0 0 0 1px rgba(32, 122, 118, 0.13);
+  gap: 12px;
+  text-decoration: none;
+  transition: box-shadow 0.22s ease, transform 0.22s var(--ease-reveal);
+}
+
+.tool-story__cta:hover { box-shadow: inset 0 0 0 1px rgba(32, 122, 118, 0.3), 0 10px 24px rgba(42, 111, 105, 0.12); transform: translateY(-1px); }
+.tool-story__cta > span { display: grid; font-size: clamp(10px, 0.66vw, 12.5px); font-weight: 680; gap: 2px; }
+.tool-story__cta small { color: #75847f; font-size: clamp(6.5px, 0.42vw, 7.5px); font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+
+.tool-story__cta > i {
+  position: relative;
+  display: grid;
+  width: clamp(30px, 2.2vw, 36px);
+  height: clamp(30px, 2.2vw, 36px);
+  flex: none;
+  place-items: center;
+  border-radius: 50%;
+  background: #ef7b67;
+  box-shadow: 0 7px 17px rgba(214, 91, 73, 0.24);
+}
+
+.tool-story__cta > i > span { position: relative; width: 12px; height: 1.4px; border-radius: 1px; background: #fff; }
+
+.tool-story__cta > i > span::after {
+  position: absolute;
+  top: -3px;
+  right: 0;
+  width: 6px;
+  height: 6px;
+  border-top: 1.4px solid #fff;
+  border-right: 1.4px solid #fff;
+  content: '';
+  transform: rotate(45deg);
+}
+
+/* ============================================================ regimes === */
+
+/*
+ * 1240 px: the section stops trying to hold a heading, a four-panel editor and
+ * a narrative column side by side on one screen. The editor keeps a fixed band
+ * and the narrative moves below it.
+ */
+@media (max-width: 1240px) {
+  .tool-section { justify-content: flex-start; min-height: 0; padding-bottom: clamp(28px, 5vh, 56px); }
+
+  .tool-stage {
+    height: auto;
+    max-height: none;
+    grid-template-areas: 'heading' 'workspace' 'story';
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto clamp(468px, 72svh, 700px) auto;
+    gap: 14px;
+  }
+
+  .tool-heading { grid-template-columns: minmax(0, 1fr) minmax(240px, 34%); }
+  .tool-heading h2 { font-size: clamp(30px, 4.4vw, 46px); }
+
+  .tool-story {
+    height: auto;
+    align-items: stretch;
+    grid-template-columns: minmax(190px, 0.8fr) minmax(0, 2.1fr) minmax(170px, 0.7fr);
+    grid-template-rows: auto;
+    gap: 16px;
+  }
+
+  .tool-story__intro { align-self: center; padding: 0 16px 0 0; border-right: 1px solid rgba(30, 84, 82, 0.11); border-bottom: 0; }
+  .tool-story__intro h3 { font-size: 19px; }
+  .tool-story__list { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); }
+  .tool-story__list::before { display: none; }
+  .tool-story__list li { padding: 5px 10px; }
+  .tool-story__list li:nth-child(odd) { border-right: 1px solid rgba(30, 84, 82, 0.09); }
+  .tool-story__copy { height: 100%; padding: 6px 0; }
+  .tool-story__cta { align-self: center; }
+}
+
+/* Below this the properties panel cannot hold a three-field vector row. */
+@media (max-width: 1080px) {
+  .studio { grid-template-columns: clamp(70px, 7.4%, 104px) minmax(0, 1fr) clamp(64px, 6.6%, 92px); }
+  .studio-properties { display: none; }
+}
+
+@media (max-width: 900px) {
+  .studio { grid-template-columns: clamp(66px, 12%, 92px) minmax(0, 1fr); }
+  .studio-detail-rail { display: none; }
+  .studio-commandbar { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .studio-range-readout { display: none; }
+
+  .tool-story { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto; gap: 12px; }
+  .tool-story__intro { align-self: stretch; padding: 0 0 12px; border-right: 0; border-bottom: 1px solid rgba(30, 84, 82, 0.11); }
+  .tool-story__intro > div { align-items: center; }
+  .tool-story__list li { padding: 4px 0; }
+  .tool-story__list li:nth-child(odd) { padding-right: 14px; }
+  .tool-story__list li:nth-child(even) { padding-left: 14px; }
+  .tool-story__cta { align-self: stretch; }
+}
+
+@media (max-width: 720px) {
+  .tool-stage { grid-template-rows: auto clamp(420px, 66svh, 560px) auto; gap: 12px; }
+  .tool-heading { grid-template-columns: minmax(0, 1fr); }
+  .tool-heading h2 { white-space: normal; }
+  .studio { --u: clamp(0.62px, 0.088cqi, 0.86px); --t: clamp(0.74px, 0.088cqi, 0.86px); border-radius: 14px; }
+  .studio-timeline-tools { display: none; }
+  .studio-timeline-panel { grid-template-columns: minmax(0, 1fr); }
+  .studio-step-select { display: none; }
+  .studio-commandbar { grid-template-columns: auto minmax(0, 1fr); }
+}
+
+/*
+ * Phone.
+ *
+ * A four-panel authoring desktop is not a phone interface, and shrinking one
+ * until it fits produces neither. What has to survive here is the *claim* — that
+ * YooStudio is a real editor with a real 3D scene on a real timeline — so the
+ * rails go, the canvas keeps the room, and the timeline keeps four named tracks
+ * and a playhead. Everything removed is a control a thumb could not have hit.
+ */
+@media (max-width: 620px) {
+  .studio { grid-template-columns: minmax(0, 1fr); }
+  /* The rail is gone, so the workspace has to move OUT of track 2 — otherwise
+     it lands in an implicit column and leaves the explicit one empty. */
+  .studio-workspace { grid-column: 1; }
+  /* The brand tab and the tool row share one 338 px edge here: the wordmark
+     goes, and the three controls a phone cannot use go with it. */
+  .studio-canvas-brand { padding-inline: calc(12 * var(--u)); }
+  .studio-canvas-brand img:last-child,
+  .studio-canvas-tools button:nth-child(1),
+  .studio-canvas-tools button:nth-child(2),
+  .studio-canvas-tools button:nth-child(5),
+  .studio-main-rail,
+  .studio-sync,
+  .studio-topbar-divider,
+  .studio-chip--peach,
+  .studio-canvas-side { display: none; }
+  .studio-topbar { height: calc(56 * var(--u)); padding-inline: calc(10 * var(--u)); gap: calc(8 * var(--u)); }
+  .studio-doc-title { max-width: none; flex: 1; }
+  .studio-viewport { padding-inline: calc(10 * var(--u)); }
+  .studio-canvas-tools { gap: calc(9 * var(--u)); }
+  .studio-playbar { width: 92%; padding-inline: calc(10 * var(--u)) calc(12 * var(--u)); }
+  .studio-timeline-ruler,
+  .studio-track { grid-template-columns: clamp(84px, calc(150 * var(--u)), 120px) minmax(0, 1fr); }
+  /* Sixteen tick labels in 180 px is a smear; every other one still reads. */
+  .studio-ruler-scale i:nth-child(even) em { display: none; }
+  .studio-spaces,
+  .studio-stepbar { padding-inline: calc(10 * var(--u)); }
+  .studio-clip small { display: none; }
+
+  .tool-story { padding: 14px; }
+  .tool-story__list { grid-template-columns: minmax(0, 1fr); grid-template-rows: repeat(4, auto); }
+  .tool-story__list li { padding: 3px 0 !important; }
+  .tool-story__copy { padding: 9px 0; }
+  .tool-story__meta em { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .studio-sync img { animation: none; }
+
+  .studio *,
+  .tool-story__cta,
+  .tool-heading-copy a { transition-duration: 0.01ms !important; }
+
+  .studio-brand:hover,
+  .studio-chip:hover,
+  .studio-primary-button:hover,
+  .tool-story__cta:hover { transform: none; }
+}

@@ -53,10 +53,19 @@ declare `--library-head` / `--edu-head` because their bands are one predictable
 row. YooStudio does not: its heading wraps to a third line below 1000 px, and every
 version of this that subtracted an estimated `--tool-head` from the viewport cut
 the bottom of the editor at whichever width the estimate was wrong — 24 px out on a
-1366, 53 px out on a 768. It is now a flex column (`.tool-stage`) one screen tall
-whose workspace is the `flex: 1` row, so the arithmetic is done by the layout engine
-against the real heading. When a band's height is not predictable, make the layout
-do the subtraction.
+1366, 53 px out on a 768. `.tool-stage` is now one screen-tall grid — an `auto`
+heading row over a `minmax(0, 1fr)` row holding the workspace and the narrative
+column — so the arithmetic is done by the layout engine against the real heading.
+When a band's height is not predictable, make the layout do the subtraction.
+
+**And measure width against width.** The counterpart mistake is deriving one axis
+from the other. A later version of this section sized the editor's *width* from the
+viewport *height*, to hold the 1920 × 1237 source frame's aspect ratio; on a
+1920 × 911 browser window that produced a 1122 px editor beside a 622 px narrative
+column, and the section's proportions became a function of how tall the visitor's
+window happened to be. The narrative column is now a bounded width
+(`clamp(250px, 18.6vw, 344px)`) and the workspace takes the remainder — the only
+thing in the section that stretches horizontally.
 
 Below 700 px a fitted section stops being fitted and scrolls: a phone cannot hold a
 heading, a workspace and a readout at once without 9 px type. Which sections give up
@@ -150,3 +159,35 @@ for a one-off question. A section is done when the screenshot shows it, not when
 `measure.mjs` is the regression guard for this document's first two sections: it
 reports the shell alignment as one spread across seven bands, and it must read
 **0 px**. Anything else means a fourth width has been invented.
+
+> **Open regression (not this pass).** `measure.mjs` currently reports a 47 px
+> spread at 1920, from `header=33` against `story=80` and everything else at 80 —
+> the header's left edge alone has drifted off the shell. It reads the same with
+> the YooStudio work stashed, so it predates it and is untouched here.
+
+## 10. YooStudio — one stylesheet, one unit
+
+The authoring section lives entirely in `app/styles/studio.css`. It replaced five
+stacked blocks in `globals.css` ("Figma v2" through "fidelity v5", ~2,300 lines)
+that had been written to patch each other; by the end `v2` was still styling
+`.studio-body`, `.studio-tree` and `.studio-topbar`, none of which the component
+had rendered for three rounds, and every new fix had to out-specify four older
+ones. **A second layer for this section is a bug, not a fix.**
+
+Inside it, the source frame's real pixel sizes survive as arithmetic:
+
+```css
+--u: clamp(0.60px, 0.0522cqi, 0.95px);   /* one Figma pixel of geometry */
+--t: clamp(0.72px, 0.0522cqi, 0.95px);   /* one Figma pixel of type     */
+```
+
+so `calc(15 * var(--u))` reads as "the 15 px control from the frame". The two
+differ only in their floor: a 34 px control can become a 22 px control and still
+be a control, while 15 px type cannot become 7 px type and still be type.
+
+The editor's icons are drawn in `app/components/studio/EditorIcons.tsx` in
+`currentColor`, not loaded from `/asset/ui/yoolab-editor/*.svg`. Those files did
+not match the design — `settings.svg` was a byte-identical copy of `text.svg`, so
+"Thiết lập" drew a text cursor where the frame has a gear — they were exported
+with `preserveAspectRatio="none"`, and their baked `#5D7E81` strokes forced the
+active state through a nine-stop `filter` chain.

@@ -10,6 +10,7 @@ import { ScrollReveal } from './components/ScrollReveal';
 import { SectionSnap } from './components/SectionSnap';
 import { SiteHeader } from './components/SiteHeader';
 import { StudioDemo } from './components/StudioDemo';
+import { IconStoryBuild, IconStoryNote, IconStoryTap, IconStoryTimeline } from './components/studio/EditorIcons';
 
 /**
  * The page is one journey, and each stop answers exactly one question:
@@ -35,10 +36,10 @@ import { StudioDemo } from './components/StudioDemo';
  */
 
 const TOOL_FEATURES = [
-  { index: '01', phase: 'Chọn học liệu', actor: 'Giáo viên', title: 'Dựng không gian', body: 'Ghép mô hình, ánh sáng và bối cảnh bằng thao tác trực quan.' },
-  { index: '02', phase: 'Biên soạn', actor: 'Giáo viên', title: 'Ghi chú tại chỗ', body: 'Gắn kiến thức đúng vào bộ phận, đúng thời điểm.' },
-  { index: '03', phase: 'Giao bài', actor: 'Lớp học', title: 'Timeline kể chuyện', body: 'Dàn nhịp mô hình, văn bản, âm thanh và hiệu ứng.' },
-  { index: '04', phase: 'Khám phá', actor: 'Học sinh', title: 'Hoạt động tương tác', body: 'Thêm hotspot và câu hỏi trả lời ngay trên mô hình.' },
+  { index: '01', phase: 'Chọn học liệu', actor: 'Giáo viên', title: 'Dựng không gian', body: 'Ghép mô hình, ánh sáng và bối cảnh bằng thao tác trực quan.', Icon: IconStoryBuild },
+  { index: '02', phase: 'Biên soạn', actor: 'Giáo viên', title: 'Ghi chú tại chỗ', body: 'Gắn kiến thức đúng vào bộ phận, đúng thời điểm.', Icon: IconStoryNote },
+  { index: '03', phase: 'Giao bài', actor: 'Lớp học', title: 'Timeline kể chuyện', body: 'Dàn nhịp mô hình, văn bản, âm thanh và hiệu ứng.', Icon: IconStoryTimeline },
+  { index: '04', phase: 'Khám phá', actor: 'Học sinh', title: 'Hoạt động tương tác', body: 'Thêm hotspot và câu hỏi trả lời ngay trên mô hình.', Icon: IconStoryTap },
 ];
 
 export default function Home() {
@@ -89,7 +90,7 @@ export default function Home() {
                 <ol className="tool-story__list">
                   {TOOL_FEATURES.map((feature) => (
                     <li key={feature.index}>
-                      <span className="tool-story__node">{feature.index}</span>
+                      <span className="tool-story__node" aria-hidden="true"><feature.Icon /></span>
                       <div className="tool-story__copy">
                         <div className="tool-story__meta">
                           <span>{feature.phase}</span>

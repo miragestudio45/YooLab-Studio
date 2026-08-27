@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import * as THREE from 'three';
 import {
   createCarLoaders,
@@ -12,45 +12,72 @@ import {
   type MaterialShader,
 } from '../lib/formula/carRuntime';
 import { createProceduralEnvironment, studioEnvironmentPalette } from '../lib/three/environment';
+import {
+  IconAi, IconAudio, IconBell, IconChevronDown, IconClock, IconClose, IconCollapse, IconComponents,
+  IconCopy, IconCreate, IconCube3d, IconDecor, IconDuplicate, IconEffects, IconFitRange, IconFrame,
+  IconFullscreen, IconGlobe, IconGrip, IconHeightAxis, IconHotspot, IconInfo, IconLabels, IconMedia,
+  IconMenu, IconMinus, IconMirror, IconModel, IconPause, IconPencil, IconPlay, IconPlus,
+  IconPositionAxis, IconProjectInfo, IconProjects, IconQuiz, IconRedo, IconReset, IconRotateAxis,
+  IconScaleAxis, IconSettings, IconShare, IconShareNodes, IconSilent, IconSpace, IconStepBack,
+  IconStepForward, IconSteps, IconSticker, IconTemplates, IconText, IconToEnd, IconToStart,
+  IconTrash, IconUndo, IconUpload, IconViewpoint, IconVolume, IconVr,
+  IconVrLab, IconWidthAxis,
+} from './studio/EditorIcons';
 
 type StudioMode = 'assemble' | 'inspect' | 'drive';
 type TrackId = 'model' | 'text' | 'audio' | 'effect';
-type EditorTool = { id: string; label: string; asset: string };
+type Glyph = (props: { className?: string }) => React.ReactElement;
+type EditorTool = { id: string; label: string; Icon: Glyph };
 
 const EDITOR_ASSET_ROOT = '/asset/ui/yoolab-editor';
 const FIGMA_ASSET_ROOT = `${EDITOR_ASSET_ROOT}/figma`;
 
 const MAIN_TOOLS: EditorTool[] = [
-  { id: 'create', label: 'Tạo mới Dự án', asset: 'create.svg' },
-  { id: 'templates', label: 'Mẫu', asset: 'templates.svg' },
-  { id: 'components', label: 'Thành phần', asset: 'components.svg' },
-  { id: 'projectInfo', label: 'Thông tin dự án', asset: 'project-info.svg' },
-  { id: 'decor', label: 'Decor', asset: 'decor.svg' },
-  { id: 'settings', label: 'Thiết lập', asset: 'settings.svg' },
-  { id: 'projects', label: 'Dự án', asset: 'projects.svg' },
-  { id: 'vrLab', label: 'VR Lab', asset: 'vr-lab.svg' },
+  { id: 'create', label: 'Tạo mới\nDự án', Icon: IconCreate },
+  { id: 'templates', label: 'Mẫu', Icon: IconTemplates },
+  { id: 'components', label: 'Thành phần', Icon: IconComponents },
+  { id: 'projectInfo', label: 'Thông tin\nDự án', Icon: IconProjectInfo },
+  { id: 'decor', label: 'Decor', Icon: IconDecor },
+  { id: 'settings', label: 'Thiết lập', Icon: IconSettings },
+  { id: 'projects', label: 'Dự án', Icon: IconProjects },
+  { id: 'vrLab', label: 'VR Lab', Icon: IconVrLab },
 ];
 
 const DETAIL_TOOLS: EditorTool[] = [
-  { id: 'labels', label: 'Quản lý nhãn', asset: 'info.svg' },
-  { id: 'space', label: 'Không gian', asset: 'space.svg' },
-  { id: 'steps', label: 'Bước', asset: 'steps.svg' },
-  { id: 'text', label: 'Văn bản', asset: 'text.svg' },
-  { id: 'audio', label: 'Âm thanh', asset: 'sound.svg' },
-  { id: 'media', label: 'Media', asset: 'media.svg' },
-  { id: 'hotspot', label: 'Hotspot', asset: 'scene-tool.svg' },
-  { id: 'info', label: 'Icon info', asset: 'info.svg' },
-  { id: 'sticker', label: 'Sticker', asset: 'sticker.svg' },
-  { id: 'effect', label: 'Hiệu ứng', asset: 'effects.svg' },
-  { id: 'quiz', label: 'Tạo Quiz', asset: 'quiz.svg' },
+  { id: 'labels', label: 'Quản lý nhãn', Icon: IconLabels },
+  { id: 'space', label: 'Không gian', Icon: IconSpace },
+  { id: 'steps', label: 'Bước', Icon: IconSteps },
+  { id: 'text', label: 'Văn bản', Icon: IconText },
+  { id: 'audio', label: 'Âm thanh', Icon: IconAudio },
+  { id: 'media', label: 'Media', Icon: IconMedia },
+  { id: 'hotspot', label: 'Hotspot', Icon: IconHotspot },
+  { id: 'info', label: 'Icon info', Icon: IconInfo },
+  { id: 'sticker', label: 'Sticker', Icon: IconSticker },
+  { id: 'effect', label: 'Hiệu ứng', Icon: IconEffects },
+  { id: 'quiz', label: 'Tạo Quiz', Icon: IconQuiz },
 ];
 
-const TRACKS: { id: TrackId; label: string; color: string; asset: string; start: number; length: number }[] = [
-  { id: 'model', label: 'Model', color: '#a852fc', asset: 'space.svg', start: 0, length: 1 },
-  { id: 'text', label: 'Văn bản', color: '#2b7fff', asset: 'text.svg', start: 0, length: 0.50958 },
-  { id: 'audio', label: 'Âm thanh', color: '#00c950', asset: 'sound.svg', start: 0, length: 0.62021 },
-  { id: 'effect', label: 'Hiệu ứng', color: '#f6339a', asset: 'effects.svg', start: 0, length: 0.82317 },
+/* Track colours are read off the source frame, not invented. */
+const TRACKS: { id: TrackId; label: string; color: string; Icon: Glyph; start: number; length: number }[] = [
+  { id: 'model', label: 'Model', color: '#a852fc', Icon: IconModel, start: 0, length: 1 },
+  { id: 'text', label: 'Văn bản', color: '#2b7fff', Icon: IconText, start: 0, length: 0.50958 },
+  { id: 'audio', label: 'Âm thanh', color: '#00c950', Icon: IconAudio, start: 0, length: 0.62021 },
+  { id: 'effect', label: 'Hiệu ứng', color: '#f6339a', Icon: IconEffects, start: 0, length: 0.82317 },
 ];
+
+const TIMELINE_TOOLS: { id: string; label: string; Icon: Glyph }[] = [
+  { id: 'undo', label: 'Hoàn tác', Icon: IconUndo },
+  { id: 'redo', label: 'Làm lại', Icon: IconRedo },
+  { id: 'delete', label: 'Xóa đối tượng', Icon: IconTrash },
+  { id: 'fit', label: 'Khớp thời lượng', Icon: IconFitRange },
+  { id: 'copy', label: 'Sao chép đối tượng', Icon: IconCopy },
+  { id: 'duplicate', label: 'Nhân bản đối tượng', Icon: IconDuplicate },
+  { id: 'mirror', label: 'Lật đối tượng', Icon: IconMirror },
+];
+
+const RULER = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150];
+
+/* --------------------------------------------------------------- 3D stage --- */
 
 function CarViewport({ mode, explode, playing, light, showGrid, resetKey, onReady, onError }: {
   mode: StudioMode;
@@ -82,55 +109,153 @@ function CarViewport({ mode, explode, playing, light, showGrid, resetKey, onRead
     if (!host) return;
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x292b2c);
-    scene.fog = new THREE.Fog(0x292b2c, 13, 29);
-    const camera = new THREE.PerspectiveCamera(32, 1, 0.05, 70);
+    const camera = new THREE.PerspectiveCamera(31, 1, 0.05, 90);
     const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.03;
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.55));
+    /*
+     * Khronos PBR Neutral, not ACES.
+     *
+     * The reference Formula viewer photographs this car on a #f8f8f8 sweep under
+     * a studio HDR, and the thing that makes its paint read as paint is that
+     * saturated reds stay red at high exposure. ACES desaturates its highlights
+     * by design — it is a film look — and on the Marlboro flank that turned the
+     * orange to a chalky salmon wherever the key hit it. Neutral was written for
+     * exactly this case: product colour preserved, highlights rolled off.
+     */
+    renderer.toneMapping = THREE.NeutralToneMapping;
+    renderer.toneMappingExposure = 1.16;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.domElement.style.touchAction = 'none';
     host.appendChild(renderer.domElement);
 
+    /*
+     * A cyclorama, not a flat clear colour.
+     *
+     * The editor viewport has to stay dark — it is a panel inside a light page
+     * and the source frame paints it near-black — but a single flat #292b2c
+     * behind a white car gives the bodywork no edge to sit against: the silhouette
+     * dissolves at the top and the shadow has nothing to fall on. This is the
+     * photographic answer instead: a sphere with a vertical ramp, lighter behind
+     * the car and falling off to the corners, so the car is lit *against*
+     * something. It is background only — `scene.environment` still does the
+     * reflections.
+     */
+    const backdrop = new THREE.Mesh(
+      new THREE.SphereGeometry(46, 40, 28),
+      new THREE.ShaderMaterial({
+        side: THREE.BackSide,
+        depthWrite: false,
+        uniforms: { uLift: { value: 0.58 } },
+        vertexShader: `
+          varying vec3 vDir;
+          void main() {
+            vDir = normalize(position);
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }`,
+        fragmentShader: `
+          uniform float uLift;
+          varying vec3 vDir;
+          void main() {
+            vec3 d = normalize(vDir);
+            float h = smoothstep(-0.42, 0.62, d.y);
+            vec3 low  = vec3(0.043, 0.049, 0.055);
+            vec3 mid  = vec3(0.128, 0.145, 0.156);
+            vec3 high = vec3(0.055, 0.063, 0.071);
+            vec3 c = mix(low, mid, smoothstep(0.0, 0.55, h));
+            c = mix(c, high, smoothstep(0.55, 1.0, h));
+            /* A soft pool of light behind the subject, centred on -Z. */
+            float pool = smoothstep(0.55, 1.0, dot(d, normalize(vec3(0.0, 0.12, -1.0))));
+            c += vec3(0.075, 0.088, 0.092) * pool * uLift;
+            gl_FragColor = vec4(c, 1.0);
+          }`,
+      }),
+    );
+    backdrop.frustumCulled = false;
+    scene.add(backdrop);
+
     const environment = createProceduralEnvironment(renderer, studioEnvironmentPalette);
     scene.environment = environment.texture;
-    const hemi = new THREE.HemisphereLight(0xe8f4f2, 0x171c22, 1.75);
+    scene.environmentIntensity = 1.05;
+
+    const hemi = new THREE.HemisphereLight(0xdff0f4, 0x14181c, 1.05);
     scene.add(hemi);
-    const key = new THREE.DirectionalLight(0xfff6ef, 5.8);
-    key.position.set(-5, 7, 5);
+    /* Key: a large soft box light above and slightly camera-left, the classic
+       three-quarter automotive set-up. It is the only caster. */
+    const key = new THREE.DirectionalLight(0xfff4e9, 3.1);
+    key.position.set(-5.4, 8.2, 5.4);
     key.castShadow = true;
+    key.shadow.mapSize.set(2048, 2048);
+    key.shadow.camera.near = 1;
+    key.shadow.camera.far = 22;
+    key.shadow.camera.left = -7;
+    key.shadow.camera.right = 7;
+    key.shadow.camera.top = 7;
+    key.shadow.camera.bottom = -7;
+    key.shadow.bias = -0.0012;
+    key.shadow.normalBias = 0.022;
     scene.add(key);
-    const teal = new THREE.PointLight(0x60d5d0, 16, 18, 2);
-    teal.position.set(5, 2, -3);
-    scene.add(teal);
-    const coral = new THREE.PointLight(0xff7f6b, 11, 15, 2);
-    coral.position.set(-4, 1.5, 4);
-    scene.add(coral);
+    /* Rim from behind-right: this is what draws the line along the sidepod and
+       the rear wing against the backdrop. */
+    const rim = new THREE.DirectionalLight(0xbfe9ff, 2.5);
+    rim.position.set(6.6, 3.4, -6.2);
+    scene.add(rim);
+    /* Warm bounce off the floor, so the underside is not a black hole. */
+    const bounce = new THREE.DirectionalLight(0xffd7bd, 0.75);
+    bounce.position.set(2.2, -3.4, 3.6);
+    scene.add(bounce);
+    const spark = new THREE.PointLight(0x7fe4de, 9, 16, 2);
+    spark.position.set(4.4, 1.6, -2.4);
+    scene.add(spark);
 
     const world = new THREE.Group();
     scene.add(world);
+    const floorY = -1.22;
     const floor = new THREE.Mesh(
-      new THREE.CircleGeometry(12, 96),
-      new THREE.MeshStandardMaterial({ color: 0x15191a, roughness: 0.94, metalness: 0.02, envMapIntensity: 0.18 }),
+      new THREE.CircleGeometry(16, 96),
+      new THREE.MeshStandardMaterial({ color: 0x0d1113, roughness: 0.62, metalness: 0.06, envMapIntensity: 0.42 }),
     );
     floor.rotation.x = -Math.PI / 2;
-    floor.position.y = -1.22;
+    floor.position.y = floorY;
     floor.receiveShadow = true;
     world.add(floor);
-    const grid = new THREE.GridHelper(24, 32, 0x4a817f, 0x3b4243);
-    grid.position.y = -1.205;
+
+    /* Contact shadow: a painted radial under the car. The directional light gives
+       a correct cast shadow, but a 2048 map over a 14-unit frustum cannot resolve
+       the tyre contact patches, and without them the car floats. */
+    const contact = new THREE.Mesh(
+      new THREE.PlaneGeometry(9.2, 5),
+      new THREE.ShaderMaterial({
+        transparent: true,
+        depthWrite: false,
+        uniforms: { uOpacity: { value: 0.62 } },
+        vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+        fragmentShader: `
+          uniform float uOpacity;
+          varying vec2 vUv;
+          void main() {
+            float d = length((vUv - 0.5) * vec2(2.05, 2.35));
+            float a = smoothstep(1.0, 0.06, d);
+            gl_FragColor = vec4(0.0, 0.0, 0.0, a * a * uOpacity);
+          }`,
+      }),
+    );
+    contact.rotation.x = -Math.PI / 2;
+    contact.position.y = floorY + 0.006;
+    world.add(contact);
+
+    const grid = new THREE.GridHelper(26, 34, 0x59a09c, 0x39464a);
+    grid.position.y = floorY + 0.012;
     const gridMaterials = Array.isArray(grid.material) ? grid.material : [grid.material];
-    gridMaterials.forEach((material) => { material.transparent = true; material.opacity = 0.16; material.depthWrite = false; });
+    gridMaterials.forEach((material) => { material.transparent = true; material.opacity = 0.19; material.depthWrite = false; });
     world.add(grid);
     const ring = new THREE.Mesh(
-      new THREE.RingGeometry(3.6, 3.63, 128),
-      new THREE.MeshBasicMaterial({ color: 0x568f8c, transparent: true, opacity: 0.24, side: THREE.DoubleSide }),
+      new THREE.RingGeometry(3.62, 3.66, 160),
+      new THREE.MeshBasicMaterial({ color: 0x69c6c0, transparent: true, opacity: 0.28, side: THREE.DoubleSide }),
     );
     ring.rotation.x = -Math.PI / 2;
-    ring.position.y = -1.19;
+    ring.position.y = floorY + 0.02;
     world.add(ring);
 
     const carRoot = new THREE.Group();
@@ -146,7 +271,7 @@ function CarViewport({ mode, explode, playing, light, showGrid, resetKey, onRead
     Promise.all([loaders.loadProtected('formulaCar.glb'), loadCarTextures(loaders)])
       .then(([gltf, textures]) => {
         if (disposed) return;
-        const carMaterials = createCarMaterials(textures, { initialKitProgress: 0, envMapIntensity: 0.76 });
+        const carMaterials = createCarMaterials(textures, { initialKitProgress: 0, envMapIntensity: 1.02 });
         shaderGroups.push(carMaterials.shaders);
         carVisual = gltf.scene;
         carPieces.push(...prepareCarVisual(carVisual, carMaterials.materials, 4.7));
@@ -161,7 +286,7 @@ function CarViewport({ mode, explode, playing, light, showGrid, resetKey, onRead
 
     let orbitYaw = 0.75;
     let orbitPitch = 0.31;
-    let orbitRadius = 7.2;
+    let orbitRadius = 6.8;
     let dragging = false;
     let previousX = 0;
     let previousY = 0;
@@ -185,7 +310,7 @@ function CarViewport({ mode, explode, playing, light, showGrid, resetKey, onRead
     };
     const onWheel = (event: WheelEvent) => {
       event.preventDefault();
-      orbitRadius = THREE.MathUtils.clamp(orbitRadius + event.deltaY * 0.006, 5.2, 10.5);
+      orbitRadius = THREE.MathUtils.clamp(orbitRadius + event.deltaY * 0.006, 5.0, 10.5);
     };
     renderer.domElement.addEventListener('pointerdown', onPointerDown);
     renderer.domElement.addEventListener('pointermove', onPointerMove);
@@ -227,6 +352,8 @@ function CarViewport({ mode, explode, playing, light, showGrid, resetKey, onRead
       const driveX = modeRef.current === 'drive' ? Math.sin(driveDistance * 0.42) * 0.8 : 0;
       carRoot.position.x += (driveX - carRoot.position.x) * Math.min(1, delta * 3.5);
       carRoot.rotation.y = modeRef.current === 'drive' ? -Math.PI / 2 : 0;
+      contact.position.x = carRoot.position.x;
+      contact.scale.set(modeRef.current === 'drive' ? 0.62 : 1, modeRef.current === 'drive' ? 1.7 : 1, 1);
 
       if (carVisual) {
         rollQuaternion.setFromAxisAngle(rollAxis, wheelRoll);
@@ -245,18 +372,29 @@ function CarViewport({ mode, explode, playing, light, showGrid, resetKey, onRead
         lastReset = resetRef.current;
         orbitYaw = 0.75;
         orbitPitch = 0.31;
-        orbitRadius = 7.2;
+        orbitRadius = 6.8;
       }
       grid.visible = gridRef.current;
       ring.visible = gridRef.current;
       const luminance = lightRef.current / 100;
-      key.intensity = 3.6 + luminance * 4.4;
-      teal.intensity = 8 + luminance * 17;
-      coral.intensity = 5 + luminance * 14;
+      key.intensity = 2.1 + luminance * 2.1;
+      rim.intensity = 1.5 + luminance * 2.0;
+      spark.intensity = 4 + luminance * 9;
+      scene.environmentIntensity = 0.72 + luminance * 0.62;
 
-      // A narrow editor canvas needs more distance to preserve the whole car;
-      // this is real camera framing, not a responsive CSS scale.
-      const frameRadius = orbitRadius * Math.max(1, 1.16 / camera.aspect);
+      /*
+       * The camera pulls back on a tall plate, not just a narrow one.
+       *
+       * A perspective camera holds its VERTICAL field of view, so the shorter
+       * the plate is relative to its width, the more of the car fits across it.
+       * The old guard only fired below 1.16:1, which was fine while the canvas
+       * was always letterboxed — then the timeline became collapsible, the plate
+       * went to 1.34:1, and the front wing ran off the right edge. 1.72 is the
+       * aspect at which this framing is composed, so anything squarer than that
+       * gets exactly enough extra distance to keep the whole car on the plate.
+       * This is real camera work, not a responsive CSS scale.
+       */
+      const frameRadius = orbitRadius * Math.max(1, 1.72 / camera.aspect);
       cameraTarget.set(
         carRoot.position.x + Math.sin(orbitYaw) * frameRadius,
         Math.sin(orbitPitch) * frameRadius * 0.5,
@@ -277,6 +415,8 @@ function CarViewport({ mode, explode, playing, light, showGrid, resetKey, onRead
       renderer.domElement.removeEventListener('pointerup', onPointerUp);
       renderer.domElement.removeEventListener('pointercancel', onPointerUp);
       renderer.domElement.removeEventListener('wheel', onWheel);
+      backdrop.geometry.dispose();
+      (backdrop.material as THREE.Material).dispose();
       disposeScene(world);
       environment.dispose();
       loaders.dispose();
@@ -296,6 +436,8 @@ function formatTime(seconds: number) {
   return `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}.${String(cs).padStart(2, '0')}`;
 }
 
+/* ------------------------------------------------------------------ shell --- */
+
 export function StudioDemo() {
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -309,9 +451,16 @@ export function StudioDemo() {
   const [time, setTime] = useState(5.2);
   const [track, setTrack] = useState<TrackId>('text');
   const [resetKey, setResetKey] = useState(0);
+  const [noteTab, setNoteTab] = useState<'text' | 'note'>('note');
+  const [noteDirection, setNoteDirection] = useState(2);
   const [noteLength, setNoteLength] = useState(100);
   const [noteWidth, setNoteWidth] = useState(50);
   const [noteOpacity, setNoteOpacity] = useState(100);
+  const [noteHeight, setNoteHeight] = useState(0);
+  const [noteBoxWidth, setNoteBoxWidth] = useState(0);
+  /* Request from the last review: the timeline is a panel you can put away.
+     Both the canvas chip and the rail's collapse button drive this one flag. */
+  const [timelineOpen, setTimelineOpen] = useState(true);
   const duration = 10.3;
   const progress = (time / duration) * 100;
   const handleReady = useCallback(() => setReady(true), []);
@@ -344,164 +493,356 @@ export function StudioDemo() {
     setPlaying(false);
   };
 
+  const noteDirections = useMemo(
+    () => ['M4 12h16', 'M4 6c7 0 9 12 16 12', 'M4 18c7 0 9-12 16-12', 'M4 18 20 6', 'M4 8c7 0 9 8 16 8', 'M4 12h16'],
+    [],
+  );
+
   return (
-    <div className="studio studio--figma" data-mode={mode}>
+    <div className="studio" data-mode={mode} data-timeline={timelineOpen ? 'open' : 'closed'}>
+      {/* ------------------------------------------------------- main rail --- */}
       <aside className="studio-main-rail" aria-label="Điều hướng chính YooLab">
-        <button className="studio-main-logo" aria-label="Trang chủ YooLab" onClick={() => setActiveMain('create')} type="button">
-          <img alt="" src={`${EDITOR_ASSET_ROOT}/logo.svg`} />
-          <img alt="" className="studio-main-logo-mark" src={`${EDITOR_ASSET_ROOT}/canvas-logo-mark.svg`} />
+        <button className="studio-brand" aria-label="Trang chủ YooLab" onClick={() => setActiveMain('create')} type="button">
+          <img alt="" src={`${EDITOR_ASSET_ROOT}/canvas-logo-mark.svg`} />
           <span>YooLab</span>
         </button>
+
         <div className="studio-main-tools">
-          {MAIN_TOOLS.map((item) => (
-            <button className={activeMain === item.id ? 'is-active' : ''} key={item.id} onClick={() => setActiveMain(item.id)} type="button">
-              <span className="studio-tool-icon" aria-hidden="true"><img alt="" src={`${EDITOR_ASSET_ROOT}/${item.asset}`} /></span>
-              <span>{item.label}</span>
+          {MAIN_TOOLS.map(({ id, label, Icon }) => (
+            <button
+              className={`studio-rail-item${activeMain === id ? ' is-active' : ''}${id === 'create' ? ' studio-rail-item--create' : ''}`}
+              key={id}
+              onClick={() => setActiveMain(id)}
+              type="button"
+              aria-pressed={activeMain === id}
+            >
+              <span className="studio-rail-glyph"><Icon /></span>
+              <span className="studio-rail-label">{label}</span>
             </button>
           ))}
         </div>
+
         <div className="studio-main-footer" aria-label="Tài khoản và ngôn ngữ">
-          <button aria-label="Thông báo" type="button"><img alt="" src={`${FIGMA_ASSET_ROOT}/bell.svg`} /><i>10</i></button>
-          <button aria-label="Ngôn ngữ: Tiếng Việt" type="button"><img alt="" src={`${FIGMA_ASSET_ROOT}/language.svg`} /><span>VNI</span></button>
-          <button className="studio-avatar" aria-label="Tài khoản" type="button"><img alt="" src={`${FIGMA_ASSET_ROOT}/avatar.png`} /></button>
+          <button className="studio-rail-mini" aria-label="Thông báo: 10 mới" type="button">
+            <IconBell /><i>10</i>
+          </button>
+          <button className="studio-rail-mini" aria-label="Ngôn ngữ: Tiếng Việt" type="button">
+            <IconGlobe /><small>VNI</small>
+          </button>
+          <span className="studio-avatar" aria-hidden="true">
+            <img alt="" src={`${FIGMA_ASSET_ROOT}/avatar.png`} />
+          </span>
         </div>
       </aside>
 
+      {/* ------------------------------------------------------- workspace --- */}
       <main className="studio-workspace">
-        <header className="studio-editor-topbar">
-          <div className="studio-document-title">
+        <header className="studio-topbar">
+          <span className="studio-doc-title">
             <b>Giới thiệu về loài Ong</b>
-            <button aria-label="Đổi tên bài học" type="button"><img alt="" src={`${FIGMA_ASSET_ROOT}/edit.svg`} /></button>
-          </div>
-          <img alt="Đang đồng bộ" className="studio-sync" src={`${FIGMA_ASSET_ROOT}/loading.svg`} />
-          <div className="studio-editor-actions" aria-label="Hành động dự án">
-            <button className="is-purple" aria-label="Mô hình 3D" onClick={() => setTrack('model')} type="button"><img alt="" src={`${FIGMA_ASSET_ROOT}/ar.svg`} /></button>
-            <button className="is-peach" aria-label="Công cụ AI" type="button"><img alt="" src={`${FIGMA_ASSET_ROOT}/ai.svg`} /><img alt="" className="studio-chevron" src={`${FIGMA_ASSET_ROOT}/chevron.svg`} /></button>
-            <button className="is-blue" aria-label="Toàn màn hình" onClick={() => setShowGrid((value) => !value)} type="button"><img alt="" src={`${FIGMA_ASSET_ROOT}/fullscreen.svg`} /></button>
-            <button className="is-teal" aria-label="Chia sẻ" aria-pressed={shared} onClick={() => setShared((value) => !value)} type="button"><img alt="" src={`${EDITOR_ASSET_ROOT}/share.svg`} /></button>
+            <button aria-label="Đổi tên bài học" type="button"><IconPencil /></button>
+          </span>
+          <span className="studio-sync" role="status" aria-label="Đang đồng bộ">
+            <img alt="" src={`${FIGMA_ASSET_ROOT}/loading.svg`} />
+          </span>
+          <div className="studio-topbar-actions" aria-label="Hành động dự án">
+            <button className="studio-chip studio-chip--violet" aria-label="Mô hình 3D" onClick={() => setTrack('model')} type="button">
+              <IconCube3d />
+            </button>
+            <button className="studio-chip studio-chip--peach studio-chip--wide" aria-label="Công cụ AI" type="button">
+              <IconAi /><IconChevronDown className="studio-chip-caret" />
+            </button>
+            <button className="studio-chip studio-chip--sky" aria-label="Toàn màn hình" onClick={() => setShowGrid((value) => !value)} type="button">
+              <IconFullscreen />
+            </button>
+            <span className="studio-topbar-divider" aria-hidden="true" />
+            <button className="studio-chip studio-chip--teal" aria-label="Chia sẻ" aria-pressed={shared} onClick={() => setShared((value) => !value)} type="button">
+              <IconShare />
+            </button>
           </div>
         </header>
 
         <section className="studio-viewport" aria-label="Không gian dựng bài học">
           <div className="studio-canvas">
-            <CarViewport explode={mode === 'assemble' ? 68 : 0} light={58} mode={mode} onError={handleError} onReady={handleReady} playing={playing} resetKey={resetKey} showGrid={showGrid} />
+            <CarViewport
+              explode={mode === 'assemble' ? 68 : 0}
+              light={58}
+              mode={mode}
+              onError={handleError}
+              onReady={handleReady}
+              playing={playing}
+              resetKey={resetKey}
+              showGrid={showGrid}
+            />
+
             <button className="studio-canvas-menu" onClick={() => setActiveMain('decor')} type="button">
-              <img alt="" src={`${EDITOR_ASSET_ROOT}/menu.svg`} /><span>Menu</span>
+              <IconMenu /><span>Menu</span>
             </button>
+
             <div className="studio-canvas-brand" aria-label="YooLab">
               <img alt="" src={`${EDITOR_ASSET_ROOT}/canvas-logo-mark.svg`} />
               <img alt="YooLab" src={`${EDITOR_ASSET_ROOT}/canvas-logo-word.svg`} />
             </div>
-            <div className="studio-canvas-actions" role="group" aria-label="Điều khiển khung nhìn">
-              <button aria-label={muted ? 'Bật âm thanh' : 'Tắt âm thanh'} aria-pressed={muted} onClick={() => setMuted((value) => !value)} type="button"><img alt="" src={`${FIGMA_ASSET_ROOT}/canvas-silent.svg`} /></button>
-              <button aria-label="Âm lượng" onClick={() => setMuted((value) => !value)} type="button"><img alt="" src={`${FIGMA_ASSET_ROOT}/canvas-volume.svg`} /></button>
-              <button aria-label="Đặt lại góc nhìn" onClick={() => setResetKey((value) => value + 1)} type="button"><img alt="" src={`${FIGMA_ASSET_ROOT}/canvas-reset.svg`} /></button>
-              <button aria-label="Khung chọn" aria-pressed={showGrid} onClick={() => setShowGrid((value) => !value)} type="button"><img alt="" src={`${FIGMA_ASSET_ROOT}/canvas-frame.svg`} /></button>
-              <button aria-label="Chế độ VR" onClick={() => chooseMode('drive')} type="button"><img alt="" src={`${FIGMA_ASSET_ROOT}/canvas-vr.svg`} /></button>
-              <button aria-label="Chia sẻ khung nhìn" onClick={() => setShared((value) => !value)} type="button"><img alt="" src={`${FIGMA_ASSET_ROOT}/canvas-share.svg`} /></button>
-              <button aria-label="Đóng chế độ xem" onClick={() => chooseMode('inspect')} type="button"><img alt="" src={`${FIGMA_ASSET_ROOT}/canvas-close.svg`} /></button>
+
+            <div className="studio-canvas-tools" role="group" aria-label="Điều khiển khung nhìn">
+              <button aria-label={muted ? 'Bật âm thanh' : 'Tắt âm thanh'} aria-pressed={muted} onClick={() => setMuted((value) => !value)} type="button"><IconSilent /></button>
+              <button aria-label="Âm lượng" onClick={() => setMuted((value) => !value)} type="button"><IconVolume /></button>
+              <button aria-label="Đặt lại góc nhìn" onClick={() => setResetKey((value) => value + 1)} type="button"><IconReset /></button>
+              <button aria-label="Khung lưới" aria-pressed={showGrid} onClick={() => setShowGrid((value) => !value)} type="button"><IconFrame /></button>
+              <button aria-label="Chế độ VR" onClick={() => chooseMode('drive')} type="button"><IconVr /></button>
+              <button aria-label="Chia sẻ khung nhìn" onClick={() => setShared((value) => !value)} type="button"><IconShareNodes /></button>
+              <button className="studio-canvas-close" aria-label="Đóng chế độ xem" onClick={() => chooseMode('inspect')} type="button"><IconClose /></button>
             </div>
-            <div className="studio-canvas-side-actions">
-              <button type="button"><img alt="" src={`${FIGMA_ASSET_ROOT}/upload.svg`} /><span>Upload</span></button>
-              <button onClick={() => setResetKey((value) => value + 1)} type="button"><img alt="" src={`${FIGMA_ASSET_ROOT}/set-view.svg`} /><span>SET VIEW</span></button>
+
+            <div className="studio-canvas-side">
+              <button type="button"><IconUpload /><span>Upload</span></button>
+              <button onClick={() => setResetKey((value) => value + 1)} type="button"><IconViewpoint /><span>Set view</span></button>
             </div>
+
             {!ready && !failed && <div className="studio-loader"><i />Đang tải mô hình xe thật…</div>}
             {failed && <div className="studio-loader studio-loader--error">Không thể tải mô hình xe.</div>}
-            <div className="studio-canvas-playback" aria-label="Điều khiển phát">
-              <button className="studio-play" aria-label={playing ? 'Tạm dừng timeline' : 'Phát timeline'} onClick={() => setPlaying((value) => !value)} type="button">
-                {playing ? <span className="studio-pause-bars" aria-hidden="true" /> : <img alt="" src={`${EDITOR_ASSET_ROOT}/play.svg`} />}
+
+            <div className="studio-playbar" aria-label="Điều khiển phát">
+              <button className="studio-playbar-play" aria-label={playing ? 'Tạm dừng' : 'Phát'} onClick={() => setPlaying((value) => !value)} type="button">
+                {playing ? <IconPause /> : <IconPlay />}
               </button>
-              <b>{formatTime(time)}</b><small>/ 00:10.30</small>
-              <div className="studio-playback-scrub" onPointerDown={scrub} role="slider" aria-label="Tiến trình phát" aria-valuemax={duration} aria-valuemin={0} aria-valuenow={time} tabIndex={0}>
+              <b>{formatTime(time)}<small> / 00:10.30</small></b>
+              <div
+                className="studio-playbar-scrub"
+                onPointerDown={scrub}
+                role="slider"
+                aria-label="Tiến trình phát"
+                aria-valuemax={duration}
+                aria-valuemin={0}
+                aria-valuenow={Number(time.toFixed(2))}
+                tabIndex={0}
+              >
                 <span style={{ width: `${progress}%` }} /><i style={{ left: `${progress}%` }} />
               </div>
             </div>
-            <button className="studio-canvas-timeline-toggle" type="button"><span aria-hidden="true" />Timeline<i aria-hidden="true" /></button>
+
+            <span className="studio-rail-handle" aria-hidden="true" />
+
+            <button
+              className="studio-timeline-chip"
+              aria-expanded={timelineOpen}
+              aria-controls="studio-timeline-panel"
+              onClick={() => setTimelineOpen((value) => !value)}
+              type="button"
+            >
+              <IconGrip /><span>Timeline</span><IconChevronDown className="studio-timeline-chip-caret" />
+            </button>
           </div>
         </section>
 
+        {/* -------------------------------------------------------- timeline --- */}
         <section className="studio-timeline" aria-label="Timeline bài học">
-          <div className="studio-timeline-side" aria-label="Công cụ timeline">
-            <button aria-label="Hoàn tác" type="button"><span className="studio-timeline-glyph studio-timeline-glyph--undo" /></button>
-            <button aria-label="Làm lại" type="button"><span className="studio-timeline-glyph studio-timeline-glyph--redo" /></button>
-            <button aria-label="Xóa đối tượng" type="button"><span className="studio-timeline-glyph studio-timeline-glyph--delete" /></button>
-            <button aria-label="Khớp thời lượng" type="button"><span className="studio-timeline-glyph studio-timeline-glyph--fit" /></button>
-            <button aria-label="Nhóm đối tượng" type="button"><span className="studio-timeline-glyph studio-timeline-glyph--folder" /></button>
-            <button aria-label="Sao chép đối tượng" type="button"><span className="studio-timeline-glyph studio-timeline-glyph--copy" /></button>
-            <button aria-label="Thu gọn timeline" type="button"><span className="studio-timeline-glyph studio-timeline-glyph--collapse" /></button>
+          <div className="studio-spaces">
+            <button className={mode === 'inspect' ? 'is-active' : ''} onClick={() => chooseMode('inspect')} type="button">Space 1: Bee</button>
+            <button className={mode === 'assemble' ? 'is-active' : ''} onClick={() => chooseMode('assemble')} type="button">Space 2: Cấu tạo</button>
+            <button className="studio-space-add" aria-label="Thêm không gian" onClick={() => chooseMode('drive')} type="button"><IconPlus /></button>
           </div>
-          <div className="studio-timeline-tabs">
-            <div>
-              <button className={mode === 'inspect' ? 'is-active' : ''} onClick={() => chooseMode('inspect')} type="button">Space 1: Bee</button>
-              <button className={mode === 'assemble' ? 'is-active' : ''} onClick={() => chooseMode('assemble')} type="button">Space 2: Cấu tạo</button>
-              <button className="studio-add-space" aria-label="Thêm không gian" onClick={() => chooseMode('drive')} type="button"><span aria-hidden="true" /></button>
-            </div>
-          </div>
+
           <div className="studio-stepbar">
-            <button onClick={() => chooseMode('drive')} type="button">Tạo Step</button>
-            <button className="studio-timeline-customize" type="button"><img alt="" src={`${EDITOR_ASSET_ROOT}/settings.svg`} />Tùy chỉnh</button>
+            <button className="studio-step-create" onClick={() => chooseMode('drive')} type="button">Tạo Step</button>
+            <button className="studio-step-customize" type="button"><IconSettings />Tùy chỉnh</button>
           </div>
-          <div className="studio-timeline-commandbar">
-            <button className="studio-timeline-display" type="button">Timeline hiển thị</button>
-            <div className="studio-range-readout"><span>Start</span><b>0</b><span>End</span><b>0</b></div>
-            <div className="studio-transport" aria-label="Điều khiển timeline">
-              <button aria-label="Về đầu" onClick={() => setTime(0)} type="button"><span className="to-start" /></button>
-              <button aria-label="Phát" onClick={() => setPlaying(true)} type="button"><span className="play-forward" /></button>
-              <button aria-label="Tới cuối" onClick={() => setTime(duration)} type="button"><span className="to-end" /></button>
-              <button aria-label="Lùi một bước" onClick={() => setTime((value) => Math.max(0, value - 1))} type="button"><span className="step-back" /></button>
-              <button aria-label="Tiến một bước" onClick={() => setTime((value) => Math.min(duration, value + 1))} type="button"><span className="step-forward" /></button>
-            </div>
-            <button className="studio-step-select" type="button">Bước 1 (Step - 1) · Mở cửa<span aria-hidden="true" /></button>
-          </div>
-          <div className="studio-timeline-grid">
-            <div className="studio-timeline-ruler"><span>Đối tượng</span><div>{[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150].map((value) => <i key={value}>{value}</i>)}</div></div>
-            {TRACKS.map((item) => (
-              <div className={`studio-track${track === item.id ? ' is-active' : ''}`} key={item.id}>
-                <button className="studio-track-name" onClick={() => { setTrack(item.id); setActiveDetail(item.id === 'model' ? 'space' : item.id); }} type="button"><img alt="" src={`${EDITOR_ASSET_ROOT}/${item.asset}`} /><span>{item.label}</span><em aria-hidden="true" /></button>
-                <div className="studio-track-lane" onPointerDown={scrub} role="slider" aria-label={`Timeline ${item.label}`} aria-valuemax={duration} aria-valuemin={0} aria-valuenow={time} tabIndex={0}>
-                  <span className={`studio-clip studio-clip--${item.id}`} style={{ background: item.color, left: `${item.start * 100}%`, width: `${item.length * 100}%` }}><b>Title</b><small>Sub-title</small>{item.id === 'audio' && <img alt="" src={`${FIGMA_ASSET_ROOT}/timeline-wave.svg`} />}</span>
-                  <span className="studio-playhead" style={{ left: `${progress}%` }} />
+
+          <div className="studio-timeline-panel" id="studio-timeline-panel" hidden={!timelineOpen}>
+            <aside className="studio-timeline-tools" aria-label="Công cụ timeline">
+              {TIMELINE_TOOLS.map(({ id, label, Icon }) => (
+                <button aria-label={label} key={id} title={label} type="button"><Icon /></button>
+              ))}
+              <button
+                aria-label="Thu gọn timeline"
+                className="studio-timeline-collapse"
+                onClick={() => setTimelineOpen(false)}
+                title="Thu gọn timeline"
+                type="button"
+              >
+                <IconCollapse />
+              </button>
+            </aside>
+
+            <div className="studio-timeline-body">
+              <div className="studio-commandbar">
+                <button className="studio-command-pill" type="button">Timeline hiển thị</button>
+                <div className="studio-range-readout">
+                  <IconClock /><span>Start</span><b>0</b><span>End</span><b>0</b>
                 </div>
+                <div className="studio-transport" aria-label="Điều khiển timeline">
+                  <button aria-label="Về đầu" onClick={() => { setTime(0); setPlaying(false); }} type="button"><IconToStart /></button>
+                  <button aria-label={playing ? 'Tạm dừng' : 'Phát'} onClick={() => setPlaying((value) => !value)} type="button">{playing ? <IconPause /> : <IconPlay />}</button>
+                  <button aria-label="Tới cuối" onClick={() => { setTime(duration); setPlaying(false); }} type="button"><IconToEnd /></button>
+                  <span className="studio-transport-gap" aria-hidden="true" />
+                  <button aria-label="Lùi một giây" onClick={() => setTime((value) => Math.max(0, value - 1))} type="button"><IconStepBack /></button>
+                  <button aria-label="Tiến một giây" onClick={() => setTime((value) => Math.min(duration, value + 1))} type="button"><IconStepForward /></button>
+                </div>
+                <button className="studio-step-select" type="button">
+                  <span>Bước 1 (Step - 1) - Mở cửa</span><IconChevronDown />
+                </button>
               </div>
-            ))}
+
+              <div className="studio-timeline-grid">
+                <div className="studio-timeline-ruler">
+                  <button className="studio-ruler-head" type="button">Đối tượng<IconChevronDown /></button>
+                  <div className="studio-ruler-scale">
+                    {RULER.map((value) => <i key={value}><em>{value}</em></i>)}
+                  </div>
+                </div>
+
+                {TRACKS.map(({ id, label, color, Icon, start, length }) => (
+                  <div className={`studio-track${track === id ? ' is-active' : ''}`} key={id}>
+                    <button
+                      className="studio-track-name"
+                      onClick={() => { setTrack(id); setActiveDetail(id === 'model' ? 'space' : id); }}
+                      type="button"
+                    >
+                      <Icon /><span>{label}</span><IconChevronDown className="studio-track-caret" />
+                    </button>
+                    <div
+                      className="studio-track-lane"
+                      onPointerDown={scrub}
+                      role="slider"
+                      aria-label={`Timeline ${label}`}
+                      aria-valuemax={duration}
+                      aria-valuemin={0}
+                      aria-valuenow={Number(time.toFixed(2))}
+                      tabIndex={0}
+                    >
+                      <span
+                        className={`studio-clip studio-clip--${id}`}
+                        style={{ background: color, left: `${start * 100}%`, width: `${length * 100}%` }}
+                      >
+                        <i className="studio-clip-handle" aria-hidden="true" />
+                        <b>Tiltle</b><small>Sub-title</small>
+                        {id === 'audio' && <img alt="" src={`${FIGMA_ASSET_ROOT}/timeline-wave.svg`} />}
+                        <i className="studio-clip-handle studio-clip-handle--end" aria-hidden="true" />
+                      </span>
+                      <span className="studio-playhead" style={{ left: `${progress}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </section>
       </main>
 
+      {/* ----------------------------------------------------- content rail --- */}
       <aside className="studio-detail-rail" aria-label="Công cụ nội dung">
-        {DETAIL_TOOLS.map((item) => (
-          <button className={activeDetail === item.id ? 'is-active' : ''} key={item.id} onClick={() => setActiveDetail(item.id)} type="button">
-            <span className="studio-tool-icon" aria-hidden="true"><img alt="" src={`${EDITOR_ASSET_ROOT}/${item.asset}`} /></span><span>{item.label}</span>
+        {DETAIL_TOOLS.map(({ id, label, Icon }) => (
+          <button
+            className={`studio-rail-item${activeDetail === id ? ' is-active' : ''}`}
+            key={id}
+            onClick={() => setActiveDetail(id)}
+            type="button"
+            aria-pressed={activeDetail === id}
+          >
+            <span className="studio-rail-glyph"><Icon /></span>
+            <span className="studio-rail-label">{label}</span>
           </button>
         ))}
       </aside>
 
+      {/* ------------------------------------------------------- properties --- */}
       <aside className="studio-properties" aria-label="Thiết lập văn bản">
         <h4>Thiết lập văn bản</h4>
-        <section className="studio-property-section studio-transform-group">
+
+        <section className="studio-prop-block">
           <h5>Chuyển đổi tỷ lệ</h5>
-          <div className="studio-vector"><span>Vị trí</span><i>0<small>X</small></i><i>0<small>Y</small></i><i>0<small>Z</small></i></div>
-          <div className="studio-vector"><span>Xoay</span><i>0<small>X</small></i><i>0<small>Y</small></i><i>0<small>Z</small></i></div>
-          <div className="studio-vector"><span>Tỷ lệ</span><i>0<small>X</small></i><i>0<small>Y</small></i><i>0<small>Z</small></i></div>
+          <div className="studio-vector"><IconPositionAxis /><span>Vị trí</span><i>0<small>X</small></i><i>0<small>Y</small></i><i>0<small>Z</small></i></div>
+          <div className="studio-vector"><IconRotateAxis /><span>Xoay</span><i>0°<small>X</small></i><i>0°<small>Y</small></i><i>0°<small>Z</small></i></div>
+          <div className="studio-vector"><IconScaleAxis /><span>Tỷ lệ</span><i>1.00<small>X</small></i><i>1.00<small>Y</small></i><i>1.00<small>Z</small></i></div>
         </section>
-        <div className="studio-note-tabs"><button type="button">Văn Bản</button><button className="is-active" type="button">Ghi Chú</button></div>
-        <section className="studio-property-section">
+
+        <div className="studio-segment" role="group" aria-label="Loại nội dung">
+          <button className={noteTab === 'text' ? 'is-active' : ''} onClick={() => setNoteTab('text')} type="button">Văn Bản</button>
+          <button className={noteTab === 'note' ? 'is-active' : ''} onClick={() => setNoteTab('note')} type="button">Ghi Chú</button>
+        </div>
+
+        <section className="studio-prop-block">
           <h5>Tùy chỉnh phong cách</h5>
-          <label className="studio-field-label">Hướng hiển thị</label>
-          <div className="studio-note-directions">{Array.from({ length: 6 }, (_, index) => <button className={index === 2 ? 'is-active' : ''} aria-label={`Hướng ghi chú ${index + 1}`} key={index} type="button"><span /></button>)}</div>
-          <div className="studio-property-row"><span>Màu sắc đường ghi chú</span><button className="studio-color-well" aria-label="Chọn màu" type="button" /></div>
-          <label className="studio-slider studio-slider--figma">Độ dài đường ghi chú <span>{noteLength}</span><input aria-label="Độ dài đường ghi chú" max="160" min="20" onChange={(event) => setNoteLength(Number(event.target.value))} type="range" value={noteLength} /></label>
-          <label className="studio-slider studio-slider--figma">Độ dày đường chú thích <span>{noteWidth} px</span><input aria-label="Độ dày đường chú thích" max="100" min="1" onChange={(event) => setNoteWidth(Number(event.target.value))} type="range" value={noteWidth} /></label>
-          <label className="studio-slider studio-slider--figma">Opacity đường chú thích <span>{noteOpacity}%</span><input aria-label="Độ trong đường chú thích" max="100" min="10" onChange={(event) => setNoteOpacity(Number(event.target.value))} type="range" value={noteOpacity} /></label>
-          <div className="studio-size-settings"><b>Thiết lập kích thước</b><div><span>Cao</span><i><button aria-label="Giảm chiều cao" type="button" /><b>0</b><button aria-label="Tăng chiều cao" type="button" /></i><span>Rộng</span><i><button aria-label="Giảm chiều rộng" type="button" /><b>0</b><button aria-label="Tăng chiều rộng" type="button" /></i></div></div>
-          <div className="studio-view-settings"><b>Thiết lập góc nhìn</b><button onClick={() => setResetKey((value) => value + 1)} type="button"><img alt="" src={`${FIGMA_ASSET_ROOT}/set-view.svg`} />Thiết lập góc nhìn</button></div>
+
+          <p className="studio-field-label">Hướng hiển thị</p>
+          <div className="studio-note-directions" role="group" aria-label="Hướng đường ghi chú">
+            {noteDirections.map((path, index) => (
+              <button
+                aria-label={`Hướng ghi chú ${index + 1}`}
+                aria-pressed={noteDirection === index}
+                className={noteDirection === index ? 'is-active' : ''}
+                key={path + index}
+                onClick={() => setNoteDirection(index)}
+                type="button"
+              >
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d={path} stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+                  <circle cx={index === 0 || index === 5 ? 20 : index % 2 ? 4 : 20} cy={index === 0 || index === 5 ? 12 : index === 1 ? 6 : index === 2 ? 18 : index === 3 ? 18 : 8} r="2.1" fill="currentColor" />
+                </svg>
+              </button>
+            ))}
+          </div>
+
+          <div className="studio-prop-row">
+            <span>Màu sắc đường ghi chú</span>
+            <button className="studio-color-well" aria-label="Chọn màu đường ghi chú" type="button" />
+          </div>
+
+          <label className="studio-slider">
+            <span>Độ dài đường chú thích</span><b>{noteLength}</b>
+            <input aria-label="Độ dài đường chú thích" max="160" min="20" onChange={(event) => setNoteLength(Number(event.target.value))} type="range" value={noteLength} />
+          </label>
+          <label className="studio-slider">
+            <span>Độ dày đường chú thích</span><b>{noteWidth} px</b>
+            <input aria-label="Độ dày đường chú thích" max="100" min="1" onChange={(event) => setNoteWidth(Number(event.target.value))} type="range" value={noteWidth} />
+          </label>
+          <label className="studio-slider studio-slider--swatch">
+            <span>Opacity đường chú thích</span><b>{noteOpacity}%</b>
+            <input aria-label="Độ trong đường chú thích" max="100" min="10" onChange={(event) => setNoteOpacity(Number(event.target.value))} type="range" value={noteOpacity} />
+            <i className="studio-alpha-well" style={{ '--alpha': noteOpacity / 100 } as React.CSSProperties} aria-hidden="true" />
+          </label>
         </section>
-        <section className="studio-property-section studio-animation-settings">
+
+        <section className="studio-prop-block">
+          <p className="studio-field-label">Thiết lập kích thước</p>
+          <div className="studio-steppers">
+            <span className="studio-stepper"><IconHeightAxis /><em>Cao</em>
+              <i>
+                <button aria-label="Giảm chiều cao" onClick={() => setNoteHeight((v) => Math.max(0, v - 1))} type="button"><IconMinus /></button>
+                <b>{noteHeight}</b>
+                <button aria-label="Tăng chiều cao" onClick={() => setNoteHeight((v) => v + 1)} type="button"><IconPlus /></button>
+              </i>
+            </span>
+            <span className="studio-stepper"><IconWidthAxis /><em>Rộng</em>
+              <i>
+                <button aria-label="Giảm chiều rộng" onClick={() => setNoteBoxWidth((v) => Math.max(0, v - 1))} type="button"><IconMinus /></button>
+                <b>{noteBoxWidth}</b>
+                <button aria-label="Tăng chiều rộng" onClick={() => setNoteBoxWidth((v) => v + 1)} type="button"><IconPlus /></button>
+              </i>
+            </span>
+          </div>
+
+          <p className="studio-field-label">Thiết lập góc nhìn</p>
+          <button className="studio-primary-button" onClick={() => setResetKey((value) => value + 1)} type="button">
+            <IconViewpoint />Thiết lập góc nhìn
+          </button>
+        </section>
+
+        <section className="studio-prop-block">
           <h5>Hiển thị theo Animation</h5>
-          <label>Chế độ hiển thị<select defaultValue="step"><option value="step">Theo Bước (Step)</option></select></label>
-          <label>Animation áp dụng<select defaultValue="choose"><option value="choose">Chọn Bước (Step)</option></select></label>
+          <label className="studio-select"><span>Chế độ hiển thị</span>
+            <i><select defaultValue="step" aria-label="Chế độ hiển thị"><option value="step">Theo Bước (Step)</option></select><IconChevronDown /></i>
+          </label>
+          <label className="studio-select"><span>Animation áp dụng</span>
+            <i><select defaultValue="choose" aria-label="Animation áp dụng"><option value="choose">Chọn Bước (Step)</option></select><IconChevronDown /></i>
+          </label>
+        </section>
+
+        <section className="studio-prop-block">
           <h5>Cách hiển thị</h5>
-          <label>Bắt đầu từ bước<select defaultValue="first"><option value="first">Chọn bước</option></select></label>
+          <label className="studio-select"><span>Bắt đầu từ bước</span>
+            <i><select defaultValue="first" aria-label="Bắt đầu từ bước"><option value="first">Chọn bước</option></select><IconChevronDown /></i>
+          </label>
         </section>
       </aside>
     </div>
