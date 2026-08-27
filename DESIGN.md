@@ -185,9 +185,50 @@ so `calc(15 * var(--u))` reads as "the 15 px control from the frame". The two
 differ only in their floor: a 34 px control can become a 22 px control and still
 be a control, while 15 px type cannot become 7 px type and still be type.
 
-The editor's icons are drawn in `app/components/studio/EditorIcons.tsx` in
-`currentColor`, not loaded from `/asset/ui/yoolab-editor/*.svg`. Those files did
-not match the design — `settings.svg` was a byte-identical copy of `text.svg`, so
-"Thiết lập" drew a text cursor where the frame has a gear — they were exported
-with `preserveAspectRatio="none"`, and their baked `#5D7E81` strokes forced the
-active state through a nine-stop `filter` chain.
+### Icons and colour come out of the frame, not off a screenshot
+
+`app/components/studio/EditorIcons.tsx` is **generated**. `scripts/build-editor-icons.mjs`
+reads `public/asset/ui/yoolab-editor/figma/*.svg` — one export per node, pulled
+through the Figma MCP's `get_design_context` — and inlines them. Run the script
+after re-exporting; never hand-edit the component.
+
+Two rounds of review landed on this file and the history is worth keeping:
+
+1. The original `/asset/ui/yoolab-editor/*.svg` set did not match the design.
+   `settings.svg` was a byte-identical copy of `text.svg`, so "Thiết lập" drew a
+   text cursor where the frame has a gear.
+2. So the set was **redrawn by hand** on a 24-unit grid in `currentColor`. That
+   fixed the wrong glyphs and made state a colour change, and it was rejected on
+   sight: "các icon mình thấy bạn đang cố làm theo chứ không lấy từ figma". An
+   icon redrawn from a thumbnail is a different icon, and a rail of sixty of them
+   reads as an imitation of the product however close each one gets.
+
+The generator makes exactly three normalisations and nothing else: it drops
+Figma's `preserveAspectRatio="none"` (which stretches a glyph to its slot instead
+of fitting it), namespaces the `id`s Figma reuses across every export, and maps
+the flat house colours onto `currentColor` so the active state is still a colour
+change. Multi-colour marks — the brand disc, the two-tone folder, the close
+control whose cross is a hole in a translucent disc — keep their own fills. Three
+canvas tools ship in a ~50-unit box because Figma writes the drop-shadow's bleed
+into the SVG's own size; those carry an explicit `crop` back to their real 24.
+
+The same rule holds for colour. `--ed-*` in `studio.css` are the frame's **named
+styles** (Color/Green Offical `#195658`, Color/Neon Green `#00AAAB`,
+Color/Gradient Brand `#96DEDA → #50C9C3`, Color/Brand Menu `#5D7E81`,
+Light/White Blur2 `#F0F1F3`, Light/Grey Sup 2 `#D9D9D9`, Others/red `#AD172B`),
+not neighbours picked by eye. Being four units off on each of nine tokens is not
+visible one at a time and is completely visible all at once.
+
+Geometry is the one place the frame is not copied literally. `--u` and `--t`
+diverge below a ~1000 px editor on purpose (see above), so a control's *size* is
+adapted while its shape, radius ratio and colour are not.
+
+### The workspace glass
+
+`.tool-frame` is a 6–12 px bezel around the editor card: a vertical tint, a 1 px
+specular top edge, an inner shade at the bottom and a wide ambient below. The
+blur lives **only in the rim** — the pool of light behind the section bends
+through a band of cover glass at the card's edge while the editor's own surface
+stays crisp. That is what keeps it a material rather than the decorative wash the
+craft floor rejects. Its outer radius is the card's radius plus the bezel, and
+`.tool-story` uses the same sum so the two surfaces on that row share a corner.

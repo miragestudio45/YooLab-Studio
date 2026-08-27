@@ -1319,7 +1319,7 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
   align-items: end;
 }
 
-.section-heading--split > p, .tool-heading-copy > p {
+.section-heading--split > p {
   max-width: 46ch;
   margin: 0 0 4px;
   color: var(--ink-2);
@@ -2918,7 +2918,8 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
   .hero-spec { grid-column: 1; grid-row: 1; justify-self: end; align-self: end; margin-bottom: 22px; }
   .annotation { display: none; }
   .section-heading--split { grid-template-columns: minmax(0, 1fr); gap: 22px; align-items: start; }
-  .section-heading--split > p, .tool-heading-copy > p { max-width: 52ch; }
+  .section-heading--split > p { max-width: 52ch; }
+  .tool-heading-lede { max-width: 52ch; }
 
   /*
    * The hamburger appears with the desktop nav disappearance, not 180 px later.

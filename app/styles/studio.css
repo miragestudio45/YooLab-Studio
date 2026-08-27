@@ -120,15 +120,34 @@
 .tool-stage > .shell { width: auto; min-width: 0; margin-inline: 0; }
 .tool-stage > .shell:first-child { grid-area: heading; }
 
+/*
+ * Two rows, four cells, two baselines.
+ *
+ * This band was two stacked blocks bottom-aligned by box (`align-items: end`),
+ * which meant the only thing the two halves shared was an edge — and because the
+ * right block's height is whatever its paragraph happens to wrap to, that edge
+ * moved with the viewport while the left block's did not. At 1920 it left the
+ * lede floating 25 px above the kicker with nothing to relate to, which is the
+ * "chưa align chuẩn" in the review.
+ *
+ * Now the kicker and the lede are row one and align on their FIRST baselines; the
+ * heading and the link are row two and align on their LAST. Both halves of the
+ * band therefore sit on two shared rules that hold at every width, and neither
+ * one depends on the other's box height.
+ */
 .tool-heading {
   display: grid;
-  align-items: end;
-  gap: clamp(12px, 1.4vw, 30px);
+  gap: clamp(4px, 0.9vh, 10px) clamp(28px, 4vw, 76px);
   grid-template-columns: minmax(0, 1fr) clamp(250px, 26vw, 470px);
+  grid-template-rows: auto auto;
 }
 
-.tool-heading > div:first-child { min-width: 0; }
-.tool-heading .section-kicker { margin-bottom: clamp(2px, 0.5vh, 7px); font-size: clamp(8px, 0.52vw, 10px); letter-spacing: 0.12em; }
+.tool-heading > .section-kicker,
+.tool-heading > .tool-heading-lede { align-self: baseline; }
+.tool-heading > h2,
+.tool-heading > .tool-heading-link { align-self: last baseline; }
+
+.tool-heading .section-kicker { margin: 0; font-size: clamp(8px, 0.52vw, 10px); letter-spacing: 0.12em; }
 
 .tool-heading h2 {
   margin: 0;
@@ -139,25 +158,81 @@
   white-space: nowrap;
 }
 
-.tool-heading-copy { display: block; padding-bottom: clamp(2px, 0.6vh, 8px); }
-.tool-heading-copy > p { max-width: 46ch; margin: 0; color: var(--ink-2); font-size: clamp(11px, 0.72vw, 13.5px); line-height: 1.5; }
+.tool-heading-lede { max-width: 46ch; margin: 0; color: var(--ink-2); font-size: clamp(11px, 0.72vw, 13.5px); line-height: 1.5; }
 
-.tool-heading-copy a {
+.tool-heading-link {
   display: inline-flex;
+  width: fit-content;
   align-items: center;
   gap: clamp(8px, 0.7vw, 14px);
-  margin-top: clamp(5px, 0.9vh, 11px);
   color: var(--brand-deep);
   font-size: clamp(10px, 0.66vw, 12.5px);
   font-weight: 650;
   transition: gap 0.24s var(--ease-reveal);
 }
 
-.tool-heading-copy a:hover { gap: clamp(12px, 1.1vw, 20px); }
-.tool-heading-copy a span { color: var(--brand-accent); }
+.tool-heading-link:hover { gap: clamp(12px, 1.1vw, 20px); }
+.tool-heading-link span { color: var(--brand-accent); }
 
 .tool-workspace { grid-area: workspace; display: flex; min-width: 0; min-height: 0; }
 .tool-feature-shell { grid-area: story; min-width: 0; min-height: 0; }
+
+/*
+ * The glass the editor is mounted behind.
+ *
+ * Asked for in review as "1 khung dạng liquid glass bao quanh". The rule that
+ * keeps it a material instead of a decorative wash: the blur happens only in the
+ * rim, so the section's pool of light bends through a band of cover glass at the
+ * edge of the card and the editor's own surface stays perfectly crisp. Four
+ * layers do it — a vertical tint that is brightest at the top where a real sheet
+ * of glass catches the room, a 1 px specular top edge, a darker inner shade at
+ * the bottom where the sheet's thickness shows, and a wide outer ambient that
+ * puts the whole assembly above the paper.
+ *
+ * `--frame-pad` is the glass's thickness; the outer radius is the editor's own
+ * radius plus that thickness, so the two curves stay concentric at every width.
+ */
+.tool-frame {
+  --frame-pad: clamp(6px, 0.62vw, 12px);
+
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  padding: var(--frame-pad);
+  border-radius: calc(clamp(14px, 1.15vw, 22px) + var(--frame-pad));
+  background:
+    linear-gradient(178deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.34) 38%, rgba(214, 236, 234, 0.3) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.55),
+    0 0 0 1px rgba(23, 78, 79, 0.09),
+    0 26px 60px -28px rgba(28, 62, 61, 0.26),
+    0 60px 120px -70px rgba(16, 88, 90, 0.45);
+  backdrop-filter: blur(22px) saturate(150%);
+}
+
+/* The specular sweep. It sits inside the rim, over the tint and under the card,
+   and is clipped to the top third so it reads as a highlight on a curved edge
+   rather than as a gradient poured over the whole frame. */
+.tool-frame::before {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(102deg, rgba(255, 255, 255, 0.86) 0%, rgba(255, 255, 255, 0) 26%, rgba(255, 255, 255, 0) 74%, rgba(255, 255, 255, 0.6) 100%);
+  content: '';
+  mask-image: linear-gradient(180deg, #000 0%, transparent 34%);
+  pointer-events: none;
+}
+
+.tool-frame > * { position: relative; z-index: 1; }
+
+@supports not (backdrop-filter: blur(2px)) {
+  .tool-frame { background: linear-gradient(178deg, rgba(255, 255, 255, 0.9), rgba(226, 240, 238, 0.75)); }
+}
 
 /* ======================================================== the editor card === */
 
@@ -171,14 +246,24 @@
      canvas rather than on the timeline. */
   --tl-row: max(calc(228 * var(--u)), min(calc(352 * var(--u)), 34%));
 
-  --ed-teal: #10585a;
-  --ed-teal-bright: #12b3ac;
-  --ed-teal-soft: #7ddcd5;
-  --ed-ink: #1d2322;
-  --ed-ink-2: #48605f;
-  --ed-line: #e3e8e7;
-  --ed-line-soft: #eff2f2;
-  --ed-fill: #f2f4f4;
+  /*
+   * Every one of these is a named style in the source frame, read out of the
+   * design context rather than sampled off a screenshot: Color/Green Offical,
+   * Color/Neon Green, Color/Gradient Brand, Color/Brand Menu, Dark/Black Grey 1,
+   * Light/Grey Sup 2, Light/White Blur2, Others/red. They were nine hand-picked
+   * neighbours of these before, and being a few units off on every one of them
+   * is most of what made the editor read as an imitation of the design.
+   */
+  --ed-teal: #195658;          /* Color/Green Offical */
+  --ed-teal-bright: #00aaab;   /* Color/Neon Green */
+  --ed-teal-soft: #96deda;     /* Color/Gradient Brand, light stop */
+  --ed-teal-deep: #50c9c3;     /* Color/Gradient Brand, dark stop */
+  --ed-ink: #1c1c1c;           /* Dark/Black Grey 1 */
+  --ed-ink-2: #5d7e81;         /* Color/Brand Menu */
+  --ed-line: #d9d9d9;          /* Light/Grey Sup 2 */
+  --ed-line-soft: #f0f1f3;     /* Light/White Blur2 */
+  --ed-fill: #f0f1f3;          /* Light/White Blur2 */
+  --ed-red: #ad172b;           /* Others/red — the playhead */
   --ed-canvas: #232628;
 
   container-type: inline-size;
@@ -199,18 +284,16 @@
   background: #fff;
   font-family: var(--font-sans);
   /*
-   * Five layers, each doing a different job: a hairline that keeps the white
-   * card off the white page, a tight contact shadow that sets it down, a mid
-   * shadow that gives it thickness, a wide ambient one that gives it a room,
-   * and a cool spill that ties it to the teal in the band. This is the
-   * "làm nổi bật phần workspace" in one rule.
+   * The card now sits inside `.tool-frame`, and the frame carries the room: the
+   * wide ambient and the cool spill moved out there. What is left here is what
+   * belongs to the card itself — a hairline that keeps white off white, and a
+   * tight contact shadow that sets it down on the glass. Keeping both sets was
+   * two lifts stacked, and it read as a card floating over another card.
    */
   box-shadow:
-    0 0 0 1px rgba(23, 78, 79, 0.1),
-    0 1px 2px rgba(35, 51, 50, 0.06),
-    0 10px 22px -8px rgba(35, 51, 50, 0.14),
-    0 34px 70px -26px rgba(28, 62, 61, 0.28),
-    0 60px 120px -60px rgba(16, 88, 90, 0.4);
+    0 0 0 1px rgba(23, 78, 79, 0.11),
+    0 1px 2px rgba(35, 51, 50, 0.07),
+    0 8px 18px -10px rgba(35, 51, 50, 0.2);
 }
 
 .studio[data-timeline='closed'] { --tl-row: auto; }
@@ -308,41 +391,75 @@
 
 /* -------------------------------------------------------------- brand --- */
 
+/*
+ * The mark is the frame's `Logo YooStudio` (48980:166621), all three layers.
+ *
+ * It was a rounded square with a teal gradient poured into it and a re-tinted
+ * canvas glyph on top: the right colour family, the wrong silhouette. The real
+ * mark is a drawn blob with its own asymmetric corners and its own four-stop
+ * ramp, and no `border-radius` reproduces that. The blob is now the background
+ * layer, the bird and the wordmark sit on it, and nothing here is filtered.
+ */
 .studio-brand {
+  position: relative;
   display: grid;
-  width: calc(58 * var(--u));
-  height: calc(58 * var(--u));
+  width: calc(60 * var(--u));
+  height: calc(60 * var(--u));
   flex: none;
   align-content: center;
   justify-items: center;
   margin: 0 auto calc(16 * var(--u));
   padding: 0;
-  border-radius: calc(17 * var(--u));
-  background: linear-gradient(158deg, #17696a 0%, #0d4a4d 100%);
-  box-shadow: 0 calc(5 * var(--u)) calc(14 * var(--u)) rgba(13, 74, 77, 0.28);
-  gap: calc(2 * var(--u));
-  transition: transform 0.24s var(--ease-reveal), box-shadow 0.24s var(--ease-reveal);
+  gap: calc(4 * var(--u));
+  transition: transform 0.24s var(--ease-reveal), filter 0.24s var(--ease-reveal);
 }
 
-.studio-brand:hover { box-shadow: 0 calc(8 * var(--u)) calc(18 * var(--u)) rgba(13, 74, 77, 0.34); transform: translateY(-1px); }
+.studio-brand:hover { filter: drop-shadow(0 calc(6 * var(--u)) calc(14 * var(--u)) rgba(25, 86, 88, 0.34)); transform: translateY(-1px); }
 
-.studio-brand img {
-  width: calc(26 * var(--u));
+.studio-brand-blob {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.studio-brand-bird {
+  position: relative;
+  width: calc(36 * var(--u));
   height: auto;
-  filter: brightness(0) invert(1);
 }
 
 .studio-brand span {
+  position: relative;
   color: #fff;
-  font-size: calc(11.5 * var(--t));
-  font-weight: 720;
-  letter-spacing: -0.02em;
+  font-size: calc(11.6 * var(--t));
+  font-weight: 800;
+  letter-spacing: -0.01em;
   line-height: 1;
 }
 
 /* ---------------------------------------------------------- rail items --- */
 
-.studio-main-tools { display: flex; min-height: 0; flex: 1; flex-direction: column; gap: calc(2 * var(--u)); }
+/*
+ * The tool list scrolls; the mark and the account block stay put.
+ *
+ * The rail as a whole was the scroll container, and its children are `flex: none`
+ * — so on a short editor (1366 and 1024, where the card is ~540 px tall) the
+ * eight tools simply overran the footer and "VR Lab" printed on top of the
+ * notification bell. Moving the scroll onto the middle band is also what the
+ * product does: brand at the top, account at the bottom, tools between them.
+ */
+.studio-main-tools {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden auto;
+  gap: calc(2 * var(--u));
+  scrollbar-width: none;
+}
+
+.studio-main-tools::-webkit-scrollbar { display: none; }
 
 .studio-rail-item {
   position: relative;
@@ -362,6 +479,26 @@
 
 .studio-rail-item:hover { color: var(--ed-teal); background: #f3f9f8; }
 
+/*
+ * Below a ~1180 px editor the rails run out of height before they run out of
+ * tools. Measured: at 1366 the eight main tools want 413 px in a 400 px band and
+ * the eleven content tools want 586 in 557, so both were spilling — "VR Lab"
+ * printed over the notification bell.
+ *
+ * The scroll containers above are the safety net; this is the fix. The padding
+ * on a rail item exists only to give hover a surface, and 9 px of it eight times
+ * over is 72 px of the rail spent on nothing. A container query rather than a
+ * media query because what is short here is the EDITOR, and the editor's width
+ * is what `--u` already keys off.
+ */
+@container (max-width: 1180px) {
+  .studio-rail-item { padding: calc(4 * var(--u)) calc(2 * var(--u)) calc(5 * var(--u)); gap: calc(3 * var(--u)); }
+  .studio-rail-label { line-height: 1.1; }
+  .studio-main-rail { padding-block: calc(10 * var(--u)); }
+  .studio-detail-rail { padding-block: calc(10 * var(--u)); gap: 0; }
+  .studio-main-footer { gap: calc(9 * var(--u)); }
+}
+
 .studio-rail-glyph {
   display: grid;
   width: calc(38 * var(--u));
@@ -378,8 +515,8 @@
 
 .studio-rail-item.is-active .studio-rail-glyph {
   color: #fff;
-  background: linear-gradient(158deg, #17696a 0%, #0d4a4d 100%);
-  box-shadow: 0 calc(4 * var(--u)) calc(11 * var(--u)) rgba(13, 74, 77, 0.26);
+  background: var(--ed-teal);
+  box-shadow: 0 calc(4 * var(--u)) calc(11 * var(--u)) rgba(25, 86, 88, 0.26);
 }
 
 .studio-rail-label {
@@ -393,17 +530,18 @@
 }
 
 /* "Tạo mới Dự án" is the one primary action on the rail and reads as a button. */
+/* The "Tạo mới Dự án" disc ships as one 44 px export — gradient and plus glyph
+   in the same vector — so the tile carries no fill of its own. */
 .studio-rail-item--create .studio-rail-glyph {
-  width: calc(42 * var(--u));
-  height: calc(42 * var(--u));
+  width: calc(44 * var(--u));
+  height: calc(44 * var(--u));
   border-radius: 50%;
-  color: #fff;
-  background: linear-gradient(150deg, #8fe4dd 0%, #2ec3ba 100%);
-  box-shadow: 0 calc(4 * var(--u)) calc(12 * var(--u)) rgba(46, 195, 186, 0.34);
-  font-size: calc(26 * var(--t));
+  background: none;
+  box-shadow: 0 calc(4 * var(--u)) calc(12 * var(--u)) rgba(80, 201, 195, 0.34);
+  font-size: calc(44 * var(--u));
 }
 
-.studio-rail-item--create.is-active .studio-rail-glyph { background: linear-gradient(150deg, #8fe4dd 0%, #2ec3ba 100%); }
+.studio-rail-item--create.is-active .studio-rail-glyph { background: none; }
 .studio-rail-item--create:hover .studio-rail-glyph { transform: scale(1.05); }
 
 /* ---------------------------------------------------------- rail footer --- */
@@ -440,8 +578,8 @@
   place-items: center;
   padding-inline: calc(4 * var(--u));
   border-radius: 999px;
-  color: #fff;
-  background: var(--ed-teal-bright);
+  color: var(--ed-teal);
+  background: linear-gradient(180deg, var(--ed-teal-soft) 0%, var(--ed-teal-deep) 100%);
   font-size: calc(9.5 * var(--t));
   font-style: normal;
   font-weight: 700;
@@ -450,15 +588,28 @@
 .studio-avatar {
   position: relative;
   display: block;
-  overflow: hidden;
-  width: calc(40 * var(--u));
-  height: calc(40 * var(--u));
+  width: calc(44 * var(--u));
+  height: calc(44 * var(--u));
   flex: none;
-  border-radius: 50%;
-  box-shadow: 0 0 0 calc(2.5 * var(--u)) #eef3f2;
 }
 
-.studio-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.studio-avatar > img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+
+/* The frame hangs a crown badge off the top-right corner — a 15 px disc with a
+   0.536 px #195658 keyline over a white-to-#f0f0f0 ramp. */
+.studio-avatar i {
+  position: absolute;
+  top: calc(-3 * var(--u));
+  right: calc(-3 * var(--u));
+  display: grid;
+  place-items: center;
+  padding: calc(2.15 * var(--u));
+  border: 1px solid var(--ed-teal);
+  border-radius: 999px;
+  background: linear-gradient(180deg, #fdfbfb 0%, #f0f0f0 100%);
+}
+
+.studio-avatar i img { width: calc(11 * var(--u)); height: calc(11 * var(--u)); }
 
 /* ===================================================== workspace column === */
 
@@ -488,8 +639,8 @@
   max-width: calc(280 * var(--u));
   align-items: center;
   padding: 0 calc(10 * var(--u)) 0 calc(14 * var(--u));
-  border-radius: calc(10 * var(--u));
-  background: var(--ed-fill);
+  border-radius: calc(11 * var(--u));
+  background: rgba(0, 0, 0, 0.05);
   gap: calc(8 * var(--u));
 }
 
@@ -511,9 +662,9 @@
   height: calc(38 * var(--u));
   flex: none;
   place-items: center;
-  border: 1px solid #cfeae8;
-  border-radius: calc(10 * var(--u));
-  background: #fff;
+  border: 1px solid var(--ed-teal-soft);
+  border-radius: calc(11 * var(--u));
+  background: rgba(0, 0, 0, 0.05);
 }
 
 .studio-sync img { width: calc(20 * var(--u)); height: calc(20 * var(--u)); animation: studio-sync-spin 2.4s linear infinite; }
@@ -530,7 +681,7 @@
   align-items: center;
   justify-content: center;
   padding-inline: calc(8 * var(--u));
-  border-radius: calc(10 * var(--u));
+  border-radius: calc(6 * var(--u));
   color: #fff;
   font-size: calc(20 * var(--t));
   gap: calc(4 * var(--u));
@@ -538,10 +689,10 @@
 }
 
 .studio-chip:hover { filter: saturate(1.08); transform: translateY(-1px); }
-.studio-chip--violet { background: linear-gradient(150deg, #c08bfb 0%, #9c55f2 100%); box-shadow: 0 calc(4 * var(--u)) calc(10 * var(--u)) rgba(156, 85, 242, 0.28); }
-.studio-chip--peach { background: linear-gradient(100deg, #ffd6b4 0%, #ffa98d 100%); box-shadow: 0 calc(4 * var(--u)) calc(10 * var(--u)) rgba(255, 169, 141, 0.34); }
-.studio-chip--sky { background: linear-gradient(150deg, #9fd0ff 0%, #5aa6f5 100%); box-shadow: 0 calc(4 * var(--u)) calc(10 * var(--u)) rgba(90, 166, 245, 0.3); }
-.studio-chip--teal { background: linear-gradient(150deg, #7fdcd5 0%, #17b0a8 100%); box-shadow: 0 calc(4 * var(--u)) calc(10 * var(--u)) rgba(23, 176, 168, 0.32); }
+.studio-chip--violet { background: linear-gradient(90deg, #d487ff 0%, #b47dff 100%); box-shadow: 0 calc(4 * var(--u)) calc(10 * var(--u)) rgba(180, 125, 255, 0.28); }
+.studio-chip--peach { background: linear-gradient(90deg, #ffecd2 0%, #fcb69f 100%); box-shadow: 0 calc(4 * var(--u)) calc(10 * var(--u)) rgba(252, 182, 159, 0.34); }
+.studio-chip--sky { background: linear-gradient(90deg, #a1c4fd 0%, #9fe1ff 100%); box-shadow: 0 calc(4 * var(--u)) calc(10 * var(--u)) rgba(161, 196, 253, 0.32); }
+.studio-chip--teal { background: linear-gradient(90deg, #96deda 0%, #50c9c3 100%); box-shadow: 0 calc(4 * var(--u)) calc(10 * var(--u)) rgba(80, 201, 195, 0.32); }
 .studio-chip--wide { padding-inline: calc(11 * var(--u)); }
 .studio-chip-caret { font-size: calc(15 * var(--t)); opacity: 0.9; }
 
@@ -555,7 +706,7 @@
   width: 100%;
   height: 100%;
   isolation: isolate;
-  border-radius: calc(16 * var(--u));
+  border-radius: calc(20 * var(--u));
   background: var(--ed-canvas);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
 }
@@ -575,14 +726,14 @@
   padding-inline: calc(14 * var(--u));
   border-radius: 999px;
   color: #fff;
-  background: rgba(24, 27, 28, 0.72);
-  backdrop-filter: blur(10px);
+  background: rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(30px);
   font-size: calc(15 * var(--t));
   gap: calc(9 * var(--u));
   transition: background 0.2s ease;
 }
 
-.studio-canvas-menu:hover { background: rgba(24, 27, 28, 0.9); }
+.studio-canvas-menu:hover { background: rgba(0, 0, 0, 0.42); }
 .studio-canvas-menu svg { font-size: calc(18 * var(--t)); }
 
 /*
@@ -595,58 +746,52 @@
  * Getting this wrong is what made the old version read as a label stuck on top
  * of the viewport.
  */
+/*
+ * The brand tab is now the frame's own shape.
+ *
+ * It was two radial-gradient fillets flanking a rounded rectangle — a constant
+ * radius on both shoulders. The real Union (48980:6239) flares: straight 14.5 by
+ * 17 diagonals run out from a 193.182 x 34 crown down to the canvas edge, and
+ * only the four corners are rounded. Drawing the path means the tab reads as a
+ * shoulder the dark surface curves up into, which is what it is.
+ */
 .studio-canvas-brand {
   position: absolute;
   z-index: 4;
   top: 0;
   left: 50%;
   display: flex;
+  width: calc(193.182 * var(--u));
   height: calc(34 * var(--u));
   align-items: center;
-  padding-inline: calc(20 * var(--u));
-  border-radius: 0 0 calc(16 * var(--u)) calc(16 * var(--u));
-  background: #fff;
+  justify-content: center;
   gap: calc(7 * var(--u));
   transform: translateX(-50%);
 }
 
-.studio-canvas-brand img:first-child { width: calc(19 * var(--u)); height: auto; }
-.studio-canvas-brand img:last-child { width: calc(58 * var(--u)); height: auto; }
+.studio-canvas-tab { position: absolute; inset: 0; width: 100%; height: 100%; }
+.studio-canvas-brand img { position: relative; }
+.studio-canvas-brand img:first-of-type { width: calc(25 * var(--u)); height: auto; }
+.studio-canvas-brand img:last-of-type { width: calc(76 * var(--u)); height: auto; }
 
-.studio-canvas-brand::before,
-.studio-canvas-brand::after {
-  position: absolute;
-  top: 0;
-  width: calc(15 * var(--u));
-  height: calc(15 * var(--u));
-  content: '';
-}
-
-.studio-canvas-brand::before {
-  right: 100%;
-  background: radial-gradient(circle at 0 100%, transparent calc(15 * var(--u) - 0.5px), #fff calc(15 * var(--u)));
-}
-
-.studio-canvas-brand::after {
-  left: 100%;
-  background: radial-gradient(circle at 100% 100%, transparent calc(15 * var(--u) - 0.5px), #fff calc(15 * var(--u)));
-}
-
+/* Seven 24 px glyphs spread across a fixed 214 px span, as the frame lays them
+   out — a fixed gap put them at a different rhythm at every editor width. */
 .studio-canvas-tools {
   position: absolute;
   z-index: 3;
-  top: calc(15 * var(--u));
-  right: calc(14 * var(--u));
+  top: calc(20 * var(--u));
+  right: calc(16 * var(--u));
   display: flex;
+  width: calc(214 * var(--u));
   align-items: center;
-  gap: calc(11 * var(--u));
+  justify-content: space-between;
 }
 
 .studio-canvas-tools button {
   display: grid;
   place-items: center;
   color: #fff;
-  font-size: calc(21 * var(--t));
+  font-size: calc(24 * var(--t));
   filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.45));
   transition: color 0.18s ease, transform 0.18s ease;
 }
@@ -654,16 +799,20 @@
 .studio-canvas-tools button:hover { color: var(--ed-teal-soft); transform: translateY(-1px); }
 .studio-canvas-tools button[aria-pressed='true'] { color: var(--ed-teal-soft); }
 
+/*
+ * No white plate behind this one.
+ *
+ * The frame's close control is a single compound path: a white-to-50%-white disc
+ * with the cross CUT OUT of it, so the dark viewport shows through the cross.
+ * Painting our own `rgba(255,255,255,.92)` circle behind it filled that hole in
+ * and left a blank white dot on the canvas.
+ */
 .studio-canvas-close {
-  width: calc(26 * var(--u));
-  height: calc(26 * var(--u));
   border-radius: 50%;
-  color: #2c3131 !important;
-  background: rgba(255, 255, 255, 0.92);
-  font-size: calc(16 * var(--t)) !important;
+  filter: none;
 }
 
-.studio-canvas-close:hover { background: #fff; }
+.studio-canvas-close:hover { transform: none; opacity: 0.82; }
 
 .studio-canvas-side {
   position: absolute;
@@ -676,22 +825,35 @@
 
 .studio-canvas-side button {
   display: grid;
-  width: calc(46 * var(--u));
-  height: calc(42 * var(--u));
+  overflow: hidden;
+  width: calc(44 * var(--u));
+  height: calc(44 * var(--u));
   place-items: center;
   padding-top: calc(3 * var(--u));
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: calc(9 * var(--u));
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: calc(11 * var(--u));
   color: #fff;
-  background: rgba(24, 27, 28, 0.68);
-  backdrop-filter: blur(8px);
+  background: rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(30px);
   font-size: calc(16 * var(--t));
   gap: calc(1 * var(--u));
   transition: background 0.2s ease;
 }
 
-.studio-canvas-side button:hover { background: rgba(24, 27, 28, 0.9); }
-.studio-canvas-side span { font-size: calc(9 * var(--t)); font-weight: 600; letter-spacing: 0.01em; text-transform: uppercase; white-space: nowrap; }
+/* The frame gives the Upload tile a 20 px radius and Set view an 11 px one. */
+.studio-canvas-side button:first-child { border-radius: calc(20 * var(--u)); }
+.studio-canvas-side button:hover { background: rgba(0, 0, 0, 0.42); }
+/* The frame sets these captions at 3.4 and 6.3 px inside a 38 px tile — micro-
+   type, and at our scale it has to stay inside the tile rather than spill past
+   its rounded edge, which is what an inherited 9 px was doing. */
+.studio-canvas-side span {
+  max-width: 100%;
+  font-size: calc(7.5 * var(--t));
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
 
 .studio-loader {
   position: absolute;
@@ -730,10 +892,10 @@
   height: calc(44 * var(--u));
   align-items: center;
   padding-inline: calc(12 * var(--u)) calc(18 * var(--u));
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  border-radius: calc(14 * var(--u));
-  background: rgba(20, 23, 24, 0.72);
-  backdrop-filter: blur(14px);
+  border: 0;
+  border-radius: calc(10 * var(--u));
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(6px);
   gap: calc(12 * var(--u));
   transform: translateX(-50%);
 }
@@ -765,11 +927,11 @@
 
 .studio-playbar-scrub {
   position: relative;
-  height: calc(5 * var(--u));
-  min-height: 4px;
+  height: calc(4 * var(--u));
+  min-height: 3px;
   flex: 1;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--ed-line);
   cursor: pointer;
   touch-action: none;
 }
@@ -834,30 +996,33 @@
 }
 
 .studio-spaces > button {
-  height: calc(34 * var(--u));
+  height: calc(36 * var(--u));
   padding-inline: calc(15 * var(--u));
-  border: 1px solid transparent;
-  border-radius: calc(8 * var(--u));
-  color: #5d6b6b;
+  border: 1px solid var(--ed-line);
+  border-radius: calc(11 * var(--u));
+  color: var(--ed-ink);
   background: var(--ed-fill);
   font-size: calc(13.5 * var(--t));
-  font-weight: 550;
+  font-weight: 500;
   white-space: nowrap;
   transition: color 0.18s ease, background 0.18s ease, border-color 0.18s ease;
 }
 
-.studio-spaces > button:hover { color: var(--ed-teal); }
-.studio-spaces > button.is-active { border-color: var(--ed-teal-bright); color: var(--ed-teal-bright); background: #fff; font-weight: 680; }
+.studio-spaces > button:hover { border-color: var(--ed-teal-soft); color: var(--ed-teal); }
+.studio-spaces > button.is-active { border-color: var(--ed-teal-soft); color: var(--ed-teal-bright); background: #fff; font-weight: 650; }
 
 .studio-space-add {
   display: grid;
-  width: calc(34 * var(--u));
-  height: calc(34 * var(--u));
+  width: calc(28 * var(--u));
+  height: calc(28 * var(--u));
   flex: none;
   place-items: center;
   padding: 0;
-  color: #4b5757;
-  font-size: calc(17 * var(--t));
+  border: 1px solid var(--ed-line);
+  border-radius: calc(11 * var(--u));
+  color: #aaa;
+  background: var(--ed-fill);
+  font-size: calc(14 * var(--t));
 }
 
 .studio-stepbar {
@@ -871,12 +1036,12 @@
 .studio-step-create {
   height: calc(30 * var(--u));
   padding-inline: calc(14 * var(--u));
-  border-radius: calc(7 * var(--u));
+  border-radius: calc(11 * var(--u));
   color: #fff;
-  background: linear-gradient(150deg, #2fc6bd 0%, #0fa79f 100%);
-  box-shadow: 0 calc(3 * var(--u)) calc(9 * var(--u)) rgba(15, 167, 159, 0.3);
+  background: var(--ed-teal-bright);
+  box-shadow: 0 calc(3 * var(--u)) calc(9 * var(--u)) rgba(0, 170, 171, 0.3);
   font-size: calc(12.5 * var(--t));
-  font-weight: 680;
+  font-weight: 650;
   transition: transform 0.2s var(--ease-reveal);
 }
 
@@ -1025,7 +1190,7 @@
   grid-template-columns: clamp(96px, calc(172 * var(--u)), 214px) minmax(0, 1fr);
 }
 
-.studio-timeline-ruler { background: #fafbfb; }
+.studio-timeline-ruler { background: var(--ed-line-soft); }
 
 .studio-ruler-head {
   display: flex;
@@ -1144,7 +1309,7 @@
   top: 0;
   bottom: 0;
   width: 1.5px;
-  background: #e8262f;
+  background: var(--ed-red);
   pointer-events: none;
   transform: translateX(-0.75px);
 }
@@ -1153,7 +1318,7 @@
   position: absolute;
   top: 0;
   left: 50%;
-  border-top: calc(5 * var(--u)) solid #e8262f;
+  border-top: calc(5 * var(--u)) solid var(--ed-red);
   border-right: calc(4 * var(--u)) solid transparent;
   border-left: calc(4 * var(--u)) solid transparent;
   content: '';
@@ -1162,6 +1327,18 @@
 
 /* ========================================================== properties === */
 
+/*
+ * The panel scrolls; the scrollbar does not show.
+ *
+ * `scrollbar-width: thin` is not thin on Windows — Chromium still paints a ~11 px
+ * grey trough with a grey thumb, and inside a 320 px inspector that is a full
+ * column of chrome running the height of the editor. It is the only element on
+ * the page wearing an OS widget, which is exactly why it stood out enough to be
+ * reported. The source frame shows no scrollbar at all, and neither do the two
+ * rails, which have hidden theirs since they were written. A hover-revealed
+ * overlay thumb replaces it: nothing at rest, a 4 px teal thumb while the
+ * pointer is in the panel, and the wheel and keyboard work throughout.
+ */
 .studio-properties {
   display: block;
   min-width: 0;
@@ -1170,9 +1347,21 @@
   padding: calc(20 * var(--u)) calc(20 * var(--u)) calc(28 * var(--u));
   background: #fff;
   grid-column: 4;
+  overscroll-behavior: contain;
+  scrollbar-color: transparent transparent;
+  scrollbar-gutter: stable;
   scrollbar-width: thin;
-  scrollbar-color: rgba(25, 86, 88, 0.2) transparent;
+  transition: scrollbar-color 0.2s ease;
 }
+
+.studio-properties:hover,
+.studio-properties:focus-within { scrollbar-color: rgba(25, 86, 88, 0.28) transparent; }
+
+.studio-properties::-webkit-scrollbar { width: calc(4 * var(--u)); }
+.studio-properties::-webkit-scrollbar-track { background: transparent; }
+.studio-properties::-webkit-scrollbar-thumb { border-radius: 999px; background: transparent; transition: background 0.2s ease; }
+.studio-properties:hover::-webkit-scrollbar-thumb,
+.studio-properties:focus-within::-webkit-scrollbar-thumb { background: rgba(25, 86, 88, 0.28); }
 
 .studio-properties h4 {
   margin: 0 0 calc(16 * var(--u));
@@ -1235,10 +1424,11 @@
 }
 
 .studio-segment button.is-active {
+  border: 1px solid var(--ed-teal-soft);
   color: #fff;
-  background: linear-gradient(100deg, #7fdcd5 0%, #16b8b0 100%);
-  box-shadow: 0 calc(2 * var(--u)) calc(7 * var(--u)) rgba(22, 184, 176, 0.3);
-  font-weight: 680;
+  background: linear-gradient(90deg, var(--ed-teal-soft) 0%, var(--ed-teal-deep) 100%);
+  box-shadow: 0 calc(2 * var(--u)) calc(7 * var(--u)) rgba(80, 201, 195, 0.3);
+  font-weight: 650;
 }
 
 .studio-note-directions { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: calc(6 * var(--u)); }
@@ -1249,25 +1439,27 @@
   place-items: center;
   border: 1px solid transparent;
   border-radius: calc(9 * var(--u));
-  color: #1fb3ab;
+  color: #000;
   background: var(--ed-fill);
   transition: border-color 0.18s ease, background 0.18s ease;
 }
 
 .studio-note-directions button:hover { background: #e9f6f5; }
-.studio-note-directions button.is-active { border-color: var(--ed-teal-bright); background: #fff; }
-.studio-note-directions svg { width: calc(22 * var(--u)); height: calc(22 * var(--u)); }
+.studio-note-directions button.is-active { border-color: var(--ed-teal-soft); background: #fff; }
+/* 2:1, the leader line's own ratio — a square box stretched it. */
+.studio-note-directions svg { width: calc(28 * var(--u)); height: calc(14 * var(--u)); }
 
 .studio-prop-row { display: flex; align-items: center; justify-content: space-between; margin-top: calc(16 * var(--u)); gap: calc(10 * var(--u)); }
 .studio-prop-row span { color: #333c3c; font-size: calc(13.5 * var(--t)); }
 
+/* The frame's own eight-stop ramp at 45°, inside a 2 px #f0f1f3 keyline. */
 .studio-color-well {
-  width: calc(42 * var(--u));
-  height: calc(38 * var(--u));
+  width: calc(44 * var(--u));
+  height: calc(44 * var(--u));
   flex: none;
+  border: calc(2 * var(--u)) solid var(--ed-line-soft);
   border-radius: calc(10 * var(--u));
-  background: linear-gradient(135deg, #2f6bff 0%, #23c4a8 22%, #7ee034 42%, #ffe141 58%, #ff8a2b 74%, #ff3d6e 100%);
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+  background: linear-gradient(45deg, #5b388b 0%, #1729cc 17%, #1a78e7 26%, #1dbaff 33%, #18c418 50%, #fff929 67%, #ff8500 83%, #cc0000 100%);
 }
 
 /* ------------------------------------------------------------- sliders --- */
@@ -1370,10 +1562,11 @@
   height: calc(40 * var(--u));
   align-items: center;
   justify-content: center;
+  border: 1px solid var(--ed-teal-bright);
   border-radius: calc(10 * var(--u));
-  color: #fff;
-  background: linear-gradient(100deg, #7fdcd5 0%, #16b8b0 100%);
-  box-shadow: 0 calc(4 * var(--u)) calc(12 * var(--u)) rgba(22, 184, 176, 0.28);
+  color: var(--ed-teal);
+  background: linear-gradient(90deg, var(--ed-teal-soft) 0%, var(--ed-teal-deep) 100%);
+  box-shadow: 0 calc(4 * var(--u)) calc(12 * var(--u)) rgba(80, 201, 195, 0.28);
   font-size: calc(13.5 * var(--t));
   font-weight: 650;
   gap: calc(8 * var(--u));
@@ -1424,8 +1617,8 @@
   overflow: hidden;
   height: 100%;
   min-height: 0;
-  padding: clamp(15px, 1.25vw, 24px);
-  border-radius: clamp(14px, 1.15vw, 22px);
+  padding: clamp(17px, 1.45vw, 28px);
+  border-radius: calc(clamp(14px, 1.15vw, 22px) + clamp(6px, 0.62vw, 12px));
   background: linear-gradient(168deg, rgba(255, 255, 255, 0.96) 0%, rgba(250, 252, 251, 0.9) 100%);
   box-shadow:
     0 0 0 1px rgba(23, 78, 79, 0.09),
@@ -1436,21 +1629,38 @@
 }
 
 .tool-story__intro { position: relative; z-index: 1; padding-bottom: clamp(10px, 1.5vh, 17px); border-bottom: 1px solid rgba(30, 84, 82, 0.11); }
-.tool-story__intro > div { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 
+/*
+ * No width cap, and `balance` instead of a guess.
+ *
+ * "Một bài học, bốn nhịp." is 22 characters; a `max-width: 14ch` guaranteed it
+ * broke, and because a "01—04" badge shared the line by `space-between` it broke
+ * after "bốn" — mid-phrase, with the orphan "nhịp." alone on line two. The badge
+ * is gone (the ordinals on the four items already carry the sequence) and the
+ * heading owns the full column, so the line either fits or breaks at the comma.
+ */
 .tool-story__intro h3 {
-  max-width: 14ch;
   margin: 0;
   color: var(--ink);
-  font-size: clamp(16px, 1.12vw, 21px);
+  font-size: clamp(16px, 1.18vw, 23px);
   font-weight: 680;
   letter-spacing: -0.035em;
-  line-height: 1.06;
+  line-height: 1.1;
+  text-wrap: balance;
 }
 
-.tool-story__intro span { flex: none; color: #1f8a86; font-size: clamp(8px, 0.52vw, 9.5px); font-variant-numeric: tabular-nums; font-weight: 700; letter-spacing: 0.09em; }
-.tool-story__intro p { max-width: 34ch; margin: clamp(5px, 0.9vh, 9px) 0 0; color: var(--ink-3); font-size: clamp(9.5px, 0.62vw, 11.5px); line-height: 1.5; }
+.tool-story__intro p { max-width: 34ch; margin: clamp(5px, 0.9vh, 9px) 0 0; color: var(--ink-3); font-size: clamp(10px, 0.68vw, 12.5px); line-height: 1.5; }
 
+/*
+ * Four groups with the air between them, not four stretched rows.
+ *
+ * On `repeat(4, 1fr)` each item took a quarter of the column whatever it held,
+ * so at 1920 a three-line beat sat centred in a 200 px row with its own rule
+ * 60 px below it — the rule stopped reading as that beat's baseline and the
+ * column read as four floating fragments. `auto` rows plus
+ * `align-content: space-between` puts each rule directly under its own text and
+ * spends the leftover height in the gaps, which is where it belongs.
+ */
 .tool-story__list {
   position: relative;
   z-index: 1;
@@ -1458,7 +1668,8 @@
   min-height: 0;
   margin: 0;
   padding: 0;
-  grid-template-rows: repeat(4, minmax(0, 1fr));
+  align-content: space-between;
+  grid-template-rows: repeat(4, auto);
   list-style: none;
 }
 
@@ -1482,6 +1693,15 @@
   gap: clamp(9px, 0.8vw, 14px);
 }
 
+/*
+ * One ring colour, not three.
+ *
+ * The nodes carried a coral, a violet and a teal ring, so four items in a 300 px
+ * column argued with each other and with the spine that already runs the same
+ * three hues. The ring is now the ink hairline for all four and the spine keeps
+ * the colour: one gradient reading top to bottom, which is what makes the list
+ * a sequence rather than a set.
+ */
 .tool-story__node {
   position: relative;
   z-index: 1;
@@ -1491,60 +1711,93 @@
   align-self: center;
   place-items: center;
   border-radius: 50%;
-  color: #c85e50;
+  color: #2c6764;
   background: #fff;
-  box-shadow: 0 0 0 1px rgba(229, 112, 92, 0.24), 0 5px 13px rgba(170, 85, 74, 0.11);
-  font-size: clamp(15px, 1.05vw, 19px);
+  box-shadow: 0 0 0 1px rgba(30, 84, 82, 0.17), 0 4px 11px rgba(35, 70, 68, 0.08);
+  font-size: clamp(14px, 0.98vw, 18px);
+  transition: color 0.24s var(--ease-reveal), box-shadow 0.24s var(--ease-reveal);
 }
 
 .tool-story__node svg { width: 1em; height: 1em; }
-.tool-story__list li:nth-child(2) .tool-story__node { color: #8659b2; box-shadow: 0 0 0 1px rgba(155, 115, 199, 0.26), 0 5px 13px rgba(120, 85, 170, 0.1); }
-.tool-story__list li:nth-child(3) .tool-story__node,
-.tool-story__list li:nth-child(4) .tool-story__node { color: #1f7d79; box-shadow: 0 0 0 1px rgba(60, 156, 150, 0.28), 0 5px 13px rgba(45, 130, 125, 0.1); }
+.tool-story__list li:hover .tool-story__node { color: #17504f; box-shadow: 0 0 0 1px rgba(30, 84, 82, 0.3), 0 6px 15px rgba(35, 70, 68, 0.13); }
 
 .tool-story__copy { display: grid; min-width: 0; align-content: center; padding: clamp(8px, 1.15vh, 13px) 0; border-bottom: 1px solid rgba(30, 84, 82, 0.09); }
 .tool-story__list li:last-child .tool-story__copy { border-bottom: 0; }
 
-.tool-story__meta { display: flex; align-items: center; justify-content: space-between; margin-bottom: 3px; gap: 8px; }
-.tool-story__meta span { color: #1f8a86; font-size: clamp(8.5px, 0.55vw, 10px); font-weight: 680; }
-.tool-story__meta em { flex: none; color: #8b9998; font-size: clamp(6.5px, 0.42vw, 8px); font-style: normal; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+.tool-story__copy h4 {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 0;
+  color: var(--ink);
+  font-size: clamp(12.5px, 0.9vw, 16.5px);
+  font-weight: 670;
+  gap: 10px;
+  letter-spacing: -0.022em;
+  line-height: 1.16;
+}
 
-.tool-story__copy h4 { margin: 0; color: var(--ink); font-size: clamp(11.5px, 0.78vw, 14.5px); font-weight: 670; letter-spacing: -0.022em; line-height: 1.16; }
-.tool-story__copy p { margin: 3px 0 0; color: var(--ink-3); font-size: clamp(9px, 0.58vw, 10.8px); line-height: 1.42; }
+/* The ordinal, held to the right rule of the copy column so four of them make a
+   column of their own. `tnum` because 01 and 04 must occupy the same width. */
+.tool-story__copy h4 b {
+  flex: none;
+  color: #9fb0ae;
+  font-size: clamp(8px, 0.52vw, 9.5px);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
 
+.tool-story__copy p { margin: 4px 0 0; color: var(--ink-3); font-size: clamp(10px, 0.66vw, 12.5px); line-height: 1.5; }
+
+/* Which panel of the editor this beat happens in — the column's whole job. */
+.tool-story__panel {
+  margin-top: clamp(4px, 0.6vh, 7px);
+  color: #1f8a86;
+  font-size: clamp(8.5px, 0.56vw, 10.5px);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/*
+ * The next step is a row, not a second card.
+ *
+ * It was a filled, rounded, inset-bordered block sitting inside the column's own
+ * filled, rounded, bordered card — a card inside a card, which is why the bottom
+ * of this column read as bolted on. It is now the card's last row: a rule above
+ * it, the card's own surface under it, and the only ornament is the disc that
+ * already carries the page's coral.
+ */
 .tool-story__cta {
   position: relative;
   z-index: 1;
   display: flex;
-  min-height: clamp(48px, 4.4vh, 60px);
   align-items: center;
   justify-content: space-between;
-  padding: 9px 9px 9px 14px;
-  border-radius: clamp(11px, 0.85vw, 15px);
+  padding-top: clamp(11px, 1.6vh, 18px);
+  border-top: 1px solid rgba(30, 84, 82, 0.11);
   color: #17504f;
-  background: linear-gradient(104deg, rgba(106, 207, 199, 0.16), rgba(255, 255, 255, 0.6));
-  box-shadow: inset 0 0 0 1px rgba(32, 122, 118, 0.13);
+  font-size: clamp(11px, 0.74vw, 14px);
+  font-weight: 680;
   gap: 12px;
   text-decoration: none;
-  transition: box-shadow 0.22s ease, transform 0.22s var(--ease-reveal);
 }
-
-.tool-story__cta:hover { box-shadow: inset 0 0 0 1px rgba(32, 122, 118, 0.3), 0 10px 24px rgba(42, 111, 105, 0.12); transform: translateY(-1px); }
-.tool-story__cta > span { display: grid; font-size: clamp(10px, 0.66vw, 12.5px); font-weight: 680; gap: 2px; }
-.tool-story__cta small { color: #75847f; font-size: clamp(6.5px, 0.42vw, 7.5px); font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
 
 .tool-story__cta > i {
   position: relative;
   display: grid;
-  width: clamp(30px, 2.2vw, 36px);
-  height: clamp(30px, 2.2vw, 36px);
+  width: clamp(28px, 2.05vw, 34px);
+  height: clamp(28px, 2.05vw, 34px);
   flex: none;
   place-items: center;
   border-radius: 50%;
   background: #ef7b67;
-  box-shadow: 0 7px 17px rgba(214, 91, 73, 0.24);
+  box-shadow: 0 6px 15px rgba(214, 91, 73, 0.24);
+  transition: transform 0.24s var(--ease-reveal), box-shadow 0.24s var(--ease-reveal);
 }
 
+.tool-story__cta:hover > i { box-shadow: 0 9px 20px rgba(214, 91, 73, 0.32); transform: translateX(3px); }
 .tool-story__cta > i > span { position: relative; width: 12px; height: 1.4px; border-radius: 1px; background: #fff; }
 
 .tool-story__cta > i > span::after {
@@ -1591,12 +1844,12 @@
 
   .tool-story__intro { align-self: center; padding: 0 16px 0 0; border-right: 1px solid rgba(30, 84, 82, 0.11); border-bottom: 0; }
   .tool-story__intro h3 { font-size: 19px; }
-  .tool-story__list { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); }
+  .tool-story__list { align-content: stretch; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); }
   .tool-story__list::before { display: none; }
   .tool-story__list li { padding: 5px 10px; }
   .tool-story__list li:nth-child(odd) { border-right: 1px solid rgba(30, 84, 82, 0.09); }
   .tool-story__copy { height: 100%; padding: 6px 0; }
-  .tool-story__cta { align-self: center; }
+  .tool-story__cta { align-self: center; justify-content: flex-start; padding-top: 0; border-top: 0; gap: 14px; }
 }
 
 /* Below this the properties panel cannot hold a three-field vector row. */
@@ -1613,18 +1866,29 @@
 
   .tool-story { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto; gap: 12px; }
   .tool-story__intro { align-self: stretch; padding: 0 0 12px; border-right: 0; border-bottom: 1px solid rgba(30, 84, 82, 0.11); }
-  .tool-story__intro > div { align-items: center; }
   .tool-story__list li { padding: 4px 0; }
   .tool-story__list li:nth-child(odd) { padding-right: 14px; }
   .tool-story__list li:nth-child(even) { padding-left: 14px; }
-  .tool-story__cta { align-self: stretch; }
+  .tool-story__cta { align-self: stretch; justify-content: space-between; padding-top: 14px; border-top: 1px solid rgba(30, 84, 82, 0.11); }
 }
 
 @media (max-width: 720px) {
   .tool-stage { grid-template-rows: auto clamp(420px, 66svh, 560px) auto; gap: 12px; }
+
+  /* One column: the two-baseline grid becomes reading order, and the heading has
+     to come back above the sentence that qualifies it. */
   .tool-heading { grid-template-columns: minmax(0, 1fr); }
   .tool-heading h2 { white-space: normal; }
+  .tool-heading > .section-kicker { order: 1; }
+  .tool-heading > h2 { order: 2; align-self: start; margin-bottom: 4px; }
+  .tool-heading > .tool-heading-lede { order: 3; align-self: start; }
+  .tool-heading > .tool-heading-link { order: 4; align-self: start; }
+
   .studio { --u: clamp(0.62px, 0.088cqi, 0.86px); --t: clamp(0.74px, 0.088cqi, 0.86px); border-radius: 14px; }
+
+  /* The brand tab is 193 source-pixels wide and the tool row is 214: on a phone
+     canvas they meet in the middle. The tab is the one carrying no function. */
+  .studio-canvas-brand { display: none; }
   .studio-timeline-tools { display: none; }
   .studio-timeline-panel { grid-template-columns: minmax(0, 1fr); }
   .studio-step-select { display: none; }
@@ -1682,7 +1946,7 @@
 
   .studio *,
   .tool-story__cta,
-  .tool-heading-copy a { transition-duration: 0.01ms !important; }
+  .tool-heading-link { transition-duration: 0.01ms !important; }
 
   .studio-brand:hover,
   .studio-chip:hover,

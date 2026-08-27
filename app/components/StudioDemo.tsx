@@ -13,24 +13,35 @@ import {
 } from '../lib/formula/carRuntime';
 import { createProceduralEnvironment, studioEnvironmentPalette } from '../lib/three/environment';
 import {
-  IconAi, IconAudio, IconBell, IconChevronDown, IconClock, IconClose, IconCollapse, IconComponents,
-  IconCopy, IconCreate, IconCube3d, IconDecor, IconDuplicate, IconEffects, IconFitRange, IconFrame,
-  IconFullscreen, IconGlobe, IconGrip, IconHeightAxis, IconHotspot, IconInfo, IconLabels, IconMedia,
-  IconMenu, IconMinus, IconMirror, IconModel, IconPause, IconPencil, IconPlay, IconPlus,
-  IconPositionAxis, IconProjectInfo, IconProjects, IconQuiz, IconRedo, IconReset, IconRotateAxis,
-  IconScaleAxis, IconSettings, IconShare, IconShareNodes, IconSilent, IconSpace, IconStepBack,
-  IconStepForward, IconSteps, IconSticker, IconTemplates, IconText, IconToEnd, IconToStart,
-  IconTrash, IconUndo, IconUpload, IconViewpoint, IconVolume, IconVr,
-  IconVrLab, IconWidthAxis,
+  IconAi, IconAudio, IconBell, IconCamera, IconChevronDown, IconClock, IconClose, IconCollapse,
+  IconComponents, IconCopy, IconCreate, IconCube3d, IconDecor, IconDuplicate, IconEffects,
+  IconFitRange, IconFrame, IconFullscreen, IconGear, IconGlobe, IconGrip, IconHeightAxis,
+  IconHotspot, IconInfo, IconLabels, IconMedia, IconMenu, IconMinus, IconMirror, IconModel,
+  IconPause, IconPencil, IconPlay, IconPlus, IconPositionAxis, IconProjectInfo, IconProjects,
+  IconQuiz, IconRedo, IconReset, IconRotateAxis, IconScaleAxis, IconSettings, IconShare,
+  IconShareNodes, IconSilent, IconSpace, IconStepBack, IconStepForward, IconSteps, IconSticker,
+  IconTemplates, IconText, IconToEnd, IconToStart, IconTrackEffects, IconTrackText, IconTrash,
+  IconUndo, IconUpload, IconViewpoint, IconVolume, IconVr, IconVrLab, IconWidthAxis,
 } from './studio/EditorIcons';
 
 type StudioMode = 'assemble' | 'inspect' | 'drive';
 type TrackId = 'model' | 'text' | 'audio' | 'effect';
 type Glyph = (props: { className?: string }) => React.ReactElement;
 type EditorTool = { id: string; label: string; Icon: Glyph };
+type Clip = { start: number; length: number; title: string; sub: string };
 
 const EDITOR_ASSET_ROOT = '/asset/ui/yoolab-editor';
 const FIGMA_ASSET_ROOT = `${EDITOR_ASSET_ROOT}/figma`;
+
+/*
+ * The tab cut out of the canvas's top edge, traced from the source frame's
+ * `Union` layer (48980:6239, 193.182 x 34). It was two radial-gradient fillets
+ * before; that read as a pill stuck on the viewport rather than as a shoulder
+ * the dark surface curves up into, because the real shape has straight flared
+ * sides between the two fillets, not a constant radius.
+ */
+const CANVAS_TAB_PATH =
+  'M193.182 0C186.717 0.000403192 180.514 3.0378 175.924 8.45117L161.424 25.5488C156.834 30.9622 150.631 33.9996 144.166 34H49.0166C42.5518 33.9997 36.3488 30.9622 31.7588 25.5488L17.2578 8.45117C12.6678 3.03789 6.46474 0.000269294 0 0H193.182Z';
 
 const MAIN_TOOLS: EditorTool[] = [
   { id: 'create', label: 'Tạo mới\nDự án', Icon: IconCreate },
@@ -58,11 +69,62 @@ const DETAIL_TOOLS: EditorTool[] = [
 ];
 
 /* Track colours are read off the source frame, not invented. */
-const TRACKS: { id: TrackId; label: string; color: string; Icon: Glyph; start: number; length: number }[] = [
-  { id: 'model', label: 'Model', color: '#a852fc', Icon: IconModel, start: 0, length: 1 },
-  { id: 'text', label: 'Văn bản', color: '#2b7fff', Icon: IconText, start: 0, length: 0.50958 },
-  { id: 'audio', label: 'Âm thanh', color: '#00c950', Icon: IconAudio, start: 0, length: 0.62021 },
-  { id: 'effect', label: 'Hiệu ứng', color: '#f6339a', Icon: IconEffects, start: 0, length: 0.82317 },
+const TRACKS: { id: TrackId; label: string; color: string; Icon: Glyph }[] = [
+  { id: 'model', label: 'Model', color: '#a852fc', Icon: IconModel },
+  { id: 'text', label: 'Văn bản', color: '#2b7fff', Icon: IconTrackText },
+  { id: 'audio', label: 'Âm thanh', color: '#00c950', Icon: IconAudio },
+  { id: 'effect', label: 'Hiệu ứng', color: '#f6339a', Icon: IconTrackEffects },
+];
+
+/*
+ * A space is one animation of the car, and the timeline under it is that
+ * animation's own score.
+ *
+ * The review asked for exactly this — "các phần space 1 2 3 chỗ timeline tương
+ * ứng với từng anim của car" — and it is also how the editor actually behaves:
+ * switching space switches what is on stage, so the four lanes have to switch
+ * with it. Space 1 holds the assembled car on its turntable, Space 2 pulls the
+ * kit apart, Space 3 puts it on the road. The clip geometry of Space 1 is the
+ * source frame's (1148 / 585 / 712 / 945 over a 1148-wide lane); the other two
+ * are that same score re-cut for a shorter and a longer step.
+ */
+const SPACES: { id: StudioMode; label: string; step: string; duration: number; clips: Record<TrackId, Clip> }[] = [
+  {
+    id: 'inspect',
+    label: 'Space 1: Car',
+    step: 'Bước 1 (Step - 1) - Giới thiệu xe',
+    duration: 10.3,
+    clips: {
+      model: { start: 0, length: 1, title: 'Xe F1', sub: 'Xoay 360°' },
+      text: { start: 0, length: 0.50958, title: 'Tiêu đề', sub: 'Tên từng bộ phận' },
+      audio: { start: 0, length: 0.62021, title: 'Lời dẫn', sub: 'Giới thiệu' },
+      effect: { start: 0, length: 0.82317, title: 'Ánh sáng', sub: 'Đèn studio' },
+    },
+  },
+  {
+    id: 'assemble',
+    label: 'Space 2: Cấu tạo',
+    step: 'Bước 2 (Step - 2) - Tách cụm chi tiết',
+    duration: 8.4,
+    clips: {
+      model: { start: 0, length: 1, title: 'Tách cụm', sub: '9 bộ phận' },
+      text: { start: 0.24, length: 0.7, title: 'Ghi chú', sub: 'Cánh gió · Lốp' },
+      audio: { start: 0.1, length: 0.55, title: 'Thuyết minh', sub: 'Cấu tạo' },
+      effect: { start: 0.36, length: 0.58, title: 'Hotspot', sub: 'Điểm chạm' },
+    },
+  },
+  {
+    id: 'drive',
+    label: 'Space: Lái xe',
+    step: 'Bước 3 (Step - 3) - Chạy thử',
+    duration: 12.6,
+    clips: {
+      model: { start: 0, length: 1, title: 'Vào vòng', sub: 'Bánh lăn' },
+      text: { start: 0.46, length: 0.42, title: 'Vận tốc', sub: '312 km/h' },
+      audio: { start: 0, length: 0.88, title: 'Tiếng máy', sub: 'V6 Turbo' },
+      effect: { start: 0.12, length: 0.74, title: 'Vệt tốc độ', sub: 'Motion blur' },
+    },
+  },
 ];
 
 const TIMELINE_TOOLS: { id: string; label: string; Icon: Glyph }[] = [
@@ -76,6 +138,23 @@ const TIMELINE_TOOLS: { id: string; label: string; Icon: Glyph }[] = [
 ];
 
 const RULER = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150];
+
+/*
+ * "Hướng hiển thị" — the six leader-line shapes.
+ *
+ * The frame draws each one as the same elbow (`M0.5 0.5H8.5L16.5 6.5`) under a
+ * different flip, plus a 4 px `#00AAAB` dot at the end the note attaches to; the
+ * first and last are the straight run. Redrawn here on one 20x10 grid so the six
+ * buttons share a baseline — the previous set was six unrelated curves.
+ */
+const NOTE_DIRECTIONS: { path: string; dot: [number, number] }[] = [
+  { path: 'M2 5H18', dot: [2, 5] },
+  { path: 'M2 2L10 8H18', dot: [2, 2] },
+  { path: 'M2 8L10 2H18', dot: [2, 8] },
+  { path: 'M2 8H10L18 2', dot: [18, 2] },
+  { path: 'M2 2H10L18 8', dot: [18, 8] },
+  { path: 'M2 5H18', dot: [18, 5] },
+];
 
 /* --------------------------------------------------------------- 3D stage --- */
 
@@ -461,8 +540,9 @@ export function StudioDemo() {
   /* Request from the last review: the timeline is a panel you can put away.
      Both the canvas chip and the rail's collapse button drive this one flag. */
   const [timelineOpen, setTimelineOpen] = useState(true);
-  const duration = 10.3;
-  const progress = (time / duration) * 100;
+  const space = useMemo(() => SPACES.find((entry) => entry.id === mode) ?? SPACES[0], [mode]);
+  const duration = space.duration;
+  const progress = (Math.min(time, duration) / duration) * 100;
   const handleReady = useCallback(() => setReady(true), []);
   const handleError = useCallback(() => setFailed(true), []);
 
@@ -478,11 +558,14 @@ export function StudioDemo() {
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [playing]);
+  }, [playing, duration]);
 
   const chooseMode = (next: StudioMode) => {
     setMode(next);
     setPlaying(next === 'drive');
+    /* Each space owns its own length, so the playhead has to land inside the new
+       one rather than keeping a position that belonged to the previous score. */
+    setTime((current) => Math.min(current, (SPACES.find((entry) => entry.id === next) ?? SPACES[0]).duration * 0.5));
     if (next === 'assemble') setTrack('model');
   };
 
@@ -493,17 +576,16 @@ export function StudioDemo() {
     setPlaying(false);
   };
 
-  const noteDirections = useMemo(
-    () => ['M4 12h16', 'M4 6c7 0 9 12 16 12', 'M4 18c7 0 9-12 16-12', 'M4 18 20 6', 'M4 8c7 0 9 8 16 8', 'M4 12h16'],
-    [],
-  );
-
   return (
     <div className="studio" data-mode={mode} data-timeline={timelineOpen ? 'open' : 'closed'}>
       {/* ------------------------------------------------------- main rail --- */}
       <aside className="studio-main-rail" aria-label="Điều hướng chính YooLab">
+        {/* The rail mark is the frame's own `Logo YooStudio` (48980:166621): the
+            teal blob, the bird and the wordmark are three exported layers, not a
+            rounded square with a gradient poured into it. */}
         <button className="studio-brand" aria-label="Trang chủ YooLab" onClick={() => setActiveMain('create')} type="button">
-          <img alt="" src={`${EDITOR_ASSET_ROOT}/canvas-logo-mark.svg`} />
+          <img alt="" className="studio-brand-blob" src={`${FIGMA_ASSET_ROOT}/rail-logo-blob.svg`} />
+          <img alt="" className="studio-brand-bird" src={`${FIGMA_ASSET_ROOT}/rail-logo-bird.svg`} />
           <span>YooLab</span>
         </button>
 
@@ -531,6 +613,7 @@ export function StudioDemo() {
           </button>
           <span className="studio-avatar" aria-hidden="true">
             <img alt="" src={`${FIGMA_ASSET_ROOT}/avatar.png`} />
+            <i><img alt="" src={`${FIGMA_ASSET_ROOT}/rail-avatar-crown.svg`} /></i>
           </span>
         </div>
       </aside>
@@ -580,8 +663,11 @@ export function StudioDemo() {
             </button>
 
             <div className="studio-canvas-brand" aria-label="YooLab">
-              <img alt="" src={`${EDITOR_ASSET_ROOT}/canvas-logo-mark.svg`} />
-              <img alt="YooLab" src={`${EDITOR_ASSET_ROOT}/canvas-logo-word.svg`} />
+              <svg className="studio-canvas-tab" viewBox="0 0 193.182 34" aria-hidden="true" focusable="false">
+                <path d={CANVAS_TAB_PATH} fill="#fff" />
+              </svg>
+              <img alt="" src={`${FIGMA_ASSET_ROOT}/canvas-logo-bird.svg`} />
+              <img alt="YooLab" src={`${FIGMA_ASSET_ROOT}/canvas-logo-word.svg`} />
             </div>
 
             <div className="studio-canvas-tools" role="group" aria-label="Điều khiển khung nhìn">
@@ -596,7 +682,7 @@ export function StudioDemo() {
 
             <div className="studio-canvas-side">
               <button type="button"><IconUpload /><span>Upload</span></button>
-              <button onClick={() => setResetKey((value) => value + 1)} type="button"><IconViewpoint /><span>Set view</span></button>
+              <button onClick={() => setResetKey((value) => value + 1)} type="button"><IconCamera /><span>Set view</span></button>
             </div>
 
             {!ready && !failed && <div className="studio-loader"><i />Đang tải mô hình xe thật…</div>}
@@ -606,7 +692,7 @@ export function StudioDemo() {
               <button className="studio-playbar-play" aria-label={playing ? 'Tạm dừng' : 'Phát'} onClick={() => setPlaying((value) => !value)} type="button">
                 {playing ? <IconPause /> : <IconPlay />}
               </button>
-              <b>{formatTime(time)}<small> / 00:10.30</small></b>
+              <b>{formatTime(Math.min(time, duration))}<small> / {formatTime(duration)}</small></b>
               <div
                 className="studio-playbar-scrub"
                 onPointerDown={scrub}
@@ -638,14 +724,23 @@ export function StudioDemo() {
         {/* -------------------------------------------------------- timeline --- */}
         <section className="studio-timeline" aria-label="Timeline bài học">
           <div className="studio-spaces">
-            <button className={mode === 'inspect' ? 'is-active' : ''} onClick={() => chooseMode('inspect')} type="button">Space 1: Bee</button>
-            <button className={mode === 'assemble' ? 'is-active' : ''} onClick={() => chooseMode('assemble')} type="button">Space 2: Cấu tạo</button>
-            <button className="studio-space-add" aria-label="Thêm không gian" onClick={() => chooseMode('drive')} type="button"><IconPlus /></button>
+            {SPACES.map((entry) => (
+              <button
+                aria-pressed={mode === entry.id}
+                className={mode === entry.id ? 'is-active' : ''}
+                key={entry.id}
+                onClick={() => chooseMode(entry.id)}
+                type="button"
+              >
+                {entry.label}
+              </button>
+            ))}
+            <button className="studio-space-add" aria-label="Thêm không gian" onClick={() => chooseMode('inspect')} type="button"><IconPlus /></button>
           </div>
 
           <div className="studio-stepbar">
-            <button className="studio-step-create" onClick={() => chooseMode('drive')} type="button">Tạo Step</button>
-            <button className="studio-step-customize" type="button"><IconSettings />Tùy chỉnh</button>
+            <button className="studio-step-create" onClick={() => setPlaying((value) => !value)} type="button">Tạo Step</button>
+            <button className="studio-step-customize" type="button"><IconGear />Tùy chỉnh</button>
           </div>
 
           <div className="studio-timeline-panel" id="studio-timeline-panel" hidden={!timelineOpen}>
@@ -679,7 +774,7 @@ export function StudioDemo() {
                   <button aria-label="Tiến một giây" onClick={() => setTime((value) => Math.min(duration, value + 1))} type="button"><IconStepForward /></button>
                 </div>
                 <button className="studio-step-select" type="button">
-                  <span>Bước 1 (Step - 1) - Mở cửa</span><IconChevronDown />
+                  <span>{space.step}</span><IconChevronDown />
                 </button>
               </div>
 
@@ -691,38 +786,41 @@ export function StudioDemo() {
                   </div>
                 </div>
 
-                {TRACKS.map(({ id, label, color, Icon, start, length }) => (
-                  <div className={`studio-track${track === id ? ' is-active' : ''}`} key={id}>
-                    <button
-                      className="studio-track-name"
-                      onClick={() => { setTrack(id); setActiveDetail(id === 'model' ? 'space' : id); }}
-                      type="button"
-                    >
-                      <Icon /><span>{label}</span><IconChevronDown className="studio-track-caret" />
-                    </button>
-                    <div
-                      className="studio-track-lane"
-                      onPointerDown={scrub}
-                      role="slider"
-                      aria-label={`Timeline ${label}`}
-                      aria-valuemax={duration}
-                      aria-valuemin={0}
-                      aria-valuenow={Number(time.toFixed(2))}
-                      tabIndex={0}
-                    >
-                      <span
-                        className={`studio-clip studio-clip--${id}`}
-                        style={{ background: color, left: `${start * 100}%`, width: `${length * 100}%` }}
+                {TRACKS.map(({ id, label, color, Icon }) => {
+                  const clip = space.clips[id];
+                  return (
+                    <div className={`studio-track${track === id ? ' is-active' : ''}`} key={id}>
+                      <button
+                        className="studio-track-name"
+                        onClick={() => { setTrack(id); setActiveDetail(id === 'model' ? 'space' : id); }}
+                        type="button"
                       >
-                        <i className="studio-clip-handle" aria-hidden="true" />
-                        <b>Tiltle</b><small>Sub-title</small>
-                        {id === 'audio' && <img alt="" src={`${FIGMA_ASSET_ROOT}/timeline-wave.svg`} />}
-                        <i className="studio-clip-handle studio-clip-handle--end" aria-hidden="true" />
-                      </span>
-                      <span className="studio-playhead" style={{ left: `${progress}%` }} />
+                        <Icon /><span>{label}</span><IconChevronDown className="studio-track-caret" />
+                      </button>
+                      <div
+                        className="studio-track-lane"
+                        onPointerDown={scrub}
+                        role="slider"
+                        aria-label={`Timeline ${label} — ${space.label}`}
+                        aria-valuemax={duration}
+                        aria-valuemin={0}
+                        aria-valuenow={Number(time.toFixed(2))}
+                        tabIndex={0}
+                      >
+                        <span
+                          className={`studio-clip studio-clip--${id}`}
+                          style={{ background: color, left: `${clip.start * 100}%`, width: `${clip.length * 100}%` }}
+                        >
+                          <i className="studio-clip-handle" aria-hidden="true" />
+                          <b>{clip.title}</b><small>{clip.sub}</small>
+                          {id === 'audio' && <img alt="" src={`${FIGMA_ASSET_ROOT}/timeline-wave.svg`} />}
+                          <i className="studio-clip-handle studio-clip-handle--end" aria-hidden="true" />
+                        </span>
+                        <span className="studio-playhead" style={{ left: `${progress}%` }} />
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -766,18 +864,18 @@ export function StudioDemo() {
 
           <p className="studio-field-label">Hướng hiển thị</p>
           <div className="studio-note-directions" role="group" aria-label="Hướng đường ghi chú">
-            {noteDirections.map((path, index) => (
+            {NOTE_DIRECTIONS.map(({ path, dot }, index) => (
               <button
                 aria-label={`Hướng ghi chú ${index + 1}`}
                 aria-pressed={noteDirection === index}
                 className={noteDirection === index ? 'is-active' : ''}
-                key={path + index}
+                key={path + dot.join()}
                 onClick={() => setNoteDirection(index)}
                 type="button"
               >
-                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <path d={path} stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-                  <circle cx={index === 0 || index === 5 ? 20 : index % 2 ? 4 : 20} cy={index === 0 || index === 5 ? 12 : index === 1 ? 6 : index === 2 ? 18 : index === 3 ? 18 : 8} r="2.1" fill="currentColor" />
+                <svg viewBox="0 0 20 10" fill="none" aria-hidden="true" focusable="false">
+                  <path d={path} stroke="currentColor" strokeLinecap="round" />
+                  <circle cx={dot[0]} cy={dot[1]} r="2" fill="#00AAAB" />
                 </svg>
               </button>
             ))}

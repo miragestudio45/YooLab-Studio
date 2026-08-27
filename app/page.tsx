@@ -10,7 +10,7 @@ import { ScrollReveal } from './components/ScrollReveal';
 import { SectionSnap } from './components/SectionSnap';
 import { SiteHeader } from './components/SiteHeader';
 import { StudioDemo } from './components/StudioDemo';
-import { IconStoryBuild, IconStoryNote, IconStoryTap, IconStoryTimeline } from './components/studio/EditorIcons';
+import { IconQuiz, IconSpace, IconSteps, IconText } from './components/studio/EditorIcons';
 
 /**
  * The page is one journey, and each stop answers exactly one question:
@@ -35,11 +35,21 @@ import { IconStoryBuild, IconStoryNote, IconStoryTap, IconStoryTimeline } from '
  * full-screen workshop, and it must be one overlay rather than three.
  */
 
-const TOOL_FEATURES = [
-  { index: '01', phase: 'Chọn học liệu', actor: 'Giáo viên', title: 'Dựng không gian', body: 'Ghép mô hình, ánh sáng và bối cảnh bằng thao tác trực quan.', Icon: IconStoryBuild },
-  { index: '02', phase: 'Biên soạn', actor: 'Giáo viên', title: 'Ghi chú tại chỗ', body: 'Gắn kiến thức đúng vào bộ phận, đúng thời điểm.', Icon: IconStoryNote },
-  { index: '03', phase: 'Giao bài', actor: 'Lớp học', title: 'Timeline kể chuyện', body: 'Dàn nhịp mô hình, văn bản, âm thanh và hiệu ứng.', Icon: IconStoryTimeline },
-  { index: '04', phase: 'Khám phá', actor: 'Học sinh', title: 'Hoạt động tương tác', body: 'Thêm hotspot và câu hỏi trả lời ngay trên mô hình.', Icon: IconStoryTap },
+/*
+ * The four beats, and why they carry the editor's own icons.
+ *
+ * This column used to pair a phase with an actor ("Chọn học liệu / GIÁO VIÊN")
+ * over a sentence that restated the section heading, and it read as a spec table
+ * beside a product. It now names the panel each beat is performed in and shows
+ * that panel's glyph — the same export the rail two hundred pixels to the left is
+ * drawing — so the column is a legend for the workspace rather than a second
+ * feature list. Point at a line here, find it in the editor.
+ */
+const TOOL_BEATS = [
+  { index: '01', panel: 'Không gian', title: 'Dựng không gian', body: 'Thả mô hình vào scene, đặt ánh sáng và bối cảnh — đúng tỉ lệ thật.', Icon: IconSpace },
+  { index: '02', panel: 'Văn bản', title: 'Ghi chú tại chỗ', body: 'Neo chú thích vào đúng bộ phận, chỉnh đường dẫn ngay trên khung nhìn.', Icon: IconText },
+  { index: '03', panel: 'Bước · Timeline', title: 'Dàn nhịp bài giảng', body: 'Bốn làn mô hình, văn bản, âm thanh, hiệu ứng — kéo để đổi thời điểm.', Icon: IconSteps },
+  { index: '04', panel: 'Hotspot · Quiz', title: 'Giao cho lớp', body: 'Gắn điểm chạm và câu hỏi, xuất một liên kết. Học sinh mở là chạy.', Icon: IconQuiz },
 ];
 
 export default function Home() {
@@ -61,50 +71,53 @@ export default function Home() {
               guessed the heading would measure. See `.tool-stage`. */}
           <div className="tool-stage">
             <div className="shell">
-              <div className="section-heading section-heading--split tool-heading" data-reveal>
-                <div>
-                  <p className="section-kicker section-kicker--light">Công cụ YooLab · YooStudio</p>
-                  <h2 id="tool-title">Từ kiến thức <em>thành bài học.</em></h2>
-                </div>
-                <div className="tool-heading-copy">
-                  <p>Chọn mô hình, thêm nội dung, âm thanh và tương tác — không cần lập trình.</p>
-                  <a href="#thu-vien">Xem thư viện học liệu <span aria-hidden="true">→</span></a>
-                </div>
+              {/*
+                Four children on one two-row grid, not two stacked blocks.
+                The kicker and the lede share row one, the heading and the link
+                share row two, and each row aligns on a baseline — so the two
+                halves of the band are locked to each other's type rather than to
+                a bottom edge that happened to line up at one width.
+              */}
+              <div className="section-heading tool-heading" data-reveal>
+                <p className="section-kicker section-kicker--light">Công cụ YooLab</p>
+                <p className="tool-heading-lede">Chọn mô hình, thêm nội dung, âm thanh và tương tác — không cần lập trình.</p>
+                <h2 id="tool-title">Từ kiến thức <em>thành bài học.</em></h2>
+                <a className="tool-heading-link" href="#thu-vien">Xem thư viện học liệu <span aria-hidden="true">→</span></a>
               </div>
             </div>
 
+            {/* The glass bezel the editor is mounted in. It is a frame, not a wash:
+                the blur happens in a 10 px rim around the card, so the pool of
+                light behind the section bends at the edge the way it would round
+                a real cover glass, and the editor keeps its own crisp surface. */}
             <div className="shell tool-workspace" data-reveal>
-              <StudioDemo />
+              <div className="tool-frame">
+                <StudioDemo />
+              </div>
             </div>
 
             <div className="shell tool-feature-shell" data-reveal>
               <aside className="tool-story" aria-labelledby="tool-story-title">
                 <header className="tool-story__intro">
-                  <div>
-                    <h3 id="tool-story-title">Một bài học, bốn nhịp.</h3>
-                    <span aria-hidden="true">01—04</span>
-                  </div>
-                  <p>Từ học liệu đến khoảnh khắc học sinh tự tay khám phá.</p>
+                  <h3 id="tool-story-title">Một bài học, bốn nhịp.</h3>
+                  <p>Bốn thao tác, làm trọn trong cửa sổ bên trái.</p>
                 </header>
 
                 <ol className="tool-story__list">
-                  {TOOL_FEATURES.map((feature) => (
-                    <li key={feature.index}>
-                      <span className="tool-story__node" aria-hidden="true"><feature.Icon /></span>
+                  {TOOL_BEATS.map((beat) => (
+                    <li key={beat.index}>
+                      <span className="tool-story__node" aria-hidden="true"><beat.Icon /></span>
                       <div className="tool-story__copy">
-                        <div className="tool-story__meta">
-                          <span>{feature.phase}</span>
-                          <em>{feature.actor}</em>
-                        </div>
-                        <h4>{feature.title}</h4>
-                        <p>{feature.body}</p>
+                        <h4>{beat.title}<b aria-hidden="true">{beat.index}</b></h4>
+                        <p>{beat.body}</p>
+                        <span className="tool-story__panel">{beat.panel}</span>
                       </div>
                     </li>
                   ))}
                 </ol>
 
                 <a className="tool-story__cta" href="#thu-vien">
-                  <span><small>Bước tiếp theo</small>Xem thư viện học liệu</span>
+                  Xem thư viện học liệu
                   <i aria-hidden="true"><span /></i>
                 </a>
               </aside>

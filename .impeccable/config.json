@@ -8,6 +8,24 @@
         "value": "7px solid var(--brand-accent)",
         "createdAt": "2026-08-25T07:53:12.370Z",
         "reason": "Claude: not a card accent border — .bridge-arrow i::after is the zero-size-box CSS triangle idiom (width:0;height:0 with two transparent borders) drawing the arrowhead on the bridge flow connector"
+      },
+      {
+        "rule": "gradient-text",
+        "value": "*",
+        "files": [
+          "app/globals.css"
+        ],
+        "createdAt": "2026-08-27T02:22:29.912Z",
+        "reason": "Committed visual world, predates this pass: the italic <em> ramp is the display role in DESIGN.md section 3 and runs on the hero h1 and every section h2. Out of scope for a YooStudio-section review."
+      },
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "app/globals.css"
+        ],
+        "createdAt": "2026-08-27T02:30:04.694Z",
+        "reason": "False positive: .bridge-arrow i::after is the zero-box CSS triangle idiom (width:0;height:0 with transparent top/bottom borders), so border-left draws the arrowhead on a 1px hairline. There is no card and no accent stripe."
       }
     ]
   }

@@ -124,6 +124,30 @@ const SHOTS = [
   { name: 'bridge', at: '#tu-kham-pha-den-tao', settle: 1800 },
   { name: 'ribbon', at: '#quy-trinh' },
   { name: 'studio', at: '#cong-cu', settle: 2200 },
+  /*
+   * Five magnified crops of the editor, for judging it against the Figma frame
+   * rather than against a memory of it. A 1920 shot of this section renders the
+   * whole editor at about 48% of the source frame's scale, which is small enough
+   * that a wrong icon, a 4 px radius or a stretched glyph is invisible — and
+   * every round of "chưa giống Figma" notes has been about exactly those. The
+   * clips are in CSS pixels at w1920 and are only meaningful at that viewport.
+   */
+  { name: 'studio-rail', at: '#cong-cu', settle: 2000, clipOf: { sel: '.studio-main-rail', scale: 3.2 } },
+  { name: 'studio-topbar', at: '#cong-cu', settle: 2000, clipOf: { sel: '.studio-topbar', scale: 3 } },
+  { name: 'studio-canvas-chrome', at: '#cong-cu', settle: 2400, clipOf: { sel: '.studio-canvas', inset: [0, 0, 380, 0], scale: 2.4 } },
+  { name: 'studio-timeline-detail', at: '#cong-cu', settle: 2000, clipOf: { sel: '.studio-timeline', scale: 2.4 } },
+  { name: 'studio-props', at: '#cong-cu', settle: 2000, clipOf: { sel: '.studio-properties', scale: 2.6 } },
+  { name: 'studio-detail-rail', at: '#cong-cu', settle: 2000, clipOf: { sel: '.studio-detail-rail', scale: 3.2 } },
+  { name: 'studio-story', at: '#cong-cu', settle: 2000, clipOf: { sel: '.tool-story', scale: 2.4 } },
+  { name: 'studio-head', at: '#cong-cu', settle: 1400, clipOf: { sel: '.tool-heading', scale: 2.2 } },
+  /*
+   * The three spaces, each with the car in its own state and the timeline holding
+   * that state's own score. This is the pair of shots that proves the review note
+   * "space 1 2 3 chỗ timeline tương ứng với từng anim của car" — a still of the
+   * default space cannot, because all three look identical until one is clicked.
+   */
+  { name: 'studio-space-2', at: '#cong-cu', settle: 2600, run: `[...document.querySelectorAll('.studio-spaces > button')][1].click();` },
+  { name: 'studio-space-3', at: '#cong-cu', settle: 3200, run: `[...document.querySelectorAll('.studio-spaces > button')][2].click();` },
   { name: 'library-bee', at: '#thu-vien', run: OPEN('Sinh học', 'Ong mật'), settle: 3400 },
   { name: 'library-fish', at: '#thu-vien', run: OPEN('Sinh học', 'Cá cảnh biển'), settle: 3200 },
   { name: 'library-jelly', at: '#thu-vien', run: OPEN('Sinh học', 'Sứa biển'), settle: 3200 },
@@ -519,10 +543,40 @@ try {
        * vector icon" is invisible at frame scale. Chrome will rasterise a region
        * at any scale, so a 4× crop of one bank answers it for one extra capture.
        */
+      /*
+       * `clipOf` is `clip` for something that moves.
+       *
+       * CDP's clip is in DOCUMENT coordinates, so a literal `y` only works for a
+       * region near the top of the page — which is why the hero crops above are
+       * written that way and why the same numbers mean nothing for a section
+       * three thousand pixels down, whose offset changes with every copy edit
+       * above it. `clipOf: { sel, inset }` measures the element at capture time
+       * and adds the scroll offset, so the crop follows the component.
+       */
+      let clip = shot.clip;
+      if (shot.clipOf) {
+        const { sel, inset = [0, 0, 0, 0], scale = 2.4 } = shot.clipOf;
+        const box = await evaluate(`
+          const node = document.querySelector(${JSON.stringify(sel)});
+          if (!node) return null;
+          const r = node.getBoundingClientRect();
+          return { x: r.left + scrollX, y: r.top + scrollY, width: r.width, height: r.height };
+        `);
+        if (!box) throw new Error(`clipOf selector not found: ${sel}`);
+        const [top, right, bottom, left] = inset;
+        clip = {
+          x: Math.round(box.x + left),
+          y: Math.round(box.y + top),
+          width: Math.round(box.width - left - right),
+          height: Math.round(box.height - top - bottom),
+          scale,
+        };
+      }
+
       const capture = await send('Page.captureScreenshot', {
         format: 'png',
         captureBeyondViewport: false,
-        ...(shot.clip ? { clip: { ...shot.clip, scale: shot.clip.scale ?? 3 } } : {}),
+        ...(clip ? { clip: { ...clip, scale: clip.scale ?? 3 } } : {}),
       });
       const file = join(outDir, `${viewportKey}-${shot.name}.png`);
       writeFileSync(file, Buffer.from(capture.data, 'base64'));
