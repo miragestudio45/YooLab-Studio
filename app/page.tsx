@@ -9,6 +9,7 @@ import { ProofSection } from './components/ProofSection';
 import { ScrollReveal } from './components/ScrollReveal';
 import { SectionSnap } from './components/SectionSnap';
 import { SiteHeader } from './components/SiteHeader';
+import { StartWithYooLabButton } from './components/StartWithYooLabButton';
 import { StudioDemo } from './components/StudioDemo';
 import { IconQuiz, IconSpace, IconSteps, IconText } from './components/studio/EditorIcons';
 
@@ -134,9 +135,9 @@ export default function Home() {
             scene cùng bạn.
           </p>
           <div data-reveal>
-            <a className="cta-main" href="mailto:hello@yoolab.vn?subject=Bắt%20đầu%20với%20YooLab">
+            <StartWithYooLabButton className="cta-main">
               Bắt đầu với YooLab <span aria-hidden="true">↗</span>
-            </a>
+            </StartWithYooLabButton>
             <a href="mailto:hello@yoolab.vn?subject=Trao%20đổi%20cùng%20YooLab">Trao đổi cùng chúng tôi</a>
           </div>
         </section>
