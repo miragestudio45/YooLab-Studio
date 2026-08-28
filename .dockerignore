@@ -1,0 +1,62 @@
+# Everything here is either reproduced inside the image, or has no business
+# being sent to the daemon. `reference-audit/` alone is ~244 MB of research
+# material that never ships, so this file is not an optimisation — without it
+# the build context is larger than the image.
+
+# dependencies — reinstalled from the lockfile in the builder stage
+node_modules
+.pnp
+.pnp.*
+.yarn
+
+# build output — the image builds its own
+.next
+.vinext
+.output
+.nitro
+.vercel
+.wrangler
+dist
+out
+outputs
+work
+tsconfig.tsbuildinfo
+next-env.d.ts
+
+# vcs and editor
+.git
+.gitignore
+.vscode
+.idea
+
+# agent tooling — not part of the app build.
+# `.openai/hosting.json` is deliberately absent from this list: `vite.config.ts`
+# imports it, so the build fails without it.
+.agents
+.claude
+.codex
+.impeccable
+
+# research material, never shipped
+reference-audit
+reference-sources
+reference-sources.zip
+
+# docs
+*.md
+
+# local environment and secrets — build-time values come in as --build-arg
+.env
+.env.*
+*.pem
+
+# logs and OS noise
+npm-debug.log*
+yarn-debug.log*
+.pnpm-debug.log*
+coverage
+.DS_Store
+
+# docker itself
+Dockerfile
+.dockerignore
