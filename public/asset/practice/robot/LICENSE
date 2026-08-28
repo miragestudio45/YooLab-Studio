@@ -1,0 +1,33 @@
+The MIT License (MIT)
+
+Copyright (c) 2024-present, Automation Standard LLC and Contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+---
+
+The above notice covers `six-axis.glb`, `eoat-suction.glb` and the six WebP
+texture maps in this directory, which are derived from
+`assets/3DModels/Six-axis/` and `assets/3DModels/EOATSuction/` in the
+Open Industry Project (https://github.com/Open-Industry-Project/Open-Industry-Project).
+
+Modifications, in full: four unused vertex attributes were removed from the two
+GLBs and their buffers repacked (see scripts/build-robot-model.mjs); the texture
+maps were resampled and re-encoded as WebP. No geometry was altered. Full detail
+in THIRD_PARTY_ASSETS.md at the repository root.

@@ -23,6 +23,11 @@ export type PracticeGlyph =
   | 'joint'
   | 'grip'
   | 'auto'
+  /* Poster tool hints — what the experience behind the still image lets you do */
+  | 'orbit'
+  | 'zoom'
+  | 'layers'
+  | 'gauge'
   /* Bottom strip */
   | 'shield'
   | 'repeat'
@@ -31,4 +36,12 @@ export type PracticeGlyph =
   /* Lab chrome */
   | 'restart'
   | 'hint'
-  | 'check';
+  | 'check'
+  /* Modal chrome */
+  | 'star'
+  | 'expand'
+  | 'collapse'
+  | 'close'
+  | 'play'
+  | 'pause'
+  | 'teach';

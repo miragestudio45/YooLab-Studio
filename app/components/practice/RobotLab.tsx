@@ -2,163 +2,213 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { LabChrome, LabPad, type LabFlash, type LabStep } from './LabChrome';
 import { PracticeIcon } from './PracticeIcons';
 import {
-  ARM,
-  CELL_COLORS,
-  JOINT_LIMITS,
-  LINE,
-  MAX_RADIUS,
-  approachAngles,
-  createRobotCell,
-  solveArm,
-  toolPoint,
-  type JointAngles,
-} from '../../lib/robot/cell';
+  CASE,
+  CASE_COUNT,
+  PER_LAYER,
+  PICK_POINT,
+  createRobotCellScene,
+  slotPosition,
+  type CellCase,
+  type RobotCellScene,
+} from '../../lib/robot/cellScene';
+import {
+  HOME_DEG,
+  JOINT_LABELS,
+  JOINT_LIMITS_DEG,
+  approachJoints,
+  clampJointDeg,
+  createForwardKinematics,
+  maxRadiusAt,
+  solveToolDown,
+  type JointIndex,
+} from '../../lib/robot/sixAxis';
 import { createPracticeRoom } from '../../lib/three/practiceRoom';
 
 /**
- * Lab 03 — the industrial robot cell.
+ * Lab 03 — the palletising cell.
  *
- * The reference for this is a serious thing: the Open Industry Project, a Godot
+ * The reference is a serious thing: the Open Industry Project, a Godot
  * warehouse simulator that speaks OPC-UA, EtherNet/IP and Modbus to real PLCs.
- * Almost none of that belongs in a student's first ten seconds with a robot
- * arm, and the part that does is the part nobody teaches: an industrial arm is
- * not programmed by typing joint angles, it is *taught* — an operator walks the
- * tool to a point, saves it, walks it to the next one, and then the cell repeats
- * what it was shown, forever, at speed.
+ * Its arm is now *literally* in this lab (`lib/robot/sixAxis.ts` loads the
+ * model and transcribes the rig from its scene file), and having the real
+ * machine changed what this lesson can be.
  *
- * So this lab is that, in five beats:
+ * The version this replaces gave a beginner four arrow keys and hid the six
+ * axes behind an "advanced mode", on the reasoning that you cannot form the
+ * intention "put it over the box" in joint space. That reasoning is correct and
+ * it was the wrong conclusion, because it answers a question nobody asked: a
+ * student who opens a robot lab is not trying to move a box efficiently, they
+ * are trying to find out what the six joints *do*. Hiding them made the lab
+ * easier to complete and pointless to open.
  *
- *   01 Quan sát     turn the cell over and look at it
- *   02 Điều khiển   jog the gripper with four arrows and two lift keys
- *   03 Gắp vật      put the gripper on a box and close the jaws
- *   04 Đặt vật      carry it to its slot and open them
- *   05 Chạy tự động the cell repeats that motion for the two remaining boxes
+ * So the control panel is the lab now, and it is the real division of labour on
+ * any cell floor:
  *
- * The controls are Cartesian, never joint angles: ← → is left and right in the
- * *room*, and an analytic three-link solve turns that into six joint commands
- * (`lib/robot/cell.ts`). Six raw sliders would be a truthful interface to a
- * six-axis arm and a completely useless one to a beginner — you cannot form the
- * intention "put it over the blue box" in joint space. They are still here,
- * behind "Chế độ nâng cao", because once a student has moved the tool around
- * for a minute, *that* is the moment the six axes become interesting.
+ *   **THỦ CÔNG** — the pendant. Six joint sliders against the real limit table,
+ *   or Cartesian jog with the plate held vertical by an analytic solve. Vacuum
+ *   on the operator. This is where a student discovers that J1 swings the whole
+ *   machine and J5 only nods the tool.
+ *
+ *   **TỰ ĐỘNG** — the program. Twelve cases, six to a layer, two layers, and
+ *   the cell runs the cycle until the pallet is built. This is where they see
+ *   that the twelve picks are *one* taught motion plus an index, which is the
+ *   single most useful thing to know about industrial automation and is invisible
+ *   from outside a cell.
+ *
+ * Teaching sits between them: save the pose you drove to, then let the cell go
+ * back to it. That is what a teach pendant is, and it is the bridge between the
+ * two modes rather than a third one.
  */
 
-const STEPS: LabStep[] = [
+/* -------------------------------------------------------------- constants --- */
+
+/** The room is a cell hall: 14 m across, for a 3 m robot. */
+const ROOM_SPAN = 14;
+/** Joint slew, degrees per second at 100% speed. Upstream's default is 45. */
+const JOINT_RATE = 62;
+/** Cartesian jog, metres per second. */
+const JOG_SPEED = 0.55;
+/** Belt speed, metres per second. A real case line runs 0.3–0.6. */
+const BELT_SPEED = 0.55;
+/** How close the plate has to be to a case's top face to draw it. */
+const PICK_TOLERANCE = 0.17;
+/** …and to a pallet slot to let go over it. */
+const PLACE_TOLERANCE = 0.24;
+/** Clearance the cycle lifts to before traversing, metres. */
+const CLEARANCE = 0.55;
+
+const STEPS = [
   { id: 'look', label: 'Quan sát' },
   { id: 'jog', label: 'Điều khiển' },
-  { id: 'pick', label: 'Gắp vật' },
-  { id: 'place', label: 'Đặt vật' },
+  { id: 'pick', label: 'Gắp & đặt' },
   { id: 'auto', label: 'Chạy tự động' },
-];
+] as const;
 
 const COPY: { objective: string; hint: string }[] = [
   {
-    objective: 'Kéo để xoay quanh cánh tay robot và nhìn kỹ sáu khớp của nó.',
-    hint: 'Từ chân đế lên: khớp xoay thân, khớp vai, khớp khuỷu, rồi ba khớp cổ tay. Sáu khớp là đủ để đưa kẹp tới bất kỳ điểm nào trong tầm với, ở bất kỳ hướng nào.',
+    objective: 'Kéo để xoay quanh cell và nhìn kỹ sáu khớp của cánh tay.',
+    hint: 'Từ chân đế lên: khớp xoay thân, khớp vai, khớp khuỷu, rồi ba khớp cổ tay. Cần đúng sáu khớp để đưa tấm hút tới bất kỳ điểm nào trong tầm với, ở bất kỳ hướng nào.',
   },
   {
-    objective: 'Dùng ← → ↑ ↓ để đưa kẹp đi, và Nâng / Hạ để lên xuống.',
-    hint: 'Bạn đang ra lệnh cho một điểm trong không gian, không phải cho từng khớp. Bộ điều khiển tự tính xem sáu khớp phải quay bao nhiêu — đó chính là việc một tủ điều khiển robot làm.',
+    objective: 'Trong bảng điều khiển, kéo thử một thanh khớp — hoặc chuyển sang Tọa độ để chạy theo X, Y, Z.',
+    hint: 'Chế độ Khớp ra lệnh cho từng động cơ. Chế độ Tọa độ ra lệnh cho một điểm trong không gian, và bộ điều khiển tự tính sáu góc quay — đó chính là việc một tủ điều khiển robot làm.',
   },
   {
-    objective: 'Đưa kẹp xuống ngay trên khối hàng đang sáng, rồi nhấn Đóng kẹp.',
-    hint: 'Vòng tròn dưới kẹp chuyển sang màu xanh khi vị trí đã đúng. Hạ kẹp xuống thấp ngang khối hàng trước khi đóng.',
+    objective: 'Đưa tấm hút xuống sát mặt trên thùng hàng, bật Hút, rồi mang nó sang pallet và Nhả.',
+    hint: 'Vòng tròn chuyển sang xanh khi tấm hút đã đủ gần. Ở chế độ Tọa độ, tấm hút luôn nằm ngang nên bạn chỉ cần hạ đúng độ cao.',
   },
   {
-    objective: 'Mang khối hàng sang ô trống trên khay, rồi nhấn Mở kẹp.',
-    hint: 'Nâng khối hàng lên cao hơn thành khay trước khi đi ngang, nếu không kẹp sẽ va vào mép khay — đúng như thật.',
-  },
-  {
-    objective: 'Nhấn Chạy tự động: robot lặp lại đúng thao tác bạn vừa dạy cho hai khối còn lại.',
-    hint: 'Đây là cách một dây chuyền thật hoạt động: người vận hành dạy một lần, cell lặp lại hàng nghìn lần mà không lệch.',
+    objective: 'Bật TỰ ĐỘNG rồi nhấn Chạy: cell xếp hết 12 thùng thành hai lớp.',
+    hint: 'Mười hai lần gắp không phải mười hai điểm được dạy. Chỉ có một chuyển động được dạy, cộng với một chỉ số ô — đó là lý do một dây chuyền thật đổi được kiểu xếp mà không phải dạy lại.',
   },
 ];
 
-type JogState = {
-  left: boolean; right: boolean; forward: boolean; back: boolean;
-  up: boolean; down: boolean; turnLeft: boolean; turnRight: boolean;
+/** Cycle phases, in order. The panel prints the current one. */
+const PHASES = {
+  feed: 'Chờ thùng vào vị trí',
+  approach: 'Tới trên thùng',
+  descend: 'Hạ tấm hút',
+  grip: 'Hút chân không',
+  lift: 'Nâng thùng',
+  traverse: 'Sang pallet',
+  lower: 'Hạ vào ô',
+  release: 'Nhả chân không',
+  retract: 'Rút lên',
+  done: 'Hoàn thành pallet',
+} as const;
+
+type Phase = keyof typeof PHASES;
+
+type Mode = 'auto' | 'manual';
+type ManualKind = 'joint' | 'tcp';
+
+type Waypoint = { name: string; degrees: number[] };
+
+/** What the UI writes and the render loop reads. */
+type Control = {
+  mode: Mode;
+  manual: ManualKind;
+  /** Multiplier on `JOINT_RATE`. */
+  speed: number;
+  running: boolean;
+  vacuum: boolean;
+  /** Manual joint-mode commanded angles, degrees. */
+  jointTargets: number[];
+  /** Cartesian jog, held. */
+  jog: Record<'xPlus' | 'xMinus' | 'yPlus' | 'yMinus' | 'zPlus' | 'zMinus', boolean>;
 };
 
-const KEY_BINDINGS: Record<string, keyof JogState> = {
-  ArrowLeft: 'left', KeyA: 'left',
-  ArrowRight: 'right', KeyD: 'right',
-  ArrowUp: 'forward', KeyW: 'forward',
-  ArrowDown: 'back', KeyS: 'back',
-  KeyR: 'up', Space: 'up',
-  KeyF: 'down', ShiftLeft: 'down', ShiftRight: 'down',
-  KeyQ: 'turnLeft',
-  KeyE: 'turnRight',
+type Pulse = {
+  home: boolean;
+  reset: boolean;
+  /** Index into the waypoint list, or −1. */
+  goTo: number;
+  /** Sync `jointTargets` from wherever the arm currently is. */
+  sync: boolean;
 };
 
-const MOVE_PAD = [
-  { id: 'forward', glyph: '↑', name: 'Đưa kẹp ra xa', area: 'up' },
-  { id: 'left', glyph: '←', name: 'Đưa kẹp sang trái', area: 'left' },
-  { id: 'back', glyph: '↓', name: 'Kéo kẹp lại gần', area: 'down' },
-  { id: 'right', glyph: '→', name: 'Đưa kẹp sang phải', area: 'right' },
-];
+/** Live numbers the panel prints. Kept in one object so one render updates all. */
+type Readout = {
+  degrees: number[];
+  tcp: [number, number, number];
+  placed: number;
+  holding: boolean;
+  phase: Phase;
+  cycles: number;
+  /** Seconds for the last completed pick-to-place, or 0. */
+  cycleTime: number;
+  reachable: boolean;
+};
 
-const LIFT_PAD = [
-  { id: 'up', glyph: '▲', name: 'Nâng kẹp', area: 'up' },
-  { id: 'down', glyph: '▼', name: 'Hạ kẹp', area: 'down' },
-];
+const JOG_KEYS: Record<string, keyof Control['jog']> = {
+  ArrowUp: 'zPlus', KeyW: 'zPlus',
+  ArrowDown: 'zMinus', KeyS: 'zMinus',
+  ArrowLeft: 'xMinus', KeyA: 'xMinus',
+  ArrowRight: 'xPlus', KeyD: 'xPlus',
+  KeyR: 'yPlus', Space: 'yPlus',
+  KeyF: 'yMinus', ShiftLeft: 'yMinus', ShiftRight: 'yMinus',
+};
 
-const JOINT_LABELS = ['J1 · Thân', 'J2 · Vai', 'J3 · Khuỷu', 'J4 · Cẳng tay', 'J5 · Cổ tay', 'J6 · Kẹp'];
-const JOINT_KEYS: (keyof JointAngles)[] = ['j1', 'j2', 'j3', 'j4', 'j5', 'j6'];
-
-/** The room is a cell, not a hall: three metres across. */
-const ROOM_SPAN = 4.2;
-/** Tool jog speed, m/s. Slow enough to aim, fast enough not to be a chore. */
-const JOG_SPEED = 0.42;
-/** Joint slew rate, rad/s. */
-const JOINT_RATE = 2.2;
-/** How close the tool has to be to a target before the cell says "yes". */
-const SNAP_RADIUS = 0.055;
-/**
- * How close it has to be for the jaws to actually close on something.
- *
- * Deliberately *looser* than the indicator, and the order matters: the ring
- * turns green at `SNAP_RADIUS` and the grip is accepted out to here, so
- * anything that looks right works. The other way round is the classic teaching
- * -lab betrayal — a student presses the button while the ring is green, the arm
- * drifts two centimetres further in the frame it takes the command to land, and
- * the cell tells them they were in the wrong place. The margin is a third of a
- * box, so it can never be mistaken for "close enough to anything".
- */
-const GRAB_RADIUS = SNAP_RADIUS * 1.7;
-
-/* Out and up rather than tucked in: at a 0.57 m radius the elbow folds back on
-   itself and the arm reads as a pile of white blocks instead of a linkage. */
-const HOME_TARGET = new THREE.Vector3(0.46, 0.78, 0.5);
-
-export function RobotLab({ startSignal }: { startSignal: number }) {
+export function RobotLab() {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<HTMLDivElement>(null);
 
-  const jogRef = useRef<JogState>({
-    left: false, right: false, forward: false, back: false,
-    up: false, down: false, turnLeft: false, turnRight: false,
+  const controlRef = useRef<Control>({
+    mode: 'manual',
+    manual: 'joint',
+    speed: 1,
+    running: false,
+    vacuum: false,
+    jointTargets: [...HOME_DEG],
+    jog: { xPlus: false, xMinus: false, yPlus: false, yMinus: false, zPlus: false, zMinus: false },
   });
-  const commandRef = useRef({ grip: false, reset: false, auto: false, advance: false });
-  const advancedRef = useRef<{ on: boolean; angles: JointAngles }>({
-    on: false,
-    angles: { j1: 0, j2: 0, j3: 0, j4: 0, j5: 0, j6: 0 },
-  });
+  const pulseRef = useRef<Pulse>({ home: false, reset: false, goTo: -1, sync: false });
+  const waypointsRef = useRef<Waypoint[]>([]);
   const stepRef = useRef(0);
 
-  const [step, setStep] = useState(0);
-  /* Keyed on the step rather than a boolean — see the note in `DroneLab`. */
-  const [hintFor, setHintFor] = useState<number | null>(null);
-  const [flash, setFlash] = useState<LabFlash | null>(null);
-  const [gripClosed, setGripClosed] = useState(false);
-  const [inRange, setInRange] = useState(false);
-  const [placedCount, setPlacedCount] = useState(0);
+  const [mode, setMode] = useState<Mode>('manual');
+  const [manual, setManual] = useState<ManualKind>('joint');
+  const [speed, setSpeed] = useState(1);
   const [running, setRunning] = useState(false);
-  const [finished, setFinished] = useState(false);
-  const [advanced, setAdvanced] = useState(false);
-  const [jointReadout, setJointReadout] = useState<JointAngles>({ j1: 0, j2: 0, j3: 0, j4: 0, j5: 0, j6: 0 });
+  const [vacuum, setVacuum] = useState(false);
+  const [jointTargets, setJointTargets] = useState<number[]>([...HOME_DEG]);
+  const [waypoints, setWaypoints] = useState<Waypoint[]>([]);
+  const [step, setStep] = useState(0);
+  const [hintOpen, setHintOpen] = useState(false);
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [flash, setFlash] = useState<{ text: string; tone: 'success' | 'warn'; key: number } | null>(null);
+  const [readout, setReadout] = useState<Readout>({
+    degrees: [...HOME_DEG],
+    tcp: [0, 0, 0],
+    placed: 0,
+    holding: false,
+    phase: 'feed',
+    cycles: 0,
+    cycleTime: 0,
+    reachable: true,
+  });
 
   const flashCount = useRef(0);
   const pushFlash = useCallback((text: string, tone: 'success' | 'warn') => {
@@ -166,201 +216,77 @@ export function RobotLab({ startSignal }: { startSignal: number }) {
     setFlash({ text, tone, key: flashCount.current });
   }, []);
 
-  useEffect(() => {
-    if (startSignal <= 0) return;
-    commandRef.current.advance = true;
-    hostRef.current?.focus();
-  }, [startSignal]);
+  /* Mirror the declarative UI state into the loop's ref. Cheaper and clearer
+     than threading six setters through the effect's closure. */
+  useEffect(() => { controlRef.current.mode = mode; }, [mode]);
+  useEffect(() => { controlRef.current.manual = manual; }, [manual]);
+  useEffect(() => { controlRef.current.speed = speed; }, [speed]);
+  useEffect(() => { controlRef.current.running = running; }, [running]);
+  useEffect(() => { controlRef.current.vacuum = vacuum; }, [vacuum]);
+  useEffect(() => { controlRef.current.jointTargets = jointTargets; }, [jointTargets]);
+  useEffect(() => { waypointsRef.current = waypoints; }, [waypoints]);
+  useEffect(() => { stepRef.current = step; }, [step]);
 
   useEffect(() => {
     const host = hostRef.current;
     const mount = viewRef.current;
     if (!host || !mount) return;
 
-    const room = createPracticeRoom(host, { mount, span: ROOM_SPAN, fov: 34 });
+    let disposed = false;
+    const room = createPracticeRoom(host, { mount, span: ROOM_SPAN, fov: 32 });
     const { stage } = room;
-    // The cell has its own floor markings and three shadow-casting objects; the
-    // shared blob would be a fourth, floating under an arm that is bolted down.
+    /* The cell paints its own floor markings and everything in it is bolted
+       down, so the shared blob shadow would be a smudge under a fixed machine. */
     room.shadow.mesh.visible = false;
 
-    const cell = createRobotCell();
-    stage.scene.add(cell.group);
+    let cell: RobotCellScene | null = null;
+    const fk = createForwardKinematics();
 
-    const angles: JointAngles = { j1: 0, j2: 0.9, j3: -1.7, j4: 0, j5: 0, j6: 0 };
-    const target = HOME_TARGET.clone();
-    let toolRoll = 0;
-    let grip = 0;
-    let gripTarget = 0;
-    let jogged = 0;
-    let dragged = false;
-    /*
-     * Seconds the *current* run has spent on the observe step.
-     *
-     * Separate from the animation clock, which is what this used to read. That
-     * clock never resets — it drives the pulse of the target ring and the stack
-     * light and has to be monotonic — so once the lab had been on screen for
-     * nine seconds, pressing "Làm lại" put the visitor back on step 01 and
-     * immediately advanced them off it again. The first step of the lesson was
-     * unreachable for anybody on their second run.
-     */
-    let observing = 0;
-
-    const tip = new THREE.Vector3();
-    const worldTip = new THREE.Vector3();
-    const carryOffset = new THREE.Vector3();
-
-    const goStep = (next: number) => {
-      stepRef.current = next;
-      setStep(next);
-    };
-
-    /* --- the taught program ------------------------------------------------
-     * Generated from the same pick and place points the student drove to by
-     * hand, which is exactly what a teach pendant stores: an approach above the
-     * part, a descent, a grip, a lift, a traverse, a descent, a release, a lift.
-     * The two remaining parts run it unchanged. */
-    const APPROACH = 0.18;
-    type Waypoint = { point: THREE.Vector3; grip?: number; hold?: number };
-    const buildProgram = (index: number): Waypoint[] => {
-      const pick = cell.pickPoints[index];
-      const place = cell.placePoints[index];
-      return [
-        { point: new THREE.Vector3(pick.x, pick.y + APPROACH, pick.z) },
-        { point: pick.clone(), hold: 0.18 },
-        { point: pick.clone(), grip: 1, hold: 0.4 },
-        { point: new THREE.Vector3(pick.x, pick.y + APPROACH, pick.z) },
-        { point: new THREE.Vector3(place.x, place.y + APPROACH, place.z) },
-        { point: place.clone(), hold: 0.18 },
-        { point: place.clone(), grip: 0, hold: 0.4 },
-        { point: new THREE.Vector3(place.x, place.y + APPROACH, place.z) },
-      ];
-    };
-
-    let program: Waypoint[] = [];
-    let programIndex = 0;
-    let programPart = -1;
+    /* --- pose state -------------------------------------------------------- */
+    const current = [...HOME_DEG];
+    /** Where the arm is being asked to go. Both modes write here. */
+    const commanded = [...HOME_DEG];
+    /** Cartesian jog target, in the arm's frame. Seeded from the home pose. */
+    const tcp = new THREE.Vector3();
+    let vacuumOn = false;
+    let held: CellCase | null = null;
+    let phase: Phase = 'feed';
     let holdTimer = 0;
-    let autoRunning = false;
-    let finishedRun = false;
+    let cycles = 0;
+    let cycleClock = 0;
+    let lastCycleTime = 0;
+    let placed = 0;
+    let reachable = true;
+    let observing = 0;
+    let jogged = 0;
 
-    /* --- helpers ---------------------------------------------------------- */
-    const nextPart = () => cell.parts.find((part) => !part.placed && !part.held) ?? null;
-    const heldPart = () => cell.parts.find((part) => part.held) ?? null;
-
-    const closeGrip = () => {
-      const candidate = nextPart();
-      if (!candidate) return false;
-      const pick = cell.pickPoints[0];
-      toolPoint(angles, tip);
-      const near = Math.hypot(tip.x - candidate.mesh.position.x, tip.z - candidate.mesh.position.z) < GRAB_RADIUS
-        && Math.abs(tip.y - candidate.mesh.position.y) < GRAB_RADIUS + 0.03
-        && Math.hypot(candidate.mesh.position.x - pick.x, candidate.mesh.position.z - pick.z) < 0.03;
-      gripTarget = 1;
-      if (!near) return false;
-      candidate.held = true;
-      // Re-parenting rather than copying a world position every frame: the part
-      // then inherits the tool's roll for free, which is the whole reason J6
-      // exists.
-      cell.toolCentre.getWorldPosition(worldTip);
-      carryOffset.copy(candidate.mesh.position).sub(worldTip);
-      return true;
-    };
-
-    /*
-     * Opening the jaws is refused while the part is over nowhere.
-     *
-     * The obvious implementation — open, and drop whatever was held — models a
-     * real gripper honestly and teaches nothing: a box that falls through the
-     * floor is a bug to a student, not a consequence. Refusing the release and
-     * saying why keeps the failure inside the lesson.
-     */
-    const openGrip = () => {
-      const carried = heldPart();
-      if (!carried) {
-        gripTarget = 0;
-        return true;
-      }
-      toolPoint(angles, tip);
-      const slot = cell.placePoints[carried.slot];
-      const near = Math.hypot(tip.x - slot.x, tip.z - slot.z) < GRAB_RADIUS
-        && Math.abs(tip.y - slot.y) < GRAB_RADIUS + 0.06;
-      if (!near) return false;
-      gripTarget = 0;
-      carried.held = false;
-      carried.placed = true;
-      carried.mesh.position.copy(slot);
-      (carried.mesh.material as THREE.MeshStandardMaterial).emissiveIntensity = 0;
-      return true;
-    };
-
-    const resetCell = () => {
-      angles.j1 = 0; angles.j2 = 0.9; angles.j3 = -1.7; angles.j4 = 0; angles.j5 = 0; angles.j6 = 0;
-      target.copy(HOME_TARGET);
-      toolRoll = 0;
-      grip = 0;
-      gripTarget = 0;
-      jogged = 0;
-      dragged = false;
-      observing = 0;
-      autoRunning = false;
-      finishedRun = false;
-      program = [];
-      programIndex = 0;
-      programPart = -1;
-      for (const part of cell.parts) {
-        part.held = false;
-        part.placed = false;
-        part.mesh.position.copy(part.home);
-        (part.mesh.material as THREE.MeshStandardMaterial).emissiveIntensity = 0;
-      }
-      cell.targetMark.visible = false;
-      goStep(0);
-      setGripClosed(false);
-      setPlacedCount(0);
-      setRunning(false);
-      setFinished(false);
-      setFlash(null);
-      setAdvanced(false);
-      advancedRef.current.on = false;
-    };
-
-    /* --- input ------------------------------------------------------------- */
-    const jog = jogRef.current;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.code === 'KeyG' || event.code === 'Enter') {
-        event.preventDefault();
-        commandRef.current.grip = true;
-        return;
-      }
-      const binding = KEY_BINDINGS[event.code];
-      if (!binding) return;
-      event.preventDefault();
-      jog[binding] = true;
-    };
-    const onKeyUp = (event: KeyboardEvent) => {
-      const binding = KEY_BINDINGS[event.code];
-      if (binding) jog[binding] = false;
-    };
-    const onBlur = () => {
-      for (const key of Object.keys(jog) as (keyof JogState)[]) jog[key] = false;
-    };
-    host.addEventListener('keydown', onKeyDown);
-    host.addEventListener('keyup', onKeyUp);
-    host.addEventListener('blur', onBlur);
+    const worldTip = new THREE.Vector3();
+    const scratch = new THREE.Vector3();
+    const scratchB = new THREE.Vector3();
 
     /* --- camera ------------------------------------------------------------ */
-    let cameraYaw = 0.52;
-    let cameraPitch = 0.38;
-    /* The cell is 2.5 m across from the tray to the far end of the conveyor;
-       at 2.75 the stack light's post ran off the top of the frame and the arm
-       filled it edge to edge. */
-    let cameraDistance = 3.3;
+    let cameraYaw = 0.82;
+    /*
+     * Looking down *into* the cell, not across it.
+     *
+     * The guarding is 2 m tall and the camera used to sit at 3.5 m, nine
+     * metres out, which put four metres of mesh fence across the bottom of
+     * every frame. At this pitch the eye is 4.9 m up and clears it, which is
+     * also the angle anyone photographing a real cell shoots from and the
+     * only one that shows the pallet pattern being built.
+     */
+    let cameraPitch = 0.4;
+    /* Framed on the working triangle — arm, pick station, pallet — with the
+       racking behind it. At 11.2 the two rack bays took the upper third of the
+       frame and the arm read as the smallest machine in the room. */
+    let cameraDistance = 11.0;
     let dragging = false;
     let previousX = 0;
     let previousY = 0;
-    /* Aimed at the work, not at the machine: the trays and the pick station are
-       all in front of the base, so the frame's centre belongs there too. */
-    const pivot = new THREE.Vector3(0.4, 0.44, 0.3);
+    /* Aimed at the work, not at the machine: the pick station, the pallet and
+       the arm's own wrist all sit forward and left of the base. */
+    const pivot = new THREE.Vector3(-0.8, 1.1, 0.7);
+
     const onPointerDown = (event: PointerEvent) => {
       if ((event.target as Element | null)?.closest('button, a, input, label')) return;
       dragging = true;
@@ -373,10 +299,10 @@ export function RobotLab({ startSignal }: { startSignal: number }) {
     const onPointerMove = (event: PointerEvent) => {
       if (!dragging) return;
       cameraYaw -= (event.clientX - previousX) * 0.007;
-      cameraPitch = THREE.MathUtils.clamp(cameraPitch + (event.clientY - previousY) * 0.005, -0.05, 0.92);
+      cameraPitch = THREE.MathUtils.clamp(cameraPitch + (event.clientY - previousY) * 0.005, 0.08, 0.9);
       previousX = event.clientX;
       previousY = event.clientY;
-      dragged = true;
+      if (stepRef.current === 0) observing += 1.4;
     };
     const endDrag = (event: PointerEvent) => {
       dragging = false;
@@ -386,438 +312,798 @@ export function RobotLab({ startSignal }: { startSignal: number }) {
     const onWheel = (event: WheelEvent) => {
       if (Math.abs(event.deltaY) < 2) return;
       event.preventDefault();
-      cameraDistance = THREE.MathUtils.clamp(cameraDistance * (1 + event.deltaY * 0.0012), 1.6, 6.4);
+      cameraDistance = THREE.MathUtils.clamp(cameraDistance * (1 + event.deltaY * 0.0012), 3.2, 24);
     };
+
+    /* --- keyboard ---------------------------------------------------------- */
+    const onKeyDown = (event: KeyboardEvent) => {
+      const binding = JOG_KEYS[event.code];
+      if (!binding) return;
+      /* Only in Cartesian manual mode. In joint mode the arrows belong to
+         whichever slider has focus, and stealing them would break the panel. */
+      if (controlRef.current.mode !== 'manual' || controlRef.current.manual !== 'tcp') return;
+      event.preventDefault();
+      controlRef.current.jog[binding] = true;
+    };
+    const onKeyUp = (event: KeyboardEvent) => {
+      const binding = JOG_KEYS[event.code];
+      if (binding) controlRef.current.jog[binding] = false;
+    };
+    const onBlur = () => {
+      const jog = controlRef.current.jog;
+      for (const key of Object.keys(jog) as (keyof Control['jog'])[]) jog[key] = false;
+    };
+
     host.addEventListener('pointerdown', onPointerDown);
     host.addEventListener('pointermove', onPointerMove);
     host.addEventListener('pointerup', endDrag);
     host.addEventListener('pointercancel', endDrag);
     host.addEventListener('wheel', onWheel, { passive: false });
+    host.addEventListener('keydown', onKeyDown);
+    host.addEventListener('keyup', onKeyUp);
+    host.addEventListener('blur', onBlur);
 
-    /* --- loop --------------------------------------------------------------- */
+    /* --- vacuum ------------------------------------------------------------ */
+
+    /** Top-face centre of a case — where the suction plate has to be. */
+    const graspPoint = (entry: CellCase, out: THREE.Vector3) => {
+      entry.mesh.getWorldPosition(out);
+      out.y += CASE.y / 2;
+      return out;
+    };
+
+    /**
+     * Draws whatever the plate is over.
+     *
+     * A distance test rather than the upstream `Area3D` overlap, and the
+     * tolerance is deliberately generous: the ring that says "close enough"
+     * turns green at `PICK_TOLERANCE`, so anything that *looks* right works.
+     * The other way round is the classic teaching-lab betrayal — the student
+     * presses the button while the ring is green, the arm drifts a centimetre
+     * in the frame it takes the command to land, and the cell tells them they
+     * were in the wrong place.
+     */
+    const draw = () => {
+      if (!cell || held) return false;
+      arm().toolTip.getWorldPosition(worldTip);
+      const candidate = cell.cases.find(
+        (entry) => entry.state === 'waiting' && graspPoint(entry, scratch).distanceTo(worldTip) < PICK_TOLERANCE,
+      );
+      if (!candidate) return false;
+      /* `attach` rather than `add`: the case keeps its world transform, so a
+         suction pick looks like the plate closing on a box that was already
+         there rather than the box jumping to the plate. */
+      arm().toolTip.attach(candidate.mesh);
+      candidate.state = 'held';
+      held = candidate;
+      return true;
+    };
+
+    /**
+     * Lets go — but only over a slot.
+     *
+     * The honest implementation drops whatever was held wherever it was, and it
+     * teaches nothing: a case that falls through the floor reads as a bug, not
+     * as a consequence. Refusing the release and saying why keeps the failure
+     * inside the lesson.
+     */
+    const release = () => {
+      if (!cell || !held) return false;
+      arm().toolTip.getWorldPosition(worldTip);
+      const slot = slotPosition(placed, scratchB);
+      const top = slot.clone();
+      top.y += CASE.y / 2;
+      if (top.distanceTo(worldTip) > PLACE_TOLERANCE) return false;
+      cell.group.attach(held.mesh);
+      held.mesh.position.copy(slot);
+      held.mesh.rotation.set(0, 0, 0);
+      held.slot = placed;
+      held.state = 'placed';
+      held = null;
+      placed += 1;
+      return true;
+    };
+
+    /** Non-null after the model resolves; every call site runs inside the loop. */
+    const arm = () => cell!.arm;
+
+    const resetAll = () => {
+      if (!cell) return;
+      if (held) {
+        cell.group.attach(held.mesh);
+        held = null;
+      }
+      cell.reset();
+      placed = 0;
+      cycles = 0;
+      cycleClock = 0;
+      lastCycleTime = 0;
+      phase = 'feed';
+      holdTimer = 0;
+      vacuumOn = false;
+      observing = 0;
+      jogged = 0;
+      for (let index = 0; index < 6; index += 1) {
+        current[index] = HOME_DEG[index];
+        commanded[index] = HOME_DEG[index];
+      }
+      fk.solve(HOME_DEG, tcp);
+      setVacuum(false);
+      setRunning(false);
+      setJointTargets([...HOME_DEG]);
+      setStep(0);
+      setFlash(null);
+    };
+
+    /* --- the cycle --------------------------------------------------------- */
+
+    /**
+     * One pass of the palletising program.
+     *
+     * Written as a phase machine over *poses* rather than as a list of
+     * waypoints, because that is what makes the lesson land: every phase asks
+     * the same analytic solve for a point in the room, and the only thing that
+     * changes between case 1 and case 12 is `slotPosition(placed)`. Twelve
+     * picks, one motion, one index.
+     */
+    const runCycle = (delta: number, step: number) => {
+      if (!cell) return;
+      const front = cell.cases.find((entry) => entry.state === 'waiting');
+      const queued = cell.cases.filter((entry) => entry.state === 'queued');
+
+      if (holdTimer > 0) {
+        holdTimer -= delta;
+        return;
+      }
+
+      const goTo = (point: THREE.Vector3) => {
+        const solution = solveToolDown(point);
+        reachable = solution.reachable;
+        for (let index = 0; index < 6; index += 1) commanded[index] = solution.degrees[index];
+        return approachJoints(current, commanded, step);
+      };
+
+      switch (phase) {
+        case 'feed': {
+          if (placed >= CASE_COUNT) { phase = 'done'; return; }
+          /* The belt only runs when there is somewhere for a case to go, which
+             is what an accumulating line does and is why the stop exists. */
+          if (!front) {
+            const next = queued[0];
+            if (!next) { phase = 'done'; return; }
+            cell.advanceBelt(BELT_SPEED * delta);
+            for (const entry of queued) entry.mesh.position.x += BELT_SPEED * delta;
+            if (next.mesh.position.x >= PICK_POINT.x - 0.001) {
+              next.mesh.position.x = PICK_POINT.x;
+              next.state = 'waiting';
+            }
+            return;
+          }
+          cycleClock = 0;
+          phase = 'approach';
+          return;
+        }
+        case 'approach': {
+          if (!front) { phase = 'feed'; return; }
+          if (goTo(scratch.copy(PICK_POINT).setY(PICK_POINT.y + CASE.y + CLEARANCE))) phase = 'descend';
+          return;
+        }
+        case 'descend': {
+          if (goTo(scratch.copy(PICK_POINT).setY(PICK_POINT.y + CASE.y))) {
+            phase = 'grip';
+            holdTimer = 0.2;
+          }
+          return;
+        }
+        case 'grip': {
+          vacuumOn = true;
+          if (draw()) {
+            phase = 'lift';
+            holdTimer = 0.25;
+          } else {
+            /* Nothing under the plate: the belt has not delivered. Back to the
+               top rather than stalling on a phase that cannot complete. */
+            vacuumOn = false;
+            phase = 'feed';
+          }
+          return;
+        }
+        case 'lift': {
+          if (goTo(scratch.copy(PICK_POINT).setY(PICK_POINT.y + CASE.y + CLEARANCE))) phase = 'traverse';
+          return;
+        }
+        case 'traverse': {
+          const slot = slotPosition(placed, scratchB);
+          if (goTo(scratch.copy(slot).setY(slot.y + CASE.y / 2 + CLEARANCE))) phase = 'lower';
+          return;
+        }
+        case 'lower': {
+          const slot = slotPosition(placed, scratchB);
+          if (goTo(scratch.copy(slot).setY(slot.y + CASE.y / 2))) {
+            phase = 'release';
+            holdTimer = 0.18;
+          }
+          return;
+        }
+        case 'release': {
+          vacuumOn = false;
+          if (release()) {
+            cycles += 1;
+            lastCycleTime = cycleClock;
+            phase = 'retract';
+            holdTimer = 0.2;
+            if (stepRef.current === 3 && placed >= CASE_COUNT) {
+              pushFlash('Đã xếp xong pallet — 12 thùng, 2 lớp', 'success');
+            }
+          } else {
+            phase = 'traverse';
+          }
+          return;
+        }
+        case 'retract': {
+          const slot = slotPosition(Math.max(0, placed - 1), scratchB);
+          if (goTo(scratch.copy(slot).setY(slot.y + CASE.y / 2 + CLEARANCE))) phase = 'feed';
+          return;
+        }
+        case 'done': {
+          if (goTo(scratch.set(0.4, 1.9, 1.5))) setRunning(false);
+          return;
+        }
+      }
+    };
+
+    /* --- build ------------------------------------------------------------- */
+    createRobotCellScene()
+      .then((built) => {
+        if (disposed) { built.dispose(); return; }
+        cell = built;
+        stage.scene.add(built.group);
+        built.arm.setJoints(current);
+        fk.solve(current, tcp);
+        setStatus('ready');
+      })
+      .catch((error) => {
+        console.error('Robot cell failed to load', error);
+        if (!disposed) setStatus('error');
+      });
+
+    /* --- loop -------------------------------------------------------------- */
     const cameraTarget = new THREE.Vector3();
-    const solved: JointAngles = { j1: 0, j2: 0, j3: 0, j4: 0, j5: 0, j6: 0 };
-    let hudElapsed = 0;
-    let pulse = 0;
     const timer = new THREE.Timer();
+    let hudClock = 0;
+    let pulseClock = 0;
 
     stage.renderer.setAnimationLoop(() => {
       timer.update();
       const delta = Math.min(timer.getDelta(), 0.05);
       if (!stage.active()) return;
-      const commands = commandRef.current;
-      const phase = stepRef.current;
 
-      if (commands.reset) { commands.reset = false; resetCell(); }
-
-      if (commands.advance) {
-        commands.advance = false;
-        if (stepRef.current === 0) goStep(1);
-      }
-
-      if (commands.auto) {
-        commands.auto = false;
-        if (!autoRunning) {
-          const candidate = nextPart();
-          if (candidate) {
-            programPart = cell.parts.indexOf(candidate);
-            program = buildProgram(programPart);
-            programIndex = 0;
-            holdTimer = 0;
-            autoRunning = true;
-            setRunning(true);
-          }
-        }
-      }
-
-      if (commands.grip) {
-        commands.grip = false;
-        if (!autoRunning) {
-          if (gripTarget > 0.5 || heldPart()) {
-            const released = openGrip();
-            if (released) {
-              setGripClosed(false);
-              const done = cell.parts.filter((part) => part.placed).length;
-              setPlacedCount(done);
-              if (done > 0) {
-                pushFlash('Đã đặt vật vào đúng ô', 'success');
-                if (stepRef.current === 3) goStep(4);
-              }
-            } else {
-              pushFlash('Chưa tới ô trống trên khay', 'warn');
-            }
-          } else {
-            const grabbed = closeGrip();
-            setGripClosed(true);
-            if (grabbed) {
-              pushFlash('Đã gắp vật', 'success');
-              if (stepRef.current === 2) goStep(3);
-            } else {
-              pushFlash('Kẹp chưa đúng vị trí khối hàng', 'warn');
-            }
-          }
-        }
-      }
-
-      /* --- what the student is being asked to reach --------------------- */
-      const carried = heldPart();
-      const pending = nextPart();
-      let mark: THREE.Vector3 | null = null;
-      if (!autoRunning && phase === 2 && pending) mark = cell.pickPoints[0];
-      if (!autoRunning && phase === 3 && carried) mark = cell.placePoints[carried.slot];
-
-      /* --- driving the arm ----------------------------------------------- */
-      if (autoRunning) {
-        const waypoint = program[programIndex];
-        if (waypoint) {
-          target.copy(waypoint.point);
-          if (waypoint.grip !== undefined) gripTarget = waypoint.grip;
-          toolPoint(angles, tip);
-          const arrived = tip.distanceTo(waypoint.point) < 0.028
-            && Math.abs(grip - gripTarget) < 0.05;
-          if (arrived) {
-            holdTimer += delta;
-            if (holdTimer >= (waypoint.hold ?? 0)) {
-              holdTimer = 0;
-              // Grip transitions are where the part actually changes hands.
-              if (waypoint.grip === 1) {
-                const part = cell.parts[programPart];
-                if (part && !part.held && !part.placed) {
-                  part.held = true;
-                  cell.toolCentre.getWorldPosition(worldTip);
-                  carryOffset.copy(part.mesh.position).sub(worldTip);
-                }
-              } else if (waypoint.grip === 0) {
-                const part = cell.parts[programPart];
-                if (part && part.held) {
-                  part.held = false;
-                  part.placed = true;
-                  part.mesh.position.copy(cell.placePoints[part.slot]);
-                  (part.mesh.material as THREE.MeshStandardMaterial).emissiveIntensity = 0;
-                  setPlacedCount(cell.parts.filter((entry) => entry.placed).length);
-                }
-              }
-              programIndex += 1;
-              if (programIndex >= program.length) {
-                const remaining = nextPart();
-                if (remaining) {
-                  programPart = cell.parts.indexOf(remaining);
-                  program = buildProgram(programPart);
-                  programIndex = 0;
-                } else {
-                  autoRunning = false;
-                  finishedRun = true;
-                  setRunning(false);
-                  setFinished(true);
-                  target.copy(HOME_TARGET);
-                  pushFlash('Cell đã xếp xong cả ba khối hàng', 'success');
-                }
-              }
-            }
-          } else {
-            holdTimer = 0;
-          }
-        }
-      } else if (!advancedRef.current.on) {
-        const dx = (jog.right ? 1 : 0) - (jog.left ? 1 : 0);
-        const dz = (jog.forward ? 1 : 0) - (jog.back ? 1 : 0);
-        const dy = (jog.up ? 1 : 0) - (jog.down ? 1 : 0);
-        const turn = (jog.turnLeft ? 1 : 0) - (jog.turnRight ? 1 : 0);
-        if (dx || dz || dy) {
-          const move = JOG_SPEED * delta;
-          target.x += dx * move;
-          target.z += dz * move;
-          target.y += dy * move;
-          jogged += Math.abs(dx) * move + Math.abs(dz) * move + Math.abs(dy) * move;
-        }
-        toolRoll = THREE.MathUtils.clamp(toolRoll + turn * delta * 1.6, -Math.PI, Math.PI);
-
-        /*
-         * The workspace, enforced on the *target* rather than on the arm.
-         *
-         * Clamping the solved angles instead would let the student drive the
-         * commanded point out to infinity while the arm sat still at full
-         * stretch — and then nothing would move for several seconds when they
-         * came back. Holding the target inside the envelope means the tool is
-         * always somewhere the arm can actually be.
-         */
-        const radius = Math.hypot(target.x, target.z);
-        if (radius > MAX_RADIUS) {
-          target.x *= MAX_RADIUS / radius;
-          target.z *= MAX_RADIUS / radius;
-        }
-        if (radius < 0.24) {
-          const scale = radius > 1e-4 ? 0.24 / radius : 0;
-          target.x *= scale;
-          target.z *= scale;
-        }
-        target.y = THREE.MathUtils.clamp(target.y, 0.12, ARM.shoulderHeight + ARM.upperArm + 0.28);
-      }
-
-      if (advancedRef.current.on && !autoRunning) {
-        for (const key of JOINT_KEYS) angles[key] = advancedRef.current.angles[key];
-        toolPoint(angles, tip);
-        target.copy(tip);
-      } else {
-        const solution = solveArm(target, toolRoll);
-        solved.j1 = solution.angles.j1;
-        solved.j2 = solution.angles.j2;
-        solved.j3 = solution.angles.j3;
-        solved.j4 = solution.angles.j4;
-        solved.j5 = solution.angles.j5;
-        solved.j6 = solution.angles.j6;
-        approachAngles(angles, solved, JOINT_RATE * delta);
-      }
-      cell.applyAngles(angles);
-
-      grip += (gripTarget - grip) * Math.min(1, delta * 7);
-      cell.setGrip(grip);
-
-      /* --- the belt, and the queue ---------------------------------------- */
-      for (const slat of cell.slats) {
-        slat.position.x -= LINE.beltSpeed * delta;
-        if (slat.position.x < LINE.pickX - 0.1) slat.position.x += 1.4;
-      }
-      let queue = 0;
-      for (const part of cell.parts) {
-        if (part.placed || part.held) continue;
-        const wantedX = LINE.pickX + queue * 0.24;
-        part.mesh.position.x += (wantedX - part.mesh.position.x)
-          * Math.min(1, delta * LINE.beltSpeed * 12);
-        part.mesh.position.y = LINE.beltTop + 0.05;
-        part.mesh.position.z = LINE.pickZ;
-        queue += 1;
-      }
-      // The carried part rides the tool centre, so it inherits J6's roll.
-      if (carried) {
-        cell.toolCentre.getWorldPosition(worldTip);
-        carried.mesh.position.copy(worldTip).add(carryOffset);
-        carried.mesh.rotation.y = angles.j1 + angles.j6;
-      }
-
-      /* --- signalling ------------------------------------------------------ */
-      pulse += delta;
-      const beat = 0.5 + Math.sin(pulse * 3.4) * 0.5;
-      toolPoint(angles, tip);
-
-      let near = false;
-      if (mark) {
-        near = Math.hypot(tip.x - mark.x, tip.z - mark.z) < SNAP_RADIUS
-          && Math.abs(tip.y - mark.y) < SNAP_RADIUS + (phase === 3 ? 0.05 : 0.02);
-        cell.targetMark.visible = true;
-        cell.targetMark.position.set(mark.x, mark.y - 0.045, mark.z);
-        const material = cell.targetMark.material as THREE.MeshBasicMaterial;
-        material.color.set(near ? CELL_COLORS.SAGE : CELL_COLORS.CORAL);
-        material.opacity = near ? 0.95 : 0.35 + beat * 0.4;
-        cell.targetMark.scale.setScalar(near ? 1 : 1 + beat * 0.12);
-      } else {
-        cell.targetMark.visible = false;
-      }
-
-      for (const part of cell.parts) {
-        const material = part.mesh.material as THREE.MeshStandardMaterial;
-        const highlight = !autoRunning && phase === 2 && part === pending;
-        material.emissiveIntensity = highlight ? 0.12 + beat * 0.3 : 0;
-      }
-
-      // The stack light: amber while the cell waits for a person, green while
-      // it runs its own program, and green-held once the job is done.
-      const done = cell.parts.every((part) => part.placed);
-      cell.beaconMaterial.color.set(autoRunning || done ? 0xcfe0c8 : 0xdcc39a);
-      cell.beaconMaterial.emissive.set(autoRunning || done ? CELL_COLORS.SAGE : 0xb08a4a);
-      cell.beaconMaterial.emissiveIntensity = autoRunning ? 0.4 + beat * 0.7 : done ? 0.9 : 0.5;
-
-      /* --- progression ------------------------------------------------------ */
-      if (phase === 0) observing += delta;
-      if (phase === 0 && (dragged || observing > 9)) goStep(1);
-      if (phase === 1 && jogged > 0.3) {
-        goStep(2);
-        pushFlash('Tốt — giờ đưa kẹp tới khối hàng đang sáng', 'success');
-      }
-      // A student who works out the pick-and-place before reaching the auto step
-      // has done the whole lesson; the cell should say so rather than wait for a
-      // button that has nothing left to run.
-      if (done && !autoRunning && !finishedRun) {
-        finishedRun = true;
-        goStep(STEPS.length - 1);
-        setRunning(false);
-        setFinished(true);
-        pushFlash('Cell đã xếp xong cả ba khối hàng', 'success');
-      }
-
-      /* --- camera ------------------------------------------------------------ */
-      const horizontal = Math.cos(cameraPitch) * cameraDistance;
+      /* The camera runs whether or not the model has arrived, so the room is
+         orbitable while the 2 MB arm is still on the wire. */
       cameraTarget.set(
-        pivot.x + Math.sin(cameraYaw) * horizontal,
+        pivot.x + Math.sin(cameraYaw) * Math.cos(cameraPitch) * cameraDistance,
         pivot.y + Math.sin(cameraPitch) * cameraDistance,
-        pivot.z + Math.cos(cameraYaw) * horizontal,
+        pivot.z + Math.cos(cameraYaw) * Math.cos(cameraPitch) * cameraDistance,
       );
-      if (!stage.reduceMotion && !dragging && phase === 0) cameraYaw += delta * 0.12;
-      stage.camera.position.lerp(cameraTarget, 1 - Math.pow(0.002, delta));
+      stage.camera.position.lerp(cameraTarget, 1 - Math.exp(-9 * delta));
       stage.camera.lookAt(pivot);
 
-      hudElapsed += delta;
-      if (hudElapsed > 0.16) {
-        hudElapsed = 0;
-        setInRange(near);
-        setJointReadout({ ...angles });
+      if (cell) {
+        const control = controlRef.current;
+        const pulse = pulseRef.current;
+        const step = JOINT_RATE * control.speed * delta;
+        pulseClock += delta;
+
+        if (pulse.reset) { pulse.reset = false; resetAll(); }
+
+        if (pulse.home) {
+          pulse.home = false;
+          for (let index = 0; index < 6; index += 1) commanded[index] = HOME_DEG[index];
+          if (control.mode === 'manual') setJointTargets([...HOME_DEG]);
+        }
+
+        if (pulse.goTo >= 0) {
+          const waypoint = waypointsRef.current[pulse.goTo];
+          pulse.goTo = -1;
+          if (waypoint) {
+            for (let index = 0; index < 6; index += 1) commanded[index] = waypoint.degrees[index];
+            setJointTargets([...waypoint.degrees]);
+          }
+        }
+
+        if (pulse.sync) {
+          pulse.sync = false;
+          setJointTargets(current.map((value) => Math.round(value * 10) / 10));
+          fk.solve(current, tcp);
+        }
+
+        if (control.mode === 'auto') {
+          if (control.running) runCycle(delta, step);
+          else approachJoints(current, commanded, step);
+          if (control.running && phase !== 'feed' && phase !== 'done') cycleClock += delta;
+          cell.setBeacon(control.running ? 'run' : 'idle');
+        } else {
+          /* Manual. Both sub-modes end up writing `commanded`, so the slew
+             below is the single place the arm is allowed to move — which is
+             what stops a mode switch from teleporting it. */
+          if (control.manual === 'joint') {
+            for (let index = 0; index < 6; index += 1) {
+              commanded[index] = clampJointDeg(index as JointIndex, control.jointTargets[index] ?? 0);
+            }
+          } else {
+            const jog = control.jog;
+            const move = JOG_SPEED * delta;
+            let moved = false;
+            if (jog.xPlus) { tcp.x += move; moved = true; }
+            if (jog.xMinus) { tcp.x -= move; moved = true; }
+            if (jog.yPlus) { tcp.y += move; moved = true; }
+            if (jog.yMinus) { tcp.y -= move; moved = true; }
+            if (jog.zPlus) { tcp.z += move; moved = true; }
+            if (jog.zMinus) { tcp.z -= move; moved = true; }
+            if (moved) {
+              tcp.y = Math.max(0.12, tcp.y);
+              /* Pull an out-of-envelope ask back onto the boundary here rather
+                 than letting the solve clamp it. Otherwise the jog target
+                 drifts off into space and the arm stops responding to the key
+                 that would bring it home. */
+              const radius = Math.hypot(tcp.x, tcp.z);
+              const limit = maxRadiusAt(tcp.y);
+              if (radius > limit && radius > 1e-6) tcp.multiplyScalar(limit / radius);
+              jogged += move;
+            }
+            const solution = solveToolDown(tcp);
+            reachable = solution.reachable;
+            for (let index = 0; index < 6; index += 1) commanded[index] = solution.degrees[index];
+          }
+          approachJoints(current, commanded, step);
+          vacuumOn = control.vacuum;
+          cell.setBeacon('idle');
+        }
+
+        cell.arm.setJoints(current);
+        cell.arm.setVacuum(vacuumOn);
+
+        /* Vacuum is a *request*; whether anything is held is a consequence. So
+           the draw and the release are evaluated from the flag every frame
+           rather than on the button press, which is also how a real gripper
+           behaves when the operator switches it off mid-air. */
+        if (control.mode === 'manual') {
+          if (vacuumOn && !held) draw();
+          if (!vacuumOn && held) {
+            const dropped = release();
+            if (dropped) {
+              pushFlash('Đã đặt thùng vào ô trên pallet', 'success');
+              if (stepRef.current === 2) setStep(3);
+            } else {
+              /* Refused: put the request back so the button and the plate agree
+                 about what is happening. */
+              setVacuum(true);
+            }
+          }
+        }
+
+        /* --- the instruction ring ------------------------------------------ */
+        const control2 = controlRef.current;
+        if (control2.mode === 'manual' && stepRef.current === 2) {
+          const mark = held ? slotPosition(placed, scratchB) : null;
+          if (mark) {
+            cell.targetMark.position.set(mark.x, mark.y + CASE.y / 2 + 0.01, mark.z);
+            cell.targetMark.visible = true;
+          } else {
+            const waiting = cell.cases.find((entry) => entry.state === 'waiting');
+            if (waiting) {
+              graspPoint(waiting, scratch);
+              cell.targetMark.position.set(scratch.x, scratch.y + 0.01, scratch.z);
+              cell.targetMark.visible = true;
+            } else {
+              cell.targetMark.visible = false;
+            }
+          }
+          arm().toolTip.getWorldPosition(worldTip);
+          const distance = cell.targetMark.visible
+            ? worldTip.distanceTo(cell.targetMark.position)
+            : Infinity;
+          const near = distance < (held ? PLACE_TOLERANCE : PICK_TOLERANCE);
+          const material = cell.targetMark.material as THREE.MeshBasicMaterial;
+          material.color.setHex(near ? 0x5aa05e : 0xe87868);
+          cell.targetMark.scale.setScalar(1 + Math.sin(pulseClock * 3.4) * 0.05);
+        } else {
+          cell.targetMark.visible = false;
+        }
+
+        /* --- lesson progression -------------------------------------------- */
+        if (stepRef.current === 0) {
+          observing += delta;
+          if (observing > 5) setStep(1);
+        } else if (stepRef.current === 1) {
+          const touched = control2.manual === 'tcp'
+            ? jogged > 0.22
+            : current.some((value, index) => Math.abs(value - HOME_DEG[index]) > 6);
+          if (touched) setStep(2);
+        } else if (stepRef.current === 3 && control2.mode !== 'auto' && placed === 0) {
+          /* nothing to do: step 4 only advances by finishing the pallet */
+        }
+
+        /* --- the readout ---------------------------------------------------- */
+        hudClock += delta;
+        if (hudClock > 0.1) {
+          hudClock = 0;
+          arm().toolTip.getWorldPosition(worldTip);
+          setReadout({
+            degrees: current.map((value) => Math.round(value * 10) / 10),
+            tcp: [
+              Math.round(worldTip.x * 1000),
+              Math.round(worldTip.y * 1000),
+              Math.round(worldTip.z * 1000),
+            ],
+            placed,
+            holding: Boolean(held),
+            phase,
+            cycles,
+            cycleTime: Math.round(lastCycleTime * 10) / 10,
+            reachable,
+          });
+        }
       }
 
-      stage.renderer.render(stage.scene, stage.camera);
       stage.noteFrame(delta);
+      stage.renderer.render(stage.scene, stage.camera);
     });
 
     return () => {
+      disposed = true;
       stage.renderer.setAnimationLoop(null);
-      host.removeEventListener('keydown', onKeyDown);
-      host.removeEventListener('keyup', onKeyUp);
-      host.removeEventListener('blur', onBlur);
       host.removeEventListener('pointerdown', onPointerDown);
       host.removeEventListener('pointermove', onPointerMove);
       host.removeEventListener('pointerup', endDrag);
       host.removeEventListener('pointercancel', endDrag);
       host.removeEventListener('wheel', onWheel);
-      delete host.dataset.grabbing;
-      cell.group.removeFromParent();
-      cell.dispose();
+      host.removeEventListener('keydown', onKeyDown);
+      host.removeEventListener('keyup', onKeyUp);
+      host.removeEventListener('blur', onBlur);
+      cell?.dispose();
       room.dispose();
     };
   }, [pushFlash]);
 
-  const press = useCallback((id: string) => {
-    jogRef.current[id as keyof JogState] = true;
-    hostRef.current?.focus();
-  }, []);
-  const release = useCallback((id: string) => {
-    jogRef.current[id as keyof JogState] = false;
-  }, []);
+  /* ------------------------------------------------------------------- ui --- */
 
-  const toggleAdvanced = useCallback(() => {
-    setAdvanced((current) => {
-      const next = !current;
-      // Seed the sliders from where the arm actually is, so switching modes
-      // never moves it. Coming back out, the IK target is re-derived from the
-      // same angles by the loop.
-      advancedRef.current.angles = { ...jointReadout };
-      advancedRef.current.on = next;
+  const setJoint = useCallback((index: number, value: number) => {
+    setJointTargets((previous) => {
+      const next = [...previous];
+      next[index] = clampJointDeg(index as JointIndex, value);
       return next;
     });
-  }, [jointReadout]);
+    if (mode !== 'manual') setMode('manual');
+    if (manual !== 'joint') setManual('joint');
+  }, [manual, mode]);
 
-  const setJoint = useCallback((key: keyof JointAngles, value: number) => {
-    advancedRef.current.angles = { ...advancedRef.current.angles, [key]: value };
-    setJointReadout((current) => ({ ...current, [key]: value }));
+  const holdJog = useCallback((key: keyof Control['jog'], down: boolean) => {
+    controlRef.current.jog[key] = down;
   }, []);
 
-  const copy = COPY[step];
+  const teach = useCallback(() => {
+    const name = `P${waypoints.length + 1}`;
+    setWaypoints((previous) => [...previous, { name, degrees: [...readout.degrees] }]);
+    pushFlash(`Đã lưu điểm ${name}`, 'success');
+  }, [pushFlash, readout.degrees, waypoints.length]);
+
+  const copy = COPY[Math.min(step, COPY.length - 1)];
+  const layer = Math.min(Math.floor(readout.placed / PER_LAYER) + 1, 2);
 
   return (
-    <div className="lab lab--robot" data-state="ready" ref={hostRef} tabIndex={0}>
-      <div ref={viewRef} role="img" aria-label="Cánh tay robot công nghiệp sáu trục trong một ô sản xuất 3D" className="lab-view" />
+    <div className="lab lab--panelled" ref={hostRef} tabIndex={0} aria-label="Cell robot công nghiệp">
+      <div className="lab-stage">
+        <div className="lab-view" ref={viewRef} />
 
-      <LabChrome
-        live={running || placedCount > 0}
-        steps={STEPS}
-        activeStep={finished ? -1 : step}
-        completedSteps={finished ? STEPS.length : step}
-        objective={finished ? 'Cả ba khối hàng đã vào khay. Nhấn Làm lại để dạy robot lượt nữa.' : copy.objective}
-        hint={copy.hint}
-        hintOpen={hintFor === step}
-        onHint={() => setHintFor((current) => (current === step ? null : step))}
-        onReset={() => { commandRef.current.reset = true; }}
-        flash={flash}
-        readout={
-          step >= 1 ? (
-            <>
-              <b>{placedCount}/3</b><span>khối</span>
-              <i aria-hidden="true" />
-              <b>{gripClosed ? 'Đóng' : 'Mở'}</b><span>kẹp</span>
-              {inRange && !running && (<><i aria-hidden="true" /><b className="is-ok">Đúng vị trí</b></>)}
-            </>
-          ) : undefined
-        }
-        actions={
-          <>
-            {step === 0 && (
-              <button
-                type="button"
-                className="lab-button is-primary"
-                onClick={() => { commandRef.current.advance = true; hostRef.current?.focus(); }}
-              >
-                <span>Bắt đầu điều khiển</span>
-                <PracticeIcon name="joint" />
-              </button>
-            )}
-            {(step === 2 || step === 3) && (
-              <button
-                type="button"
-                className="lab-button is-primary"
-                onClick={() => { commandRef.current.grip = true; hostRef.current?.focus(); }}
-              >
-                <span>{gripClosed ? 'Mở kẹp' : 'Đóng kẹp'}</span>
-                <PracticeIcon name="grip" />
-              </button>
-            )}
-            {step === 4 && !finished && (
-              <button
-                type="button"
-                className="lab-button is-primary"
-                disabled={running}
-                onClick={() => { commandRef.current.auto = true; }}
-              >
-                <span>{running ? 'Đang chạy…' : 'Chạy tự động'}</span>
-                <PracticeIcon name="auto" />
-              </button>
-            )}
-          </>
-        }
-      >
-        {step >= 1 && !running && (
-          <>
-            <div className="lab-keys" aria-hidden="true">
-              <p><kbd>←</kbd><kbd>→</kbd><span>Trái / phải</span></p>
-              <p><kbd>↑</kbd><kbd>↓</kbd><span>Tiến / lùi</span></p>
-              <p><kbd>R</kbd><kbd>F</kbd><span>Nâng / hạ</span></p>
-              <p><kbd>Q</kbd><kbd>E</kbd><span>Xoay kẹp</span></p>
-            </div>
-            <LabPad label="Di chuyển kẹp" buttons={MOVE_PAD} onPress={press} onRelease={release} />
-            <LabPad
-              label="Nâng hạ kẹp"
-              className="lab-pad--lift"
-              buttons={LIFT_PAD}
-              onPress={press}
-              onRelease={release}
-            />
-          </>
+        {status === 'loading' && (
+          <p className="lab-status"><i />Đang tải cánh tay robot…</p>
+        )}
+        {status === 'error' && (
+          <p className="lab-status is-error"><i />Không tải được mô hình robot. Hãy tải lại trang.</p>
         )}
 
-        {step >= 1 && (
-          <div className={`lab-advanced${advanced ? ' is-open' : ''}`}>
-            <button type="button" aria-expanded={advanced} onClick={toggleAdvanced}>
-              <PracticeIcon name="joint" />
-              <span>Chế độ nâng cao</span>
+        <p className={`lab-badge${running || step > 0 ? ' is-live' : ''}`}>
+          <i aria-hidden="true" />
+          {mode === 'auto' ? (running ? 'Đang chạy tự động' : 'Tự động · tạm dừng') : 'Vận hành thủ công'}
+        </p>
+
+        <ol className="lab-steps" aria-label="Các bước của bài thực hành">
+          {STEPS.map((entry, index) => (
+            <li key={entry.id} aria-current={index === step ? 'step' : undefined}>
+              <p className={`lab-step${index < step ? ' is-done' : ''}${index === step ? ' is-current' : ''}`}>
+                <b aria-hidden="true">
+                  {index < step ? <PracticeIcon name="check" /> : String(index + 1).padStart(2, '0')}
+                </b>
+                <span>{entry.label}</span>
+              </p>
+            </li>
+          ))}
+        </ol>
+
+        <div className="lab-brief">
+          <p className="lab-objective">{copy.objective}</p>
+          {hintOpen && <p className="lab-hint">{copy.hint}</p>}
+        </div>
+
+        <div className="lab-actions">
+          <button
+            type="button"
+            className={`lab-button${hintOpen ? ' is-active' : ''}`}
+            aria-pressed={hintOpen}
+            onClick={() => setHintOpen((open) => !open)}
+          >
+            <PracticeIcon name="hint" />
+            <span>Gợi ý</span>
+          </button>
+          <button
+            type="button"
+            className="lab-button"
+            onClick={() => { pulseRef.current.reset = true; setHintOpen(false); }}
+          >
+            <PracticeIcon name="restart" />
+            <span>Làm lại</span>
+          </button>
+        </div>
+
+        {flash && (
+          <p className={`lab-flash lab-flash--${flash.tone}`} key={flash.key} role="status">
+            {flash.tone === 'success' && <PracticeIcon name="check" />}
+            {flash.text}
+          </p>
+        )}
+      </div>
+
+      {/*
+        The pendant.
+
+        Docked rather than floating, and that is the point: a control panel that
+        overlays the scene has to stay small enough not to hide it, which is how
+        six joint sliders became an "advanced mode" nobody opened. Given its own
+        column it can carry the whole machine — six axes against their real
+        limits, the tool, the program and the readout — without ever covering the
+        thing it drives.
+      */}
+      <aside className="hmi" aria-label="Bảng điều khiển robot">
+        <div className="hmi-modes" role="tablist" aria-label="Chế độ vận hành">
+          {([
+            ['manual', 'Thủ công', 'joint'],
+            ['auto', 'Tự động', 'auto'],
+          ] as const).map(([id, label, glyph]) => (
+            <button
+              type="button"
+              key={id}
+              role="tab"
+              aria-selected={mode === id}
+              className={mode === id ? 'is-active' : ''}
+              onClick={() => {
+                setMode(id);
+                if (id === 'auto') setVacuum(false);
+                /* Entering manual, seed the sliders from wherever the program
+                   left the arm — otherwise the first slider touch snaps it. */
+                if (id === 'manual') pulseRef.current.sync = true;
+                else setRunning(false);
+              }}
+            >
+              <PracticeIcon name={glyph} />
+              {label}
             </button>
-            {advanced && (
-              <div className="lab-joints">
-                {JOINT_KEYS.map((key, index) => (
-                  <label key={key}>
-                    <span>{JOINT_LABELS[index]}</span>
-                    <input
-                      type="range"
-                      min={JOINT_LIMITS[index][0]}
-                      max={JOINT_LIMITS[index][1]}
-                      step={0.01}
-                      value={jointReadout[key]}
-                      onChange={(event) => setJoint(key, Number(event.target.value))}
-                    />
-                    <b>{Math.round((jointReadout[key] * 180) / Math.PI)}°</b>
-                  </label>
+          ))}
+        </div>
+
+        <div className="hmi-body">
+          {mode === 'auto' ? (
+            <>
+              <section className="hmi-group">
+                <h4>Chương trình xếp pallet</h4>
+                <button
+                  type="button"
+                  className={`hmi-run${running ? ' is-running' : ''}`}
+                  onClick={() => {
+                    if (!running && readout.placed >= CASE_COUNT) pulseRef.current.reset = true;
+                    setRunning((value) => !value);
+                    if (step < 3) setStep(3);
+                  }}
+                  disabled={status !== 'ready'}
+                >
+                  <PracticeIcon name={running ? 'pause' : 'play'} />
+                  {running ? 'Tạm dừng' : readout.placed >= CASE_COUNT ? 'Chạy lại từ đầu' : 'Chạy'}
+                </button>
+                <p className="hmi-phase">
+                  <i aria-hidden="true" data-run={running ? 'true' : 'false'} />
+                  {PHASES[readout.phase]}
+                </p>
+              </section>
+
+              <section className="hmi-group">
+                <h4>Tiến độ</h4>
+                <div className="hmi-progress" role="img" aria-label={`Đã xếp ${readout.placed} trên ${CASE_COUNT} thùng`}>
+                  {Array.from({ length: CASE_COUNT }, (unused, index) => (
+                    <span key={index} className={index < readout.placed ? 'is-filled' : ''} />
+                  ))}
+                </div>
+                <dl className="hmi-readout">
+                  <div><dt>Đã xếp</dt><dd>{readout.placed} / {CASE_COUNT}</dd></div>
+                  <div><dt>Lớp</dt><dd>{layer} / 2</dd></div>
+                  <div><dt>Chu kỳ</dt><dd>{readout.cycleTime ? `${readout.cycleTime.toFixed(1)} s` : '—'}</dd></div>
+                  <div><dt>Đã hoàn tất</dt><dd>{readout.cycles}</dd></div>
+                </dl>
+              </section>
+            </>
+          ) : (
+            <>
+              <div className="hmi-subtabs" role="tablist" aria-label="Kiểu điều khiển">
+                {([['joint', 'Khớp'], ['tcp', 'Tọa độ']] as const).map(([id, label]) => (
+                  <button
+                    type="button"
+                    key={id}
+                    role="tab"
+                    aria-selected={manual === id}
+                    className={manual === id ? 'is-active' : ''}
+                    onClick={() => {
+                      setManual(id);
+                      pulseRef.current.sync = true;
+                    }}
+                  >
+                    {label}
+                  </button>
                 ))}
               </div>
+
+              {manual === 'joint' ? (
+                <section className="hmi-group hmi-group--joints">
+                  {JOINT_LABELS.map((joint, index) => {
+                    const [min, max] = JOINT_LIMITS_DEG[index];
+                    return (
+                      <label className="hmi-joint" key={joint.id}>
+                        <span className="hmi-joint-head">
+                          <b>{joint.id}</b>
+                          <em>{joint.name}</em>
+                          <output>{(jointTargets[index] ?? 0).toFixed(0)}°</output>
+                        </span>
+                        <input
+                          type="range"
+                          min={min}
+                          max={max}
+                          step={1}
+                          value={jointTargets[index] ?? 0}
+                          onChange={(event) => setJoint(index, Number(event.target.value))}
+                          aria-label={`${joint.id} — ${joint.name}, ${joint.note}`}
+                        />
+                        <span className="hmi-joint-scale">
+                          <i>{min}°</i>
+                          {/* Live pose against commanded pose. The gap between
+                              the two is the slew, and showing it is the only way
+                              a slider tells the truth about a machine that
+                              cannot move instantly. */}
+                          <i className="hmi-joint-live">thực {(readout.degrees[index] ?? 0).toFixed(0)}°</i>
+                          <i>{max}°</i>
+                        </span>
+                      </label>
+                    );
+                  })}
+                </section>
+              ) : (
+                <section className="hmi-group">
+                  <h4>Chạy theo trục</h4>
+                  <div className="hmi-jog">
+                    {([
+                      ['zPlus', 'Z+', 'Ra xa'],
+                      ['yPlus', 'Y+', 'Lên'],
+                      ['xMinus', 'X−', 'Sang trái'],
+                      ['zMinus', 'Z−', 'Lại gần'],
+                      ['xPlus', 'X+', 'Sang phải'],
+                      ['yMinus', 'Y−', 'Xuống'],
+                    ] as const).map(([key, glyph, name]) => (
+                      <button
+                        type="button"
+                        key={key}
+                        aria-label={name}
+                        onPointerDown={(event) => { event.preventDefault(); holdJog(key, true); }}
+                        onPointerUp={() => holdJog(key, false)}
+                        onPointerCancel={() => holdJog(key, false)}
+                        onPointerLeave={() => holdJog(key, false)}
+                      >
+                        <b>{glyph}</b>
+                        <span>{name}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <p className="hmi-note">
+                    Tấm hút luôn được giữ nằm ngang — bộ điều khiển tự tính sáu góc quay.
+                    Bàn phím: W A S D · R nâng · F hạ.
+                  </p>
+                </section>
+              )}
+
+              <section className="hmi-group">
+                <h4>Công cụ</h4>
+                <div className="hmi-row">
+                  <button
+                    type="button"
+                    className={`hmi-toggle${vacuum ? ' is-on' : ''}`}
+                    aria-pressed={vacuum}
+                    onClick={() => setVacuum((value) => !value)}
+                  >
+                    <PracticeIcon name="grip" />
+                    {vacuum ? 'Đang hút' : 'Bật hút'}
+                  </button>
+                  <button
+                    type="button"
+                    className="hmi-button"
+                    onClick={() => { pulseRef.current.home = true; }}
+                  >
+                    <PracticeIcon name="restart" />
+                    Về gốc
+                  </button>
+                </div>
+              </section>
+
+              <section className="hmi-group">
+                <h4>Dạy điểm</h4>
+                <button type="button" className="hmi-button hmi-button--wide" onClick={teach}>
+                  <PracticeIcon name="teach" />
+                  Lưu vị trí hiện tại
+                </button>
+                {waypoints.length > 0 ? (
+                  <ul className="hmi-waypoints">
+                    {waypoints.map((waypoint, index) => (
+                      <li key={waypoint.name}>
+                        <b>{waypoint.name}</b>
+                        <span>{waypoint.degrees.map((value) => value.toFixed(0)).join(' · ')}</span>
+                        <button
+                          type="button"
+                          onClick={() => { pulseRef.current.goTo = index; }}
+                          aria-label={`Đi tới ${waypoint.name}`}
+                        >
+                          Đi tới
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setWaypoints((list) => list.filter((entry) => entry !== waypoint))}
+                          aria-label={`Xóa ${waypoint.name}`}
+                        >
+                          ×
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="hmi-note">
+                    Đây là cách một cánh tay thật được lập trình: người vận hành đưa
+                    công cụ tới một điểm rồi lưu lại, không ai gõ góc quay bằng tay.
+                  </p>
+                )}
+              </section>
+            </>
+          )}
+
+          <section className="hmi-group hmi-group--status">
+            <h4>Trạng thái</h4>
+            <dl className="hmi-readout hmi-readout--tight">
+              <div><dt>TCP X</dt><dd>{readout.tcp[0]} mm</dd></div>
+              <div><dt>TCP Y</dt><dd>{readout.tcp[1]} mm</dd></div>
+              <div><dt>TCP Z</dt><dd>{readout.tcp[2]} mm</dd></div>
+              <div><dt>Chân không</dt><dd>{readout.holding ? 'Đang giữ thùng' : vacuum ? 'Hút, chưa có thùng' : 'Tắt'}</dd></div>
+            </dl>
+            {!readout.reachable && (
+              <p className="hmi-warn">Ngoài tầm với — cánh tay đang giữ ở biên vùng làm việc.</p>
             )}
-          </div>
-        )}
-      </LabChrome>
+          </section>
+
+          <label className="hmi-speed">
+            <span>Tốc độ <output>{Math.round(speed * 100)}%</output></span>
+            <input
+              type="range"
+              min={30}
+              max={160}
+              step={5}
+              value={Math.round(speed * 100)}
+              onChange={(event) => setSpeed(Number(event.target.value) / 100)}
+            />
+          </label>
+        </div>
+      </aside>
     </div>
   );
 }
