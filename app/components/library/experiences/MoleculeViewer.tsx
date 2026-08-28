@@ -2,10 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
+import { LibraryIcon } from '../LibraryIcons';
 import { usePrefersReducedMotion } from '../../../lib/usePrefersReducedMotion';
 import { createVisibilityGate } from '../../../lib/three/visibility';
 import { createProceduralEnvironment } from '../../../lib/three/environment';
 import { libraryEnvironmentPalette } from '../../../lib/three/libraryEnvironment';
+import { createContactShadow, createLearningGrid } from '../../../lib/three/studioBackdrop';
 import {
   VI_NAME,
   formatNumber,
@@ -224,7 +226,11 @@ function MoleculeStage({
     const renderer = new THREE.WebGLRenderer({ antialias: !compact, alpha: true });
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.02;
+    /* The same exposure the shared stage runs at. This viewer builds its own
+       renderer — it keeps a transparent canvas so the ten-control bar and the
+       projected measurement guides do not have to fight an opaque buffer — but
+       "its own renderer" was quietly becoming "its own look". */
+    renderer.toneMappingExposure = 0.92;
     renderer.setClearColor(0x000000, 0);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, compact ? 1.4 : 1.7));
     renderer.domElement.setAttribute('aria-hidden', 'true');
@@ -233,13 +239,28 @@ function MoleculeStage({
 
     const environment = createProceduralEnvironment(renderer, libraryEnvironmentPalette);
     scene.environment = environment.texture;
-    scene.add(new THREE.HemisphereLight(0xfff6ec, 0xe0d0c0, 1.1));
-    const key = new THREE.DirectionalLight(0xfff4e8, 2.1);
+    scene.add(new THREE.HemisphereLight(0xfff6ec, 0xdccbb6, 0.86));
+    const key = new THREE.DirectionalLight(0xfff4e8, 2.15);
     key.position.set(-3, 4.2, 5);
     scene.add(key);
-    const rim = new THREE.DirectionalLight(0xffd6c2, 1.2);
+    const rim = new THREE.DirectionalLight(0xffd6c2, 1.42);
     rim.position.set(4, -1.2, -4);
     scene.add(rim);
+
+    /*
+     * The floor, and the mark the molecule leaves on it.
+     *
+     * Both blend over a transparent canvas, so they work here without the opaque
+     * backdrop plate the model stages need — the CSS gradient on
+     * `.library-viewer-stage` is this viewer's plate, and it carries the same
+     * three tones. A measured floor is not decoration under a molecule: this is
+     * the one viewer in the Library whose whole subject is distance, and the grid
+     * is the only thing in the frame that says how big an ångström is.
+     */
+    const shadow = createContactShadow();
+    scene.add(shadow.mesh);
+    const grid = createLearningGrid();
+    scene.add(grid.mesh);
 
     const root = new THREE.Group();
     scene.add(root);
@@ -383,6 +404,13 @@ function MoleculeStage({
       pickMesh.instanceMatrix.needsUpdate = true;
       atoms.computeBoundingSphere();
       pickMesh.computeBoundingSphere();
+      // `frame` is the radius that has to fit, and it changes with the mode:
+      // space-fill spheres are van der Waals radii, ball-and-stick ones are a
+      // third of that. The floor follows, or it belongs to the previous mode.
+      const extent = new THREE.Vector3(frame, frame, frame);
+      const bounds = new THREE.Box3(extent.clone().negate(), extent);
+      shadow.fit(bounds);
+      grid.fit(bounds);
     };
 
     const layoutBonds = () => {
@@ -617,6 +645,8 @@ function MoleculeStage({
       document.removeEventListener('visibilitychange', onVisibility);
       resizeObserver.disconnect();
       gate.dispose();
+      shadow.dispose();
+      grid.dispose();
       atoms.dispose();
       pickMesh.dispose();
       bonds.dispose();
@@ -786,11 +816,14 @@ function MoleculeStage({
           aria-pressed={spin}
           onClick={() => setSpinChoice(!spin)}
         >
-          <svg viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
-            <path d="M16.4 8.2A6.6 6.6 0 1 0 10 16.6" />
-            <path d="M16.8 4.4v4h-4" />
-          </svg>
-          <span>Tự quay</span>
+          {/* The section's one auto-rotate control, shared with both model
+              stages: same mark, same two-line label, same switch. This used to
+              be a bespoke arrow and the word "Tự quay", which made the molecule
+              viewer the only specimen on the page whose rotation toggle looked
+              like a different product's. */}
+          <LibraryIcon name="spin" className="stage-spin-mark" />
+          <span>Tự động<br />xoay</span>
+          <i className="stage-switch" aria-hidden="true"><em /></i>
         </button>
       </div>
 

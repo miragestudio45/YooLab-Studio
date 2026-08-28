@@ -1,12 +1,16 @@
 /**
- * Sinh học tế bào — nội dung cho sáu loại tế bào của Thư viện.
+ * Sinh học tế bào — nội dung cho bảy loại tế bào của Thư viện.
+ *
+ * Sáu tế bào nhân thực và một tế bào nhân sơ. Tế bào vi khuẩn được thêm vào sau,
+ * và nó không phải mục thứ bảy cho đủ số: sáu mục đầu đọc liền nhau sẽ dạy rằng
+ * "tế bào thì có nhân", nên phải có một mục cho thấy điều ngược lại trên hình.
  *
  * Tất cả chữ tiếng Việt của phần tế bào nằm trong file này, kể cả phần mà bản
  * kê học liệu (`lib/library/subjects/biology.ts`) hiển thị. Đó là chủ ý: nội
  * dung sinh học phải đọc soát được ở một chỗ, còn `CellStudio.tsx` chỉ dựng
- * hình và xử lý tương tác. Sáu manifest của Thư viện lấy `parts`, `goals`,
- * `facts`, `notes` từ đây nên tên bào quan trên mô hình và trong bảng kiến thức
- * không thể lệch nhau.
+ * hình và xử lý tương tác. Bảy manifest của Thư viện lấy `poetic`, `parts`,
+ * `goals`, `facts`, `notes` và `context` từ đây nên tên bào quan trên mô hình và
+ * trong bảng kiến thức không thể lệch nhau.
  *
  * Hình học là hình học thủ tục do YooLab dựng, không phải mesh tải về. Hai bản
  * quét của NIH có thể dùng cho tế bào động vật (3DPX-015797) và neuron
@@ -16,8 +20,26 @@
  * và gọi tên được.
  */
 
-/** Sáu loại tế bào có hình học riêng trong CellStudio. */
-export type CellId = 'animal' | 'plant' | 'white-blood' | 'epithelial' | 'muscle' | 'neuron';
+import type { FactGlyph } from '../library/glyphs';
+
+/** Bảy loại tế bào có hình học riêng trong CellStudio. */
+export type CellId =
+  | 'animal'
+  | 'plant'
+  | 'white-blood'
+  | 'epithelial'
+  | 'muscle'
+  | 'neuron'
+  /*
+   * Vi khuẩn — mục thứ bảy, và là mục duy nhất *không* phải tế bào nhân thực.
+   *
+   * Sáu loại trên đều có nhân, nên đọc liền nhau chúng dạy rằng "tế bào thì có
+   * nhân" — đúng một nửa và là nửa sai của chương trình. Một tế bào nhân sơ đặt
+   * cạnh sáu tế bào nhân thực là chỗ duy nhất trong thư viện mà học sinh thấy
+   * được sự khác biệt ấy trên hình thay vì trong bảng chữ: không nhân, không bào
+   * quan có màng, DNA là một vòng nằm tự do trong tế bào chất.
+   */
+  | 'bacteria';
 
 export type OrganelleAttribute = { label: string; value: string };
 
@@ -60,6 +82,15 @@ export type CellContent = {
   id: CellId;
   name: string;
   subtitle: string;
+  /**
+   * Một dòng nói loại tế bào này *để làm gì*, không nói nó tên gì.
+   *
+   * Đây là câu mở đầu một tiết học, và là chỗ duy nhất trong bảng kiến thức mà
+   * chữ được phép có giọng. Thư viện dựng nó thành dòng in nghiêng ngay dưới tên
+   * mẫu vật, trước mọi con số — vì một người đọc gặp ý trước khi gặp số đo thì
+   * mới có chỗ để đặt các số đo vào.
+   */
+  poetic: string;
   /** Nhân thực hay nhân sơ — chip loại tế bào. */
   cellClass: string;
   /** Token màu của loại tế bào, dùng cho danh sách bào quan. */
@@ -72,9 +103,20 @@ export type CellContent = {
   defaultOrganelle: string;
   organelles: Organelle[];
   goals: string[];
-  facts: { label: string; value: string }[];
+  facts: { label: string; value: string; icon?: FactGlyph }[];
   /** Câu giáo viên nhắc lại; Thư viện dựng thành khối ghi chú. */
   highlight: { label: string; body: string };
+  /**
+   * Khối "Bạn có biết" — ghi chú thứ hai, tông hổ phách.
+   *
+   * Tách khỏi `highlight` vì hai khối này làm hai việc khác nhau: `highlight` là
+   * điều học sinh phải hiểu, `curio` là điều khiến học sinh muốn hiểu. Thư viện
+   * luôn dựng `highlight` trước, nên không mục nào đặt được sự tò mò lên trên cơ
+   * chế.
+   */
+  curio: { label: string; body: string };
+  /** Nơi loại tế bào này xuất hiện ngoài mô hình: chương trình, thực tế, môn khác. */
+  context: string[];
   /** Có lớp bao kín nên cắt được nửa trước để nhìn vào trong. */
   crossSection: boolean;
   frame: CellFrame;
@@ -118,6 +160,7 @@ export const CELLS: CellContent[] = [
     id: 'animal',
     name: 'Tế bào động vật',
     subtitle: 'Tế bào nhân thực điển hình',
+    poetic: 'Một xưởng sản xuất có phòng điều khiển riêng.',
     cellClass: 'Tế bào nhân thực',
     accent: 'var(--color-lavender)',
     where: 'Mọi cơ quan trong cơ thể động vật và người.',
@@ -219,15 +262,25 @@ export const CELLS: CellContent[] = [
       'Phân biệt tế bào động vật với tế bào thực vật bằng ba đặc điểm',
     ],
     facts: [
-      { label: 'Đường kính tế bào', value: '10–30 µm' },
-      { label: 'Bào quan tách được', value: '6' },
-      { label: 'Hình học', value: 'Thủ tục — YooLab dựng' },
+      { label: 'Đường kính tế bào', value: '10–30 µm', icon: 'scale-micro' },
+      { label: 'Bào quan tách được', value: '6', icon: 'layers' },
+      { label: 'Hình học', value: 'Thủ tục — YooLab dựng', icon: 'geometry' },
     ],
     highlight: {
       label: 'Vì sao mô hình này dựng bằng hình học',
       body:
         'Hai bản quét tế bào của NIH đều mang giấy phép phi thương mại nên không dùng được. Dựng lại bằng hình học còn cho phép tách rời từng bào quan — điều một mesh liền khối không làm được.',
     },
+    curio: {
+      label: 'Bạn có biết',
+      body:
+        'Ti thể có DNA riêng, tách biệt hoàn toàn với DNA trong nhân. Đó là dấu vết của một vi khuẩn từng sống độc lập, bị một tế bào lớn hơn nuốt vào và được giữ lại.',
+    },
+    context: [
+      'Sinh học 10 — cấu tạo tế bào nhân thực',
+      'So sánh trực tiếp với tế bào thực vật ở mục kế bên',
+      'Thực tế: nuôi cấy tế bào và tế bào gốc trong y học',
+    ],
   },
 
   /* ------------------------------------------------------ tế bào thực vật --- */
@@ -235,6 +288,7 @@ export const CELLS: CellContent[] = [
     id: 'plant',
     name: 'Tế bào thực vật',
     subtitle: 'Thành xenlulozơ và không bào trung tâm',
+    poetic: 'Một cái hộp căng nước — và đó là lý do cây đứng được.',
     cellClass: 'Tế bào nhân thực',
     accent: 'var(--color-sage)',
     where: 'Lá, thân, rễ — mọi mô của cây xanh.',
@@ -336,15 +390,25 @@ export const CELLS: CellContent[] = [
       'Liên hệ vị trí lục lạp với việc lá phải hướng về phía sáng',
     ],
     facts: [
-      { label: 'Kích thước tế bào', value: '10–100 µm' },
-      { label: 'Không bào', value: 'Tới 80% thể tích' },
-      { label: 'Bào quan tách được', value: '6' },
+      { label: 'Kích thước tế bào', value: '10–100 µm', icon: 'scale-micro' },
+      { label: 'Không bào', value: 'Tới 80% thể tích', icon: 'drop' },
+      { label: 'Bào quan tách được', value: '6', icon: 'layers' },
     ],
     highlight: {
       label: 'Không bào quyết định bố cục bên trong',
       body:
         'Không bào lớn ép mọi bào quan còn lại thành một lớp mỏng sát thành. Đó là lý do trên tiêu bản thịt lá, lục lạp trông như xếp thành một vòng quanh mép tế bào.',
     },
+    curio: {
+      label: 'Bạn có biết',
+      body:
+        'Cây không có xương. Thứ giữ cho một cọng rau đứng thẳng là áp suất nước trong hàng triệu không bào đẩy ra thành tế bào — rau héo là khi áp suất đó mất đi.',
+    },
+    context: [
+      'Sinh học 6 — tế bào thực vật và quang hợp',
+      'Thực tế: vì sao rau héo khi thiếu nước',
+      'Hoá học — áp suất thẩm thấu và sự vận chuyển nước',
+    ],
   },
 
   /* -------------------------------------------------------------- bạch cầu --- */
@@ -352,6 +416,7 @@ export const CELLS: CellContent[] = [
     id: 'white-blood',
     name: 'Bạch cầu',
     subtitle: 'Bạch cầu trung tính',
+    poetic: 'Tế bào duy nhất trong cơ thể có việc là đi tìm rắc rối.',
     cellClass: 'Tế bào nhân thực',
     accent: 'var(--color-lavender)',
     where: 'Máu, dịch lympho và các mô đang bị viêm.',
@@ -439,15 +504,25 @@ export const CELLS: CellContent[] = [
       'Phân biệt hạt bào tương với lysosome',
     ],
     facts: [
-      { label: 'Đường kính', value: '12–15 µm' },
-      { label: 'Số múi nhân', value: '2–5' },
-      { label: 'Bào quan tách được', value: '5' },
+      { label: 'Đường kính', value: '12–15 µm', icon: 'scale-micro' },
+      { label: 'Số múi nhân', value: '2–5', icon: 'dna' },
+      { label: 'Bào quan tách được', value: '5', icon: 'layers' },
     ],
     highlight: {
       label: 'Hình dạng ở đây chính là chức năng',
       body:
         'Bạch cầu không có hình cố định vì việc của nó là di chuyển và nuốt. Màng gấp nếp, nhân nhiều múi, hạt dày đặc — cả ba chi tiết đều phục vụ hai việc đó.',
     },
+    curio: {
+      label: 'Bạn có biết',
+      body:
+        'Một bạch cầu trung tính chỉ sống được vài ngày. Tuỷ xương phải sản xuất khoảng một trăm tỉ tế bào loại này mỗi ngày để giữ đủ số trong máu.',
+    },
+    context: [
+      'Sinh học 8 — máu và hệ miễn dịch',
+      'Thực tế: vì sao mủ có màu trắng đục',
+      'Liên hệ: đọc chỉ số bạch cầu trong xét nghiệm công thức máu',
+    ],
   },
 
   /* ------------------------------------------------------- tế bào biểu mô --- */
@@ -455,6 +530,7 @@ export const CELLS: CellContent[] = [
     id: 'epithelial',
     name: 'Tế bào biểu mô',
     subtitle: 'Biểu mô trụ đơn ở ruột non',
+    poetic: 'Một tấm lát có mặt trên và mặt dưới khác nhau.',
     cellClass: 'Tế bào nhân thực',
     accent: 'var(--color-blush)',
     where: 'Da, ruột non, đường hô hấp — mọi bề mặt tiếp xúc của cơ thể.',
@@ -556,15 +632,25 @@ export const CELLS: CellContent[] = [
       'Nêu vai trò của liên kết chặt trong việc tạo hàng rào',
     ],
     facts: [
-      { label: 'Chiều cao tế bào', value: '20–30 µm' },
-      { label: 'Vi nhung mao', value: 'Tăng diện tích ~20 lần' },
-      { label: 'Bào quan tách được', value: '6' },
+      { label: 'Chiều cao tế bào', value: '20–30 µm', icon: 'ruler' },
+      { label: 'Vi nhung mao', value: 'Tăng diện tích ~20 lần', icon: 'surface' },
+      { label: 'Bào quan tách được', value: '6', icon: 'layers' },
     ],
     highlight: {
       label: 'Một tế bào có hai đầu khác nhau',
       body:
         'Đầu ngọn hấp thụ, đầu đáy chuyển chất vào máu, liên kết chặt ngăn không cho chất đi tắt qua khe. Ba chi tiết đó cùng làm nên một lớp hấp thụ một chiều.',
     },
+    curio: {
+      label: 'Bạn có biết',
+      body:
+        'Trải phẳng toàn bộ vi nhung mao trong ruột non của một người, diện tích hấp thụ thu được xấp xỉ một sân tennis.',
+    },
+    context: [
+      'Sinh học 8 — tiêu hoá và hấp thụ ở ruột non',
+      'Thực tế: lớp da và mọi bề mặt tiếp xúc của cơ thể',
+      'Vật lý — diện tích bề mặt và tốc độ trao đổi chất',
+    ],
   },
 
   /* ----------------------------------------------------------- tế bào cơ --- */
@@ -572,6 +658,7 @@ export const CELLS: CellContent[] = [
     id: 'muscle',
     name: 'Tế bào cơ',
     subtitle: 'Sợi cơ vân',
+    poetic: 'Một tế bào dài bằng cả bắp cơ, và có nhiều nhân.',
     cellClass: 'Tế bào nhân thực',
     accent: 'var(--color-accent-deep)',
     where: 'Cơ bám xương — lớp cơ vận động toàn bộ cơ thể.',
@@ -659,15 +746,25 @@ export const CELLS: CellContent[] = [
       'Liên hệ mật độ ti thể với sức bền của cơ',
     ],
     facts: [
-      { label: 'Chiều dài sợi cơ', value: 'Tới 30 cm' },
-      { label: 'Đường kính', value: '10–100 µm' },
-      { label: 'Bào quan tách được', value: '5' },
+      { label: 'Chiều dài sợi cơ', value: 'Tới 30 cm', icon: 'ruler' },
+      { label: 'Đường kính', value: '10–100 µm', icon: 'scale-micro' },
+      { label: 'Bào quan tách được', value: '5', icon: 'layers' },
     ],
     highlight: {
       label: 'Vân ngang là kết quả của việc xếp thẳng hàng',
       body:
         'Vân ngang không phải một cấu trúc riêng. Nó hiện ra vì hàng nghìn tơ cơ trong cùng một sợi có các đơn vị co cơ nằm thẳng hàng nhau.',
     },
+    curio: {
+      label: 'Bạn có biết',
+      body:
+        'Một tế bào cơ vân có thể chứa hàng trăm nhân. Nó hình thành bằng cách nhiều tế bào con hợp nhất lại với nhau, chứ không phải bằng cách một tế bào lớn dần lên.',
+    },
+    context: [
+      'Sinh học 8 — hệ vận động',
+      'Vật lý — lực, công và sự co cơ',
+      'Thực tế: vì sao cơ mỏi sau khi vận động mạnh',
+    ],
   },
 
   /* -------------------------------------------------- tế bào thần kinh --- */
@@ -675,6 +772,7 @@ export const CELLS: CellContent[] = [
     id: 'neuron',
     name: 'Tế bào thần kinh',
     subtitle: 'Neuron vận động',
+    poetic: 'Một tế bào có thể dài tới hơn một mét.',
     cellClass: 'Tế bào nhân thực',
     accent: 'var(--color-lavender)',
     where: 'Não, tuỷ sống và các dây thần kinh.',
@@ -784,15 +882,183 @@ export const CELLS: CellContent[] = [
       'Nêu điều xảy ra tại cúc xináp',
     ],
     facts: [
-      { label: 'Chiều dài sợi trục', value: 'Vài µm tới hơn 1 m' },
-      { label: 'Tốc độ dẫn truyền', value: 'Tới 120 m/s' },
-      { label: 'Bào quan tách được', value: '6' },
+      { label: 'Chiều dài sợi trục', value: 'Vài µm tới hơn 1 m', icon: 'ruler' },
+      { label: 'Tốc độ dẫn truyền', value: 'Tới 120 m/s', icon: 'speed' },
+      { label: 'Bào quan tách được', value: '6', icon: 'layers' },
     ],
     highlight: {
       label: 'Tín hiệu chỉ đi một chiều',
       body:
         'Sợi nhánh nhận, thân cộng dồn, sợi trục dẫn đi, cúc xináp chuyển sang tế bào sau. Trên mô hình, chiều đó chạy từ trái sang phải.',
     },
+    curio: {
+      label: 'Bạn có biết',
+      body:
+        'Sợi trục nối tuỷ sống với ngón chân là một tế bào duy nhất dài hơn một mét. Nhân của nó nằm ở tuỷ sống, cách đầu kia gần trọn chiều dài cơ thể.',
+    },
+    context: [
+      'Sinh học 8 — hệ thần kinh và cung phản xạ',
+      'Vật lý — dẫn truyền xung điện và vai trò của lớp cách điện',
+      'Thực tế: tốc độ phản xạ và thời gian phanh khi lái xe',
+    ],
+  },
+
+  /* ------------------------------------------------------- tế bào vi khuẩn --- */
+  /*
+   * Mục duy nhất trong bộ này không phải tế bào nhân thực, và nó ở đây vì sáu
+   * mục trên đọc liền nhau sẽ dạy sai một điều: rằng tế bào thì có nhân.
+   *
+   * Cả sáu đặc điểm dựng ra ở đây đều là *sự thiếu vắng* của một thứ mà học sinh
+   * vừa mới học: không nhân, không ti thể, không lưới nội chất, không bộ máy
+   * Golgi. Thứ duy nhất còn lại và giống hệt là ribosome — nên trong cảnh này
+   * ribosome giữ đúng màu nó có ở sáu tế bào kia, và đó chính là bài học: bộ máy
+   * dịch mã có trước khi nhân xuất hiện.
+   */
+  {
+    id: 'bacteria',
+    name: 'Tế bào vi khuẩn',
+    subtitle: 'Trực khuẩn — tế bào nhân sơ',
+    poetic: 'Một tế bào không chia phòng bên trong.',
+    cellClass: 'Tế bào nhân sơ',
+    accent: 'var(--color-sage)',
+    where: 'Đất, nước, không khí — và nhiều hơn cả là trong chính cơ thể người.',
+    comparison:
+      'Khác cả sáu loại trên ở một điểm quyết định: không có nhân. DNA là một vòng nằm tự do trong tế bào chất, và không bào quan nào có màng riêng.',
+    defaultOrganelle: 'nucleoid',
+    crossSection: true,
+    /*
+     * `yaw` 0.42 — gần ngang, hơi chếch.
+     *
+     * Thân trực khuẩn nằm dọc trục X, nên trục ngang của khung phải gần trùng
+     * trục X mới thấy được nó là một cái que. Bản trước thử 1.36 để "nhìn ngang
+     * hơn" và làm đúng điều ngược lại: ở góc đó trục ngang của khung nằm 98% theo
+     * trục Z, tức là nhìn dọc theo thân, và tế bào hiện ra thành một khối tròn
+     * mập. 0.42 giữ 91% theo trục X — thân trải hết khung, còn 9% còn lại cho đủ
+     * chiều sâu để không phẳng như hình vẽ.
+     *
+     * Khung bao gồm cả roi, nên `center` lệch sang âm: mẫu vật trải từ −8,8 tới
+     * +4,2 chứ không đối xứng quanh gốc. Đây là mục dài và mỏng nhất trong bảy
+     * mục, cùng một dạng khung với tế bào cơ.
+     */
+    frame: { fill: 0.94, yaw: 0.42, pitch: 0.2, size: [13.2, 3.2, 3.2], center: [-2.3, 0, 0] },
+    organelles: [
+      {
+        id: 'wall',
+        name: 'Thành tế bào',
+        role: 'Lớp peptidoglycan giữ hình dạng và chịu áp suất bên trong.',
+        attributes: [
+          { label: 'Độ dày', value: '20–80 nm (Gram dương)' },
+          { label: 'Vật liệu', value: 'Peptidoglycan' },
+          LM_NO,
+        ],
+        note:
+          'Thành tế bào là một lưới peptidoglycan bao kín bên ngoài màng. Nó chịu toàn bộ áp suất thẩm thấu bên trong — mất thành là vi khuẩn vỡ. Đây cũng chính là lớp mà nhóm kháng sinh β-lactam nhắm vào.',
+        color: INK.wall,
+        offset: [0, 0, 0],
+        shell: true,
+      },
+      {
+        id: 'membrane',
+        name: 'Màng sinh chất',
+        role: 'Ranh giới chọn lọc, và cũng là nơi tạo năng lượng.',
+        attributes: [
+          { label: 'Độ dày', value: '7–8 nm' },
+          { label: 'Cấu tạo', value: 'Hai lớp phospholipid' },
+          { label: 'Kính quang học', value: 'Không thấy được' },
+        ],
+        note:
+          'Ở tế bào nhân thực, chuỗi hô hấp nằm trên màng trong của ti thể. Vi khuẩn không có ti thể, nên toàn bộ chuỗi đó nằm ngay trên màng sinh chất này — một màng làm hai việc.',
+        color: INK.membrane,
+        offset: [0, 0, 0],
+        shell: true,
+      },
+      {
+        id: 'nucleoid',
+        name: 'Vùng nhân',
+        role: 'DNA vòng cuộn lại, không có màng bao quanh.',
+        attributes: [
+          { label: 'Dạng', value: 'Một vòng DNA kép, khép kín' },
+          { label: 'Chiều dài', value: '~1,5 mm khi trải thẳng' },
+          { label: 'Màng bao', value: 'Không có' },
+        ],
+        note:
+          'Toàn bộ hệ gen nằm trong một phân tử DNA vòng dài khoảng 1,5 mm, cuộn trong một tế bào dài 2 µm. Không có màng nhân, nên phiên mã và dịch mã diễn ra cùng lúc ở cùng một chỗ — điều không thể xảy ra trong tế bào nhân thực.',
+        color: INK.nucleus,
+        offset: [0, 2.6, 0],
+        shell: false,
+      },
+      {
+        id: 'ribosome',
+        name: 'Ribosome',
+        role: 'Nơi lắp protein — bào quan duy nhất giống tế bào nhân thực.',
+        attributes: [
+          { label: 'Số lượng', value: '~20.000 mỗi tế bào' },
+          { label: 'Kích thước', value: '~20 nm (loại 70S)' },
+          LM_NO,
+        ],
+        note:
+          'Ribosome của vi khuẩn nhỏ hơn ribosome của người và khác ở một số chi tiết. Chính khoảng khác biệt đó là chỗ nhiều loại kháng sinh chen vào: chúng chặn ribosome 70S của vi khuẩn mà gần như không chạm tới ribosome 80S của tế bào người.',
+        color: INK.ribosome,
+        offset: [0, -2.6, 0],
+        shell: false,
+      },
+      {
+        id: 'plasmid',
+        name: 'Plasmid',
+        role: 'Vòng DNA nhỏ rời, trao đổi được giữa hai tế bào.',
+        attributes: [
+          { label: 'Dạng', value: 'Vòng DNA nhỏ, độc lập' },
+          { label: 'Số lượng', value: '0 đến vài chục' },
+          { label: 'Vai trò', value: 'Mang gene phụ, ví dụ gene kháng thuốc' },
+        ],
+        note:
+          'Plasmid không cần thiết cho sự sống của tế bào, nhưng nó truyền được sang tế bào khác — kể cả sang loài khác. Đó là cách một gene kháng kháng sinh lan ra một quần thể trong vài giờ thay vì vài thế hệ.',
+        color: INK.golgi,
+        offset: [0, 0, 2.8],
+        shell: false,
+      },
+      {
+        id: 'flagellum',
+        name: 'Roi',
+        role: 'Sợi xoắn quay như chân vịt để đẩy tế bào đi.',
+        attributes: [
+          { label: 'Chiều dài', value: '10–20 µm — dài hơn cả tế bào' },
+          { label: 'Cơ chế', value: 'Động cơ quay ở chân roi' },
+          { label: 'Tốc độ', value: 'Tới 100.000 vòng mỗi phút' },
+        ],
+        note:
+          'Roi vi khuẩn không uốn như đuôi cá: nó là một sợi xoắn cứng được một động cơ protein ở chân quay tròn. Đây là một trong rất ít cấu trúc sinh học chuyển động bằng cách quay liên tục quanh một trục.',
+        color: INK.fibril,
+        offset: [-3.4, 0, 0],
+        shell: false,
+      },
+    ],
+    goals: [
+      'Chỉ ra ba thứ tế bào nhân sơ KHÔNG có mà tế bào nhân thực có',
+      'Giải thích vì sao DNA vòng không cần màng nhân vẫn hoạt động được',
+      'Nêu vai trò của plasmid trong sự lan truyền gene kháng kháng sinh',
+    ],
+    facts: [
+      { label: 'Chiều dài tế bào', value: '1–5 µm — nhỏ hơn ~10 lần', icon: 'scale-micro' },
+      { label: 'Bào quan tách được', value: '6', icon: 'layers' },
+      { label: 'Màng nhân', value: 'Không có', icon: 'dna' },
+      { label: 'Hình học', value: 'Thủ tục — YooLab dựng', icon: 'geometry' },
+    ],
+    highlight: {
+      label: 'Không có nhân không có nghĩa là đơn giản',
+      body:
+        'Vi khuẩn thiếu nhân và mọi bào quan có màng, nhưng vẫn tự tổng hợp được toàn bộ protein, tự sinh năng lượng và tự di chuyển. Cái nó đánh đổi là kích thước: không có màng để chia việc thì tế bào không lớn lên được.',
+    },
+    curio: {
+      label: 'Bạn có biết',
+      body:
+        'Số tế bào vi khuẩn trong và trên cơ thể một người xấp xỉ số tế bào của chính người đó. Phần lớn nằm trong ruột già, và phần lớn là vô hại hoặc có lợi.',
+    },
+    context: [
+      'Sinh học 10 — tế bào nhân sơ và tế bào nhân thực',
+      'So sánh trực tiếp với sáu tế bào nhân thực trong cùng danh sách',
+      'Thực tế: kháng kháng sinh và vì sao phải uống đủ liều',
+    ],
   },
 ];
 

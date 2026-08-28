@@ -22,6 +22,7 @@
  */
 @import './styles/library.css';
 @import './styles/sections.css';
+@import './styles/practice.css';
 @import './styles/studio.css';
 @import './styles/exp-cells.css';
 @import './styles/exp-molecule.css';
@@ -2149,9 +2150,18 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
   transition: background-color 240ms ease;
 }
 .bridge-viewer:not(.is-effects-on) .bridge-viewport { background: color-mix(in srgb, var(--color-surface) 72%, var(--color-lavender-soft)); }
+/* The bridge drives the same `CreatureStage` the Library does but supplies its
+   own toolbar, so the stage's own chrome is hidden here. `.stage-rail` replaced
+   `.stage-tools` when the rail was regrouped; `.stage-guide` is the card that
+   replaced `.stage-hint`, and both names are listed so a stage that still emits
+   the old ones stays covered. */
+.bridge-viewport .stage-rail,
+.bridge-viewport .stage-clips,
 .bridge-viewport .stage-tools,
 .bridge-viewport .stage-caption,
+.bridge-viewport .stage-guide,
 .bridge-viewport .stage-hint,
+.bridge-viewport .stage-pins,
 .bridge-viewport .stage-spin { display: none; }
 
 .bridge-orbit-control {

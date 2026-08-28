@@ -227,6 +227,67 @@ export type CreatureLoader = {
 };
 
 /**
+ * `KHR_materials_pbrSpecularGlossiness`, put back.
+ *
+ * three.js removed this extension in r155, and what that removal looks like on a
+ * real asset is not a warning — it is a specimen with no colour. The T-rex ships
+ * its hand-painted teal-and-rust skin as the extension's `diffuseTexture`, so
+ * the core loader reads the material's empty `pbrMetallicRoughness` block,
+ * builds a white MeshStandardMaterial, correctly applies the normal and
+ * occlusion maps (those are core), and hands back a grey dinosaur. Nothing in
+ * the console says a texture was skipped.
+ *
+ * So the mapping is done here, as a loader plugin, which is what three itself
+ * used to do. It is deliberately the cheap conversion rather than a faithful
+ * one: `diffuse → map`, `glossiness → 1 - roughness`, `metalness = 0`, and the
+ * specular map is dropped. A spec/gloss workflow cannot be expressed exactly in
+ * metal/rough — the two describe reflectance differently — and for a dielectric
+ * skin the difference is a slightly softer highlight, while the difference
+ * between having the diffuse map and not having it is the whole animal.
+ *
+ * Registered on every Library loader rather than at the one call site that needs
+ * it: the next asset from Sketchfab will arrive the same way, and a texture that
+ * silently does not load is the worst class of bug this project can ship.
+ */
+export function registerSpecularGlossiness(loader: GLTFLoader) {
+  const NAME = 'KHR_materials_pbrSpecularGlossiness';
+  loader.register((parser) => ({
+    name: NAME,
+    getMaterialType(index: number) {
+      const definition = parser.json.materials?.[index];
+      return definition?.extensions?.[NAME] ? THREE.MeshPhysicalMaterial : null;
+    },
+    extendMaterialParams(index: number, params: THREE.MeshPhysicalMaterialParameters) {
+      const extension = parser.json.materials?.[index]?.extensions?.[NAME];
+      if (!extension) return Promise.resolve();
+
+      const pending: Promise<unknown>[] = [];
+      const diffuse = extension.diffuseFactor as number[] | undefined;
+      if (diffuse) {
+        params.color = new THREE.Color().setRGB(diffuse[0], diffuse[1], diffuse[2], THREE.LinearSRGBColorSpace);
+        params.opacity = diffuse[3] ?? 1;
+      }
+      if (extension.diffuseTexture) {
+        pending.push(parser.assignTexture(params, 'map', extension.diffuseTexture, THREE.SRGBColorSpace));
+      }
+      // Glossiness is the inverse of roughness, and the floor matters: a
+      // glossiness of 1 becomes a perfect mirror, which on a skin reads as wet
+      // plastic under this section's four-light rig.
+      const glossiness = (extension.glossinessFactor as number | undefined) ?? 1;
+      params.roughness = Math.max(0.16, 1 - glossiness);
+      params.metalness = 0;
+      const specular = extension.specularFactor as number[] | undefined;
+      if (specular) {
+        params.specularColor = new THREE.Color().setRGB(specular[0], specular[1], specular[2], THREE.LinearSRGBColorSpace);
+      }
+      return Promise.all(pending);
+    },
+  // The plugin shape is wider than the public `GLTFLoaderPlugin` type, which
+  // does not declare `getMaterialType` returning a physical-material class.
+  } as unknown as Parameters<GLTFLoader['register']>[0] extends (p: infer P) => infer R ? R : never));
+}
+
+/**
  * The one loader configuration both stages must agree on. The bee ships Draco
  * geometry and meshopt-packed animation, so a stage that forgets either decoder
  * fails at parse time rather than at render time — which is exactly the kind of
@@ -238,6 +299,7 @@ export function createCreatureLoader(): CreatureLoader {
   const gltf = new GLTFLoader();
   gltf.setDRACOLoader(draco);
   gltf.setMeshoptDecoder(MeshoptDecoder);
+  registerSpecularGlossiness(gltf);
   return {
     gltf,
     textures: new THREE.TextureLoader(),
@@ -770,6 +832,43 @@ export function createJellyfishCreature(
  * passed through untouched, so this is safe to put on every load and there is no
  * list of protected files to keep in sync.
  */
+/**
+ * Measure the animal, not its bind pose.
+ *
+ * `Box3.setFromObject` on a `SkinnedMesh` reads `mesh.boundingBox`, and three
+ * computes that lazily from `getVertexPosition` — which goes through
+ * `applyBoneTransform` and therefore through `skeleton.boneMatrices`. Those
+ * matrices are only refreshed by `Skeleton.update()`, which the renderer calls at
+ * *draw* time. A fit solved between `mixer.update(poseTime)` and the first frame
+ * is therefore solved against whatever the skeleton happened to hold — the bind
+ * pose, not the pose the visitor is about to see.
+ *
+ * For the T-rex the two differ enormously: the bind pose is a sprawled A-pose
+ * with the tail straight out and the legs apart, so the box was roughly half
+ * again as large as the biting animal inside it, and a manifest asking for
+ * `fill: 0.92` got a dinosaur occupying about 40% of the frame with a lake of
+ * empty ivory above it. Nothing in the fit was wrong; it was exact about the
+ * wrong box.
+ *
+ * three's own documentation says as much — "if the skinned mesh is animated, the
+ * bounding box should be recomputed" — so this does that, once, right before the
+ * measurement that depends on it.
+ *
+ * Deliberately NOT applied to `CreatureStage`. The bee, fish and jellyfish are
+ * normalised to authored world sizes and framed with `fill` values hand-tuned
+ * against the bind-pose box; correcting the box under them would silently
+ * re-frame three finished chapters and change the bee's optical scale with it.
+ */
+export function refreshSkinnedBounds(root: THREE.Object3D) {
+  root.updateMatrixWorld(true);
+  root.traverse((child) => {
+    const skinned = child as THREE.SkinnedMesh;
+    if (!skinned.isSkinnedMesh) return;
+    skinned.skeleton.update();
+    skinned.computeBoundingBox();
+  });
+}
+
 export async function loadLibraryGltf(loader: GLTFLoader, url: string): Promise<GLTF> {
   const response = await fetch(url);
   if (!response.ok) throw new Error(`Unable to load ${url} (${response.status})`);

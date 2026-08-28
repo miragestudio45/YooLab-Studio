@@ -2,45 +2,59 @@
 /*
  * The Library is an application, not a section.
  *
- * Two structural decisions carry most of the look:
+ * Three structural decisions carry most of the look:
  *
  *   1. Three separate cards, not one bordered box with internal dividers. A
  *      divider says "these are paragraphs of one document"; a 14 px gutter
  *      between three bordered, shadowed cards says "these are instruments". The
  *      gap is doing more work here than any amount of styling inside the panels.
  *
- *   2. The whole workspace fits the first screen. The head band is one row and
- *      the app height is derived from it, so landing on `#thu-vien` on a
- *      1366×768 laptop shows the entire application instead of a large headline
- *      and the top edge of one. The related strip is deliberately below that
- *      fold, which is what still invites the scroll.
+ *   2. **The section is exactly one screen, and it is a chapter of the page's
+ *      snap track.** It reserves the header band in its own padding like every
+ *      band above it, and the workspace takes whatever the two `auto` rows above
+ *      it leave. Nothing is below this fold; there is nothing below it.
+ *
+ *   3. Small type, everywhere. Nothing in the three panels is above 12.5 px
+ *      except the specimen's own name, because a specimen card is read by
+ *      scanning and not by reading — and the specimen is the largest thing on
+ *      the row, which is the point.
  */
 
 .library {
   /*
-   * The height budget, in one place.
+   * A fitted section, on the `.tool-section` pattern.
    *
-   * `--library-head` is the measured height of the head band (its own padding
-   * included), so the app can subtract it without measuring anything at
-   * runtime. The trailing 14 px leaves a sliver of the strip below the fold: at
-   * exactly 100svh the section looks like it ends there, and nobody scrolls.
+   * `--library-head` used to declare the head band's height so the app could
+   * subtract it. That is the mistake DESIGN.md §2 records against YooStudio, and
+   * this section had it too: the band gained the subject switcher, the estimate
+   * did not move, and the bottom of the three panels went under the fold at
+   * 1366. The band is an `auto` grid row now and the arithmetic belongs to the
+   * layout engine.
    *
-   * `scroll-margin-top: 0` overrides the site-wide `[id]` rule on purpose. This
-   * section already reserves the header band in its own `padding-top`, so the
-   * global scroll margin would reserve it twice — a whole header band of the
-   * budget spent pushing the workspace off the bottom of the screen.
+   * `scroll-margin-top: 0` overrides the site-wide `[id]` rule on purpose. The
+   * header band is already reserved in `padding-top`, so the global scroll
+   * margin would reserve it twice — a whole header band of the budget spent
+   * pushing the workspace off the bottom of the screen.
    */
-  /* The measured content, not a round number: kicker, one line of heading, and
-     the band's own padding. At 96 px the band was 30 px taller than what it
-     holds, and because it is bottom-aligned that slack appeared as dead air
-     between the section's top edge and its own kicker. */
-  --library-head: clamp(72px, 9.5vh, 104px);
-  --library-chrome: calc(var(--header-h) + var(--section-gap) * 2 + var(--library-head) + 14px);
   position: relative;
-  padding: calc(var(--header-h) + var(--section-gap)) 0 clamp(48px, 7vh, 88px);
+  display: flex;
+  min-height: 100svh;
+  flex-direction: column;
+  justify-content: center;
+  padding: calc(var(--header-h) + clamp(12px, 2vh, 26px)) 0 clamp(12px, 2vh, 26px);
   scroll-margin-top: 0;
   background:
     linear-gradient(180deg, var(--color-bg) 0%, var(--color-bg-deep) 46%, var(--color-bg) 100%);
+}
+
+.library-stage {
+  display: grid;
+  width: 100%;
+  height: calc(100svh - var(--header-h) - clamp(24px, 4vh, 52px));
+  min-height: 0;
+  max-height: 1040px;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: clamp(9px, 1.2vh, 15px);
 }
 
 /* ---------------------------------------------------------------- head band --- */
@@ -53,18 +67,16 @@
   display: grid;
   grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto;
   align-items: end;
-  gap: 10px clamp(24px, 3vw, 56px);
-  min-height: var(--library-head);
-  padding-bottom: clamp(14px, 2vh, 22px);
+  gap: 8px clamp(22px, 3vw, 52px);
 }
 
-.library-head-copy .section-kicker { margin: 0 0 9px; }
+.library-head-copy .section-kicker { margin: 0 0 8px; }
 
 .library-head h2 {
   margin: 0;
   color: var(--color-ink);
   font-family: var(--font-display);
-  font-size: clamp(25px, min(2.4vw, 3.5vh), 38px);
+  font-size: clamp(24px, min(2.2vw, 3.2vh), 34px);
   font-weight: 700;
   letter-spacing: -0.038em;
   line-height: 1.04;
@@ -82,58 +94,51 @@
 
 .library-head-lede {
   max-width: 38ch;
-  margin: 0 0 3px;
+  margin: 0 0 2px;
   color: var(--color-ink-2);
-  font-size: 13px;
-  line-height: 1.62;
+  font-size: 12.5px;
+  line-height: 1.6;
 }
 
 .library-head-count {
   display: flex;
   flex: none;
   align-items: baseline;
-  gap: 18px;
-  margin: 0 0 3px;
+  gap: 16px;
+  margin: 0 0 2px;
   color: var(--color-muted);
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  font-size: 9.5px;
+  font-weight: 620;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
 }
-.library-head-count span + span { border-left: 1px solid var(--color-border); padding-left: 18px; }
+.library-head-count span + span { border-left: 1px solid var(--color-border); padding-left: 16px; }
 .library-head-count b {
   margin-right: 5px;
   color: var(--color-ink);
-  font-family: var(--font-mono);
-  font-size: 14px;
-  font-weight: 500;
-  letter-spacing: -0.02em;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 620;
+  letter-spacing: -0.03em;
 }
 
 /* --------------------------------------------------------------- app shell --- */
 /*
- * A definite height, not a min-height.
+ * A definite height, inherited from the stage grid rather than computed here.
  *
  * This matters for more than proportion. The viewer canvas is sized in CSS with
  * `height: 100%`, and a percentage height against an `auto`-height ancestor
  * resolves to `auto` — at which point the canvas falls back to its own intrinsic
  * aspect ratio, the row grows to fit it, the ResizeObserver resizes the drawing
  * buffer to the new box, and the two chase each other until they converge
- * somewhere arbitrary. Pinning the height ends that loop and gives the workspace
- * the proportions of an application rather than of a document.
+ * somewhere arbitrary. Being the `1fr` row of a fixed-height grid ends that loop
+ * and gives the workspace the proportions of an application rather than of a
+ * document.
  */
 .library-app {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  gap: 14px;
-  /*
-   * A real application height. The floor is where the three panels stop being
-   * usable side by side; the ceiling stops a 1440-tall display from turning a
-   * workspace into a wall. Between them the height is the screen less what the
-   * section reserves above it, so no external page scrolling is ever needed to
-   * see the bottom of the workspace.
-   */
-  height: clamp(468px, calc(100svh - var(--library-chrome)), 940px);
+  grid-template-rows: minmax(0, 1fr);
+  min-height: 0;
 }
 
 /* ---------------------------------------------------------------- chrome --- */
@@ -143,76 +148,95 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 16px;
+  gap: 14px;
   padding: 0 2px;
 }
 
 .library-subjects {
   display: flex;
   min-width: 0;
-  gap: 5px;
+  gap: 3px;
   overflow-x: auto;
   padding: 2px;
   scrollbar-width: none;
 }
 .library-subjects::-webkit-scrollbar { display: none; }
 
+/*
+ * A subject tab is a mark, a name and a count.
+ *
+ * The mark is what makes seven tabs findable without reading seven names — the
+ * flask, the atom, the globe, the gear — and it is why the tint can be quiet:
+ * the drawn shape carries the identity, so the colour does not have to shout.
+ * The count is `font-variant-numeric: tabular-nums` rather than a mono face,
+ * which is the same trick every readout on this page uses to align digits
+ * without leaving the one family (DESIGN.md §3).
+ */
 .library-subject {
   display: inline-flex;
   flex: none;
   align-items: center;
-  gap: 9px;
-  min-height: 38px;
-  padding: 0 13px;
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 11px;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   background: transparent;
   transition: background 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
 }
+.library-subject > svg {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  color: var(--color-muted-2);
+  transition: color 180ms ease;
+}
 .library-subject b {
   color: var(--color-ink-2);
   font-family: var(--font-display);
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: -0.015em;
   white-space: nowrap;
 }
 .library-subject i {
   color: var(--color-muted-2);
-  font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 9.5px;
   font-style: normal;
-  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
 }
 .library-subject:hover { border-color: var(--color-border-hair); background: var(--color-surface); }
+.library-subject:hover > svg { color: var(--color-muted); }
 .library-subject.is-active {
   border-color: var(--color-border);
   background: var(--color-surface-raised);
   box-shadow: 0 5px 14px rgba(87, 62, 43, 0.07);
 }
-/* The subject's own accent as a 2 px underline rather than a fill: seven filled
-   chips in seven colours would be the loudest thing on the page. */
-.library-subject.is-active b {
-  color: var(--color-ink);
-  box-shadow: 0 11px 0 -10px var(--subject-tint, var(--color-accent-strong));
-}
+/* The subject's own accent lands on the MARK, not on the chip. Seven filled
+   chips in seven colours would be the loudest thing on the page; one tinted
+   glyph inside a white chip says the same thing at a tenth of the volume, and it
+   is the same tint the rail rows and the knowledge panel's topic dot carry. */
+.library-subject.is-active > svg { color: var(--subject-tint, var(--color-accent-strong)); }
+.library-subject.is-active b { color: var(--color-ink); }
 .library-subject.is-active i { color: var(--color-accent-deep); }
 .library-subject.is-empty b { color: var(--color-muted); }
+.library-subject.is-empty > svg { opacity: 0.55; }
 .library-subject.is-empty i { color: var(--color-pending); }
 
 .library-search {
   display: flex;
   flex: none;
   align-items: center;
-  gap: 9px;
-  width: clamp(180px, 19vw, 268px);
-  min-height: 38px;
-  padding: 0 11px;
+  gap: 8px;
+  width: clamp(176px, 18vw, 250px);
+  min-height: 34px;
+  padding: 0 10px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   color: var(--color-muted);
   background: var(--color-surface-raised);
-  font-size: 12.5px;
+  font-size: 12px;
 }
 .library-search svg { flex: none; width: 14px; height: 14px; }
 .library-search input {
@@ -229,11 +253,13 @@
 .library-search kbd {
   flex: none;
   padding: 2px 5px;
-  border: 1px solid var(--color-border);
   border-radius: 5px;
   color: var(--color-muted-2);
-  font-family: var(--font-mono);
+  background: var(--color-surface-2);
+  font-family: inherit;
   font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
 /* ------------------------------------------------------------ three cards --- */
@@ -257,11 +283,11 @@
 .library-body {
   display: grid;
   grid-template-columns:
-    clamp(268px, 17.5%, 336px)
+    clamp(250px, 16.4%, 312px)
     minmax(0, 1fr)
-    clamp(310px, 20.5%, 396px);
+    clamp(296px, 19.4%, 372px);
   grid-template-rows: minmax(0, 1fr);
-  gap: 14px;
+  gap: 12px;
   min-height: 0;
 }
 
@@ -287,22 +313,22 @@
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 9px;
-  padding: 14px 16px 12px;
+  gap: 8px;
+  padding: 12px 14px 10px;
   border-bottom: 1px solid var(--color-border-hair);
   color: var(--color-muted);
-  font-size: 9.5px;
-  font-weight: 650;
-  letter-spacing: 0.11em;
+  font-size: 9px;
+  font-weight: 660;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 .library-rail-head svg { width: 15px; height: 15px; color: var(--color-muted-2); }
 .library-rail-head b {
   color: var(--color-ink);
-  font-family: var(--font-mono);
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0;
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 620;
+  letter-spacing: -0.02em;
 }
 
 .library-rail-list {
@@ -320,28 +346,38 @@
 }
 
 /* ---- the row, and the reason the rail stopped looking like a menu ---- */
+/*
+ * 46 px and round, not 56 px and square.
+ *
+ * A rounded square beside a rounded rectangle beside a rounded card is three
+ * radii doing the same job; a circle is unambiguously a *specimen well*, which
+ * is what this slot is — the thing itself, lit, on its own ground. Losing ten
+ * pixels of it also lets the row lose eight of its own height, and with ten
+ * specimens in Sinh học that is a whole extra row visible in the rail before
+ * anyone scrolls.
+ */
 .library-asset {
   display: grid;
-  grid-template-columns: 56px minmax(0, 1fr);
+  grid-template-columns: 46px minmax(0, 1fr);
   align-items: center;
-  gap: 12px;
+  gap: 11px;
   width: 100%;
-  padding: 9px 11px 9px 9px;
+  padding: 7px 10px 7px 8px;
   border: 1px solid transparent;
   border-radius: var(--radius-md);
   text-align: left;
   background: transparent;
   transition: background 170ms ease, border-color 170ms ease, box-shadow 170ms ease;
 }
-.library-asset-copy { display: grid; gap: 2px; min-width: 0; }
+.library-asset-copy { display: grid; gap: 1px; min-width: 0; }
 .library-asset-kind {
   display: flex;
   align-items: center;
   gap: 6px;
   color: var(--color-muted-2);
-  font-size: 9px;
-  font-weight: 650;
-  letter-spacing: 0.1em;
+  font-size: 8.5px;
+  font-weight: 660;
+  letter-spacing: 0.11em;
   text-transform: uppercase;
 }
 .library-asset-kind em {
@@ -361,10 +397,10 @@
  */
 .library-asset b {
   color: var(--color-ink);
-  font-size: 15.5px;
-  font-weight: 650;
+  font-size: 14px;
+  font-weight: 660;
   letter-spacing: -0.028em;
-  line-height: 1.18;
+  line-height: 1.2;
 }
 .library-asset small {
   display: -webkit-box;
@@ -372,8 +408,8 @@
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   color: var(--color-muted);
-  font-size: 10.5px;
-  line-height: 1.48;
+  font-size: 10px;
+  line-height: 1.46;
 }
 .library-asset-flag {
   justify-self: start;
@@ -388,14 +424,30 @@
   text-transform: uppercase;
 }
 .library-asset:hover { background: var(--color-surface-2); }
-/* Inset shadow rather than `border-left`, so selecting a row cannot shift its
-   text by two pixels. */
+/*
+ * The selected row is a plate in the specimen's own subject tint, lifted a
+ * little off the rail.
+ *
+ * It used to be the coral wash plus a 2 px inset bar down the left edge. The bar
+ * was the wrong instrument twice over: it repeated the accent the plate was
+ * already carrying, and it made the coral the selection colour for every row in
+ * every subject — so a selected cell in Sinh học and a selected molecule in Hóa
+ * học looked like the same kind of thing selected in the same place. Tinting the
+ * plate from `--rail-tint` instead means the selection tells you which subject
+ * you are in, and the shadow does the lifting the bar was trying to do.
+ */
 .library-asset.is-active {
-  border-color: var(--color-accent-line);
-  background: var(--color-accent-wash);
-  box-shadow: inset 2px 0 0 var(--color-accent-strong);
+  border-color: color-mix(in srgb, var(--rail-tint, var(--color-accent-strong)) 42%, transparent);
+  background: color-mix(in srgb, var(--rail-tint, var(--color-accent-strong)) 9%, var(--color-surface-raised));
+  box-shadow: 0 6px 16px rgba(87, 62, 43, 0.07);
 }
-.library-asset.is-active b { color: var(--color-accent-deep); }
+.library-asset.is-active b { color: var(--color-ink); }
+.library-asset.is-active .library-asset-kind { color: color-mix(in srgb, var(--rail-tint, var(--color-accent-strong)) 72%, var(--color-ink)); }
+.library-asset.is-active .rail-visual {
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--rail-tint, var(--color-accent-strong)) 34%, transparent),
+    0 4px 12px rgba(87, 62, 43, 0.09);
+}
 .library-asset.is-planned b { color: var(--color-ink-2); }
 .library-asset.is-planned .rail-visual { opacity: 0.62; }
 
@@ -436,19 +488,22 @@
   place-items: center;
   overflow: hidden;
   color: var(--rail-tint, var(--color-accent-strong));
-  background: radial-gradient(120% 120% at 30% 22%, var(--color-surface-raised) 0%, var(--color-surface-2) 100%);
-  box-shadow: inset 0 0 0 1px var(--color-border-hair);
-}
-.rail-visual::before {
-  content: '';
-  position: absolute;
-  z-index: 0;
-  inset: 0;
-  background: currentColor;
-  opacity: 0.07;
+  /*
+   * A lit well, not a tinted tile: white at the ten-o'clock highlight falling to
+   * the subject's own tint at the rim. It is one gradient rather than a flat wash
+   * plus an overlay, so the specimen sits *in* something instead of on top of a
+   * coloured square — and at 46 px that highlight is most of what makes a baked
+   * render read as an object.
+   */
+  background:
+    radial-gradient(112% 112% at 33% 26%,
+      #ffffff 0%,
+      color-mix(in srgb, currentColor 5%, var(--color-surface-raised)) 46%,
+      color-mix(in srgb, currentColor 15%, var(--color-surface-2)) 100%);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 16%, var(--color-border-hair));
 }
 .rail-visual > * { position: relative; z-index: 1; }
-.rail-visual .library-mark { width: 78%; height: 78%; }
+.rail-visual .library-mark { width: 76%; height: 76%; }
 .rail-visual .model-thumbnail { width: 100%; height: 100%; }
 /* The baker's status line is written for a card. In a 56 px slot the tinted
    ground is the placeholder. */
@@ -472,7 +527,12 @@
 @keyframes rail-pending { 50% { opacity: 0.3; } }
 .rail-visual-photo { width: 100%; height: 100%; object-fit: cover; }
 
-.library-asset .rail-visual { width: 56px; height: 56px; border-radius: 16px; }
+.library-asset .rail-visual {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  transition: box-shadow 170ms ease;
+}
 
 /* ------------------------------------------------------------ viewer card --- */
 /*
@@ -502,14 +562,14 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
-  padding: 12px 20px;
+  gap: 18px;
+  padding: 10px 16px;
   border-bottom: 1px solid var(--color-border-hair);
 }
-.library-viewer-title { display: flex; align-items: baseline; gap: 11px; min-width: 0; }
+.library-viewer-title { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
 .library-viewer-title b {
   color: var(--color-ink);
-  font-size: 20px;
+  font-size: 17px;
   font-weight: 680;
   letter-spacing: -0.032em;
   white-space: nowrap;
@@ -529,35 +589,54 @@
   min-width: 0;
   overflow: hidden;
   color: var(--color-muted);
-  font-size: 11.5px;
+  font-size: 11px;
+  font-style: italic;
+  font-weight: 450;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.library-viewer-tags { display: flex; flex: none; gap: 6px; }
+.library-viewer-tags { display: flex; flex: none; gap: 5px; }
+/* Filled, no keyline. An outline plus a fill is one edge more than this bar
+   needs, and the three tags are the quietest thing in the panel by design —
+   the specimen underneath them is the loudest. */
 .library-viewer-tags span {
-  padding: 4px 9px;
-  border: 1px solid var(--color-border);
+  padding: 3px 8px;
   border-radius: 999px;
   color: var(--color-muted);
-  font-size: 9.5px;
-  font-weight: 620;
-  letter-spacing: 0.06em;
+  background: var(--color-surface-2);
+  font-size: 9px;
+  font-weight: 640;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
   white-space: nowrap;
 }
-.library-viewer-tags .is-ready { border-color: transparent; color: #2f5f33; background: rgba(118, 157, 116, 0.17); }
-.library-viewer-tags .is-planned { border-color: transparent; color: var(--color-pending); background: rgba(176, 138, 74, 0.13); }
+.library-viewer-tags .is-ready { color: #2f5f33; background: rgba(118, 157, 116, 0.17); }
+.library-viewer-tags .is-planned { color: var(--color-pending); background: rgba(176, 138, 74, 0.13); }
 
 /* The specimen sits in a room, not on a card: a very soft dome so the object has
    somewhere to sit into, and nothing else. */
+/*
+ * The Library has two plates, and they have to be the same plate.
+ *
+ * Stages that own an opaque WebGL canvas paint their own room in-scene
+ * (`studioBackdrop.ts`), so this gradient never shows through them. The ones with
+ * a transparent canvas — the molecule viewer, whose ten-control bar and screen
+ * projected measurement guides make an opaque buffer more trouble than it is
+ * worth — show *this* instead. So the three stops below are the same three
+ * numbers as `libraryBackdropPalette`, written out rather than tokenised because
+ * two of them are specific to the plate and are not surfaces anything else uses.
+ * Change one and change the other, or the section grows a second background
+ * again: white-centred here and ivory-centred there was exactly the mismatch
+ * that made two neighbouring specimens look photographed in different rooms.
+ */
 .library-viewer-stage {
   position: relative;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
   background:
-    radial-gradient(112% 82% at 50% 40%, #ffffff 0%, var(--color-surface) 54%, var(--color-surface-2) 100%);
+    radial-gradient(126% 96% at 50% 42%, #fffcf6 0%, #f8f2ea 56%, #e2dace 100%);
 }
 
 .library-sheet-toggle { display: none; }
@@ -609,152 +688,424 @@
   height: 100%;
 }
 
-/* ---- the floating tool rail, inside the stage ---- */
+/* ---- the floating rail, inside the stage ---- */
 /*
- * 58 px, not 46.
+ * Camera verbs only, four cells, 52 px wide.
  *
- * The bee carries seven controls — orbit, two zooms, reset and its three flight
- * states — and at 46 px every Vietnamese label wrapped: "PHÓNG TO" over two
- * lines, "BAY TẠI CHỖ" over three, which turned a control rail into a paragraph
- * and made the whole column 300 px tall down the left of the specimen. The
- * labels are single-line now and the cells are shorter, so seven of them are
- * still less than half the panel height.
+ * Two things were wrong with the version this replaces. Its width was set by the
+ * longest Vietnamese label in it — "PHÓNG TO" and "BAY TẠI CHỖ" wrapped at 46 px,
+ * so the column grew to fit words rather than to fit controls — and it carried
+ * the specimen's behaviours as well, which made it nine cells and 410 px tall in
+ * a 715 px stage. Down one edge of the frame that is more chrome than specimen,
+ * and on the T-rex it put the animal's head behind the glass.
+ *
+ * So the labels are one word each ("Gần" / "Xa" / "Về khung", with the full phrase
+ * on `title` and `aria-label` so nothing is lost to a screen reader), and the
+ * behaviours moved to `.stage-clips` along the bottom. What is left is a column
+ * of four camera controls, ~190 px, in the corner of the frame the subject never
+ * occupies.
  */
-.stage-tools {
+.stage-rail {
   position: absolute;
   z-index: 3;
-  top: 14px;
-  left: 14px;
-  display: flex;
-  width: 58px;
-  flex-direction: column;
-  gap: 1px;
+  top: 12px;
+  left: 12px;
+  display: grid;
+  width: 52px;
+  gap: 5px;
   padding: 4px;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-border-hair);
   border-radius: var(--radius-md);
-  background: rgba(255, 253, 249, 0.82);
-  box-shadow: 0 10px 26px rgba(87, 62, 43, 0.1);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: rgba(255, 253, 249, 0.78);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 10px 26px rgba(87, 62, 43, 0.09);
+  backdrop-filter: blur(14px) saturate(1.4);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
 }
+
+.stage-rail-group { display: grid; gap: 1px; }
+.stage-rail-group + .stage-rail-group { border-top: 1px solid var(--color-border-hair); padding-top: 5px; }
+
+/* ---- the specimen's own behaviours, along the bottom ---- */
+/*
+ * A row, not a column, because the axis these controls live on is *time*.
+ *
+ * Five takes of the same animal read as a set to choose between when they sit
+ * side by side; stacked in the left rail they read as five more buttons of the
+ * same kind as "zoom in", which is exactly the confusion the split fixes. It
+ * also puts them where a media control belongs, and it is the one place in the
+ * frame that a horizontally-long specimen leaves free.
+ *
+ * `translate(-50%)` and not a flex row with the caption: the caption and the
+ * switch are shared with stages that have no clips at all, so all three are
+ * anchored independently and only look like one row.
+ */
+.stage-clips {
+  position: absolute;
+  z-index: 3;
+  bottom: 12px;
+  left: 50%;
+  display: grid;
+  gap: 2px;
+  padding: 4px 5px 5px;
+  border: 1px solid var(--color-border-hair);
+  border-radius: var(--radius-md);
+  background: rgba(255, 253, 249, 0.78);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 10px 26px rgba(87, 62, 43, 0.09);
+  backdrop-filter: blur(14px) saturate(1.4);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  transform: translateX(-50%);
+}
+.stage-clips-title {
+  margin: 1px 0 0;
+  color: var(--color-muted-2);
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-align: center;
+  text-transform: uppercase;
+}
+.stage-clips-row { display: flex; gap: 1px; }
+.stage-clips .stage-tool { width: 48px; height: 36px; }
 
 .stage-tool {
   display: grid;
-  width: 50px;
-  height: 37px;
+  width: 44px;
+  height: 38px;
   place-items: center;
-  gap: 2px;
+  align-content: center;
+  gap: 3px;
   padding: 0;
   border: 0;
   border-radius: var(--radius-xs);
   color: var(--color-muted);
   background: transparent;
-  transition: color 160ms ease, background 160ms ease;
+  transition: color 160ms ease, background 160ms ease, box-shadow 160ms ease;
 }
-.stage-tool svg { width: 15px; height: 15px; }
+.stage-tool svg { width: 16px; height: 16px; }
 .stage-tool span {
   font-size: 7.5px;
-  font-weight: 650;
-  letter-spacing: 0.04em;
+  font-weight: 660;
+  letter-spacing: 0.03em;
   line-height: 1;
   text-transform: uppercase;
   white-space: nowrap;
 }
 .stage-tool:hover { color: var(--color-ink-2); background: var(--color-surface-2); }
-.stage-tool.is-active { color: var(--color-accent-deep); background: var(--color-accent-wash); }
+/* The selected behaviour is a filled chip, not a tinted glyph: this is the one
+   state in the rail that persists, so it has to hold at a glance from across the
+   panel while the four camera buttons above it stay momentary. */
+.stage-tool.is-active {
+  color: var(--color-accent-deep);
+  background: var(--color-accent-wash);
+  box-shadow: inset 0 0 0 1px var(--color-accent-line);
+}
+
+/* ---- the guide card, top-right ---- */
+/*
+ * Three lines of how-to, on paper, which leave for good the first time the
+ * visitor drags, scrolls or opens a pin.
+ *
+ * It replaces a single centred line of 10 px text that sat under the specimen
+ * for the whole session. Two things were wrong with that: it competed with the
+ * caption for the same band of the frame, and a hint that stays after it has
+ * been obeyed is furniture. This one is a real card in the corner nothing else
+ * uses, each line led by the mark for the gesture it names, and it is
+ * `aria-hidden` because every gesture it describes also has a button on the rail.
+ */
+.stage-guide {
+  position: absolute;
+  z-index: 2;
+  top: 12px;
+  right: 12px;
+  padding: 9px 11px;
+  border: 1px solid var(--color-border-hair);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 253, 249, 0.72);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 8px 20px rgba(87, 62, 43, 0.06);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  pointer-events: none;
+  animation: stage-guide-in 620ms var(--ease-reveal) 340ms both;
+}
+.stage-guide ul { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.stage-guide li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--color-muted);
+  font-size: 9.5px;
+  font-weight: 560;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+.stage-guide svg { width: 13px; height: 13px; flex: none; color: var(--color-muted-2); }
+@keyframes stage-guide-in { from { opacity: 0; transform: translateY(-5px); } }
+
+/* ---- anatomy pins, over the specimen ---- */
+/*
+ * The dot is the control and the card is its disclosure; the wrapper is a
+ * zero-size anchor whose position the render loop writes every frame, so a pin
+ * stays on its joint through an animation without costing a React render.
+ */
+.stage-pins { position: absolute; z-index: 4; inset: 0; pointer-events: none; }
+.stage-pin {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: var(--on, 0);
+  pointer-events: var(--hit, none);
+  transition: opacity 200ms ease;
+}
+/* A pin the visitor opened on purpose stays fully readable even when the model
+   has turned it to the far side. The render loop cannot know that; the DOM can. */
+.stage-pin[data-open] { z-index: 1; opacity: 1; }
+.stage-pin-dot {
+  position: absolute;
+  top: -11px;
+  left: -11px;
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 253, 249, 0.66);
+  box-shadow: inset 0 0 0 1px rgba(117, 91, 70, 0.16);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  transition: background 180ms ease, box-shadow 180ms ease, transform 180ms var(--ease-reveal);
+}
+.stage-pin-dot i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-accent-strong);
+  box-shadow: 0 0 0 3px rgba(232, 120, 104, 0.16);
+  transition: box-shadow 180ms ease;
+}
+.stage-pin-dot:hover { transform: scale(1.12); }
+.stage-pin[data-open] .stage-pin-dot {
+  background: var(--color-surface-raised);
+  box-shadow: inset 0 0 0 1px var(--color-accent-line), 0 6px 16px rgba(87, 62, 43, 0.12);
+}
+.stage-pin[data-open] .stage-pin-dot i { box-shadow: 0 0 0 4px rgba(232, 120, 104, 0.22); }
+
+.stage-pin-card {
+  position: absolute;
+  top: -15px;
+  display: grid;
+  gap: 2px;
+  width: 164px;
+  padding: 8px 11px;
+  border: 1px solid var(--color-border-hair);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 253, 249, 0.94);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 12px 28px rgba(87, 62, 43, 0.14);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  animation: stage-pin-in 240ms cubic-bezier(0.2, 0.85, 0.3, 1);
+}
+.stage-pin[data-side='right'] .stage-pin-card { left: 18px; }
+.stage-pin[data-side='left'] .stage-pin-card { right: 18px; }
+/* The leader: a 1 px rule from the dot to the card's edge, so the label is
+   visibly attached to the joint rather than floating near it. */
+.stage-pin-card::before {
+  content: '';
+  position: absolute;
+  top: 18px;
+  width: 12px;
+  height: 1px;
+  background: var(--color-accent-line);
+}
+.stage-pin[data-side='right'] .stage-pin-card::before { right: 100%; }
+.stage-pin[data-side='left'] .stage-pin-card::before { left: 100%; }
+.stage-pin-card b {
+  color: var(--color-ink);
+  font-size: 11.5px;
+  font-weight: 660;
+  letter-spacing: -0.02em;
+}
+.stage-pin-card small { color: var(--color-muted); font-size: 10px; line-height: 1.45; }
+@keyframes stage-pin-in { from { opacity: 0; transform: translateY(3px) scale(0.97); } }
 
 /* ---- caption, bottom-left ---- */
+/* 30%, not 46%: the clip row now sits in the middle of this band, and a caption
+   that ran to nearly half the frame collided with it on a 700 px panel. */
 .stage-caption {
   position: absolute;
   z-index: 2;
-  bottom: 18px;
-  left: 18px;
+  bottom: 14px;
+  left: 14px;
   display: grid;
-  gap: 3px;
-  max-width: 52%;
+  gap: 2px;
+  max-width: 30%;
   pointer-events: none;
 }
 .stage-caption b {
   color: var(--color-muted-2);
-  font-size: 8.5px;
-  font-weight: 650;
-  letter-spacing: 0.13em;
+  font-size: 8px;
+  font-weight: 680;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
 }
 .stage-caption span {
   color: var(--color-ink-2);
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 500;
   letter-spacing: -0.005em;
 }
 
-/* ---- auto-rotate switch, bottom-right ---- */
-.stage-spin {
-  position: absolute;
-  z-index: 3;
-  right: 18px;
-  bottom: 18px;
-  display: inline-flex;
-  align-items: center;
-  gap: 9px;
-  min-height: 30px;
-  padding: 0 9px 0 12px;
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  color: var(--color-muted);
-  background: rgba(255, 253, 249, 0.8);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  transition: color 180ms ease, border-color 180ms ease;
-}
-/* The track and its knob are one background: a 26×15 pill plus a radial the
-   size of the knob, moved by `background-position` when the switch is on. */
-.stage-spin::after {
-  content: '';
-  width: 26px;
-  height: 15px;
-  border-radius: 999px;
-  background-color: var(--color-border-strong);
-  background-image: radial-gradient(circle 5.4px at 7.5px 7.5px, #fffdf9 0 99%, transparent 100%);
-  background-position: 0 0;
-  background-repeat: no-repeat;
-  transition: background-color 200ms ease, background-position 200ms var(--ease-reveal);
-}
-.stage-spin[aria-pressed='true'] { color: var(--color-accent-deep); border-color: var(--color-accent-line); }
-.stage-spin[aria-pressed='true']::after {
-  background-color: var(--color-accent-strong);
-  background-position: 11px 0;
-}
-
-/* ---- one line of interaction help, bottom-centre ---- */
+/* ---- the single-line hint, for stages whose affordance never expires ---- */
+/*
+ * `.stage-guide` fades because "kéo để xoay" is learnt in one gesture. The cell
+ * studio and the molecule viewer keep this one instead, because their third
+ * clause — nhấp một bào quan, nhấp hai nguyên tử để đo — names a *target* rather
+ * than a gesture, and a visitor who has rotated the model still does not know
+ * the atoms are clickable. Same paper, same corner, same type as the guide card,
+ * so the two do not read as two different systems inside one section.
+ */
 .stage-hint,
 .model-stage-hint {
   position: absolute;
   z-index: 2;
-  bottom: 16px;
-  left: 50%;
+  top: 12px;
+  right: 12px;
+  max-width: 46%;
   margin: 0;
-  color: var(--color-muted-2);
-  font-size: 10px;
+  padding: 8px 11px;
+  border: 1px solid var(--color-border-hair);
+  border-radius: var(--radius-sm);
+  color: var(--color-muted);
+  background: rgba(255, 253, 249, 0.72);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 8px 20px rgba(87, 62, 43, 0.06);
+  font-size: 9.5px;
   font-weight: 560;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.01em;
+  line-height: 1.5;
+  text-align: right;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   pointer-events: none;
-  transform: translateX(-50%);
   transition: opacity 420ms ease;
 }
 /* The stage flags the hint as spent once the visitor has touched the model. */
 .stage-hint[data-dismissed='true'],
 .stage-hint.is-hidden { opacity: 0; }
 
-/* Narrow stage: the hint takes a line of its own above the caption and the
-   switch instead of printing through the caption's second line. */
-@container (max-width: 780px) {
-  .stage-hint,
-  .model-stage-hint { bottom: 58px; }
-  .stage-caption { max-width: 62%; }
+/*
+ * The molecule viewer is the one stage with its own full-width toolbar across the
+ * top, so the corner this card wants is already taken — the hint printed straight
+ * over "Đặt lại góc nhìn". It goes to the bottom band there, centred between the
+ * caption and the switch, which is the only free strip that stage has.
+ */
+.mol .stage-hint {
+  top: auto;
+  right: 14px;
+  bottom: 52px;
+  max-width: min(62%, 320px);
+}
+
+/* ---- auto-rotate, bottom-right ---- */
+/*
+ * A mark, a two-line label and a real switch.
+ *
+ * Auto-rotation is a *state*, and the previous control drew it as a pressed
+ * button with a pill glued to the right of it. Three things changed. The track
+ * and knob are their own elements rather than a `::after` painted with two
+ * stacked backgrounds, so the knob carries its own shadow and travels on its own
+ * easing. The label breaks to two lines, which keeps the control 84 px wide
+ * instead of 118 and stops it colliding with the caption on a 340 px panel. And
+ * the circular-arrow mark turns — slowly, nine seconds a revolution, only while
+ * the state is on — which is the one place in this section where an icon reports
+ * state by moving, and the cheapest possible way to say "this is what is
+ * happening right now" without a word of copy.
+ */
+.stage-spin {
+  position: absolute;
+  z-index: 3;
+  right: 14px;
+  bottom: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 9px;
+  border: 1px solid var(--color-border-hair);
+  border-radius: 999px;
+  color: var(--color-muted);
+  background: rgba(255, 253, 249, 0.78);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 8px 20px rgba(87, 62, 43, 0.07);
+  font-size: 8.5px;
+  font-weight: 680;
+  letter-spacing: 0.09em;
+  line-height: 1.22;
+  text-align: left;
+  text-transform: uppercase;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: color 180ms ease, border-color 180ms ease;
+}
+.stage-spin-mark { width: 16px; height: 16px; flex: none; }
+.stage-spin-mark .glyph-turn { transform-origin: 10px 10px; }
+
+.stage-switch {
+  display: grid;
+  width: 26px;
+  height: 15px;
+  flex: none;
+  align-items: center;
+  padding: 2px;
+  border-radius: 999px;
+  background: var(--color-border-strong);
+  box-shadow: inset 0 1px 2px rgba(87, 62, 43, 0.16);
+  transition: background 200ms ease;
+}
+.stage-switch em {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: #fffdf9;
+  box-shadow: 0 1px 3px rgba(87, 62, 43, 0.3);
+  transition: transform 220ms var(--ease-reveal);
+}
+
+.stage-spin[aria-pressed='true'] {
+  border-color: var(--color-accent-line);
+  color: var(--color-accent-deep);
+}
+.stage-spin[aria-pressed='true'] .stage-switch { background: var(--color-accent-strong); }
+.stage-spin[aria-pressed='true'] .stage-switch em { transform: translateX(11px); }
+.stage-spin[aria-pressed='true'] .stage-spin-mark .glyph-turn {
+  animation: glyph-turn 9s linear infinite;
+}
+@keyframes glyph-turn { to { transform: rotate(360deg); } }
+
+/*
+ * Narrow stage.
+ *
+ * Three things stop fitting at once, so all three give way together: the guide
+ * card would cover a third of a 340 px panel, the switch's two-line label stops
+ * earning its width, and the clip row can no longer share the bottom band with a
+ * caption on one side and a switch on the other — so it takes a line of its own
+ * above them and the caption keeps the corner.
+ *
+ * 640 px, not 780. At 780 the rule fired on a 1366 × 768 laptop, where the viewer
+ * panel is about 700 px — and a 1366 is the most common screen this page is opened
+ * on, so the two things a first-time visitor most needs (how to drive the model,
+ * and what the switch in the corner is for) were the two things being dropped on
+ * it. Everything still fits at 700; nothing does at 600.
+ */
+@container (max-width: 640px) {
+  .stage-guide { display: none; }
+  .stage-caption { max-width: 44%; }
+  .stage-spin span { display: none; }
+  .stage-spin { gap: 6px; padding: 6px; }
+  .stage-clips { bottom: 56px; }
+  .stage-clips .stage-tool { width: 44px; height: 34px; }
 }
 
 /* ---- centred loading / error block ---- */
@@ -955,86 +1306,123 @@
   mask-image: linear-gradient(180deg, transparent 0, #000 14px, #000 calc(100% - 30px), transparent 100%);
 }
 
-.knowledge-head { padding: 18px 20px 20px; border-bottom: 1px solid var(--color-border-hair); }
+.knowledge-head { padding: 15px 17px 17px; border-bottom: 1px solid var(--color-border-hair); }
 .knowledge-head::after { content: ''; display: block; clear: both; }
 
 .knowledge-topic {
   display: flex;
   align-items: center;
   gap: 7px;
-  margin: 0 0 10px;
+  margin: 0 0 9px;
   color: var(--color-muted);
-  font-size: 9.5px;
+  font-size: 9px;
   font-weight: 660;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.13em;
   text-transform: uppercase;
 }
 .knowledge-topic i {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: var(--rail-tint, var(--color-accent-strong));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--rail-tint, var(--color-accent-strong)) 16%, transparent);
 }
 
 /* Floated, not gridded: the title should wrap *under* the thumbnail on the
    third line rather than being permanently narrowed by it. */
 .knowledge-thumb {
   float: right;
-  width: 44px;
-  height: 44px;
-  margin: 1px 0 8px 13px;
+  width: 42px;
+  height: 42px;
+  margin: 1px 0 8px 12px;
   border-radius: 50%;
 }
-.knowledge-thumb .library-mark { width: 74%; height: 74%; }
+.knowledge-thumb .library-mark { width: 72%; height: 72%; }
 
 .knowledge-head h3 {
   margin: 0;
   color: var(--color-ink);
-  font-size: 24px;
+  font-size: 21px;
   font-weight: 700;
   letter-spacing: -0.036em;
   line-height: 1.1;
 }
-/* The Latin binomial keeps its italic — that is a scientific convention, not a
-   typographic flourish — in the same family at a lighter weight. */
+/*
+ * The specimen's one authored line, and the only place in this panel where the
+ * writing has a voice.
+ *
+ * Italic and tinted, so it reads as a caption rather than as the first sentence
+ * of the description below it — and *above* the description, because a reader
+ * who meets "cỗ máy săn lớn nhất từng đi trên cạn" before the measurements has
+ * somewhere to put them. The Latin binomial is not repeated here: the viewer bar
+ * two panels to the left already prints it beside the specimen's name.
+ */
+.knowledge-poetic {
+  margin: 6px 0 0;
+  color: var(--color-lavender);
+  font-size: 12px;
+  font-style: italic;
+  font-weight: 500;
+  letter-spacing: -0.008em;
+  line-height: 1.45;
+}
+/* The fallback, for an entry with no authored line: the binomial keeps its
+   italic, which is a scientific convention rather than a flourish. */
 .knowledge-epithet {
   margin: 5px 0 0;
   color: var(--color-muted);
-  font-size: 12.5px;
+  font-size: 12px;
   font-style: italic;
   font-weight: 450;
   letter-spacing: -0.005em;
 }
-.knowledge-body { margin: 12px 0 0; color: var(--color-ink-2); font-size: 12.5px; line-height: 1.68; }
+.knowledge-body { margin: 11px 0 0; color: var(--color-ink-2); font-size: 12px; line-height: 1.66; }
 
-.library-knowledge section { padding: 16px 20px; border-bottom: 1px solid var(--color-border-hair); }
+.library-knowledge section { padding: 14px 17px; border-bottom: 1px solid var(--color-border-hair); }
+/*
+ * A section heading is a mark and a word.
+ *
+ * The mark is the reason five stacked 9 px uppercase labels stop reading as five
+ * identical rules: the gauge, the layers, the target, the branch. It is set in
+ * the accent at 40% so it registers as punctuation rather than as a second
+ * colour — the panel already has one tint doing real work, the subject's.
+ */
 .library-knowledge h4 {
-  margin: 0 0 11px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 9px;
   color: var(--color-muted);
-  font-size: 9.5px;
+  font-size: 9px;
   font-weight: 660;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.13em;
   text-transform: uppercase;
+}
+.library-knowledge h4 > svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  color: color-mix(in srgb, var(--color-accent-strong) 62%, var(--color-muted-2));
 }
 
 .knowledge-parts { margin: 0; }
-.knowledge-parts div { padding: 7px 0; border-bottom: 1px solid var(--color-border-hair); }
+.knowledge-parts div { padding: 6px 0; border-bottom: 1px solid var(--color-border-hair); }
 .knowledge-parts div:last-child { border-bottom: 0; padding-bottom: 0; }
-.knowledge-parts dt { color: var(--color-ink); font-size: 12px; font-weight: 620; }
-.knowledge-parts dd { margin: 2px 0 0; color: var(--color-muted); font-size: 11.5px; line-height: 1.55; }
+.knowledge-parts dt { color: var(--color-ink); font-size: 11.5px; font-weight: 640; }
+.knowledge-parts dd { margin: 1px 0 0; color: var(--color-muted); font-size: 11px; line-height: 1.52; }
 
 .knowledge-goals { margin: 0; padding: 0; list-style: none; }
 .knowledge-goals li {
   position: relative;
-  padding: 5px 0 5px 18px;
+  padding: 4px 0 4px 17px;
   color: var(--color-ink-2);
-  font-size: 12px;
-  line-height: 1.6;
+  font-size: 11.5px;
+  line-height: 1.58;
 }
 .knowledge-goals li::before {
   content: '';
   position: absolute;
-  top: 12px;
+  top: 11px;
   left: 2px;
   width: 6px;
   height: 6px;
@@ -1042,8 +1430,45 @@
   border-radius: 50%;
 }
 
-/* Numbers in mono, right-aligned, each row led by a small accent tick: a
-   readout, not a paragraph of statistics. */
+/* ---- liên hệ thực tế: a short list, marked with a rule and not a glyph ---- */
+/*
+ * The marker is a 7 px rule in the subject's tint. It is drawn rather than
+ * lettered for the same reason every other mark in this section is — and it is a
+ * rule rather than a dot because these entries are *pointers outward*, which is
+ * what a dash says and a bullet does not.
+ */
+.knowledge-context { margin: 0; padding: 0; list-style: none; }
+.knowledge-context li {
+  position: relative;
+  padding: 4px 0 4px 17px;
+  color: var(--color-ink-2);
+  font-size: 11.5px;
+  line-height: 1.55;
+}
+.knowledge-context li::before {
+  content: '';
+  position: absolute;
+  top: 13px;
+  left: 1px;
+  width: 8px;
+  height: 1px;
+  background: var(--rail-tint, var(--color-accent-strong));
+  opacity: 0.7;
+}
+
+/*
+ * The measurement table — the block that turns a description into a specimen
+ * card.
+ *
+ * Each row is a drawn mark, a label, and a right-aligned tabular value. The mark
+ * is the whole point: a reader looking for "how long is it" finds the rule
+ * without reading six labels in sequence, which is what a readout is *for*. It
+ * replaced a 5 px rotated square repeated on every row — the same mark six
+ * times is a decoration, not an index.
+ *
+ * The digits are `font-variant-numeric: tabular-nums` in the one family rather
+ * than a mono face (DESIGN.md §3): column alignment without a second typeface.
+ */
 .knowledge-facts { margin: 0; }
 .knowledge-facts div {
   display: grid;
@@ -1051,71 +1476,90 @@
      `auto` value track had no upper bound, so a long one — "Natural Earth
      1:110m · Public Domain" on the globe — overran the label instead of
      wrapping, and the two texts printed on top of each other. */
-  grid-template-columns: 9px auto minmax(0, 1fr);
+  grid-template-columns: 15px auto minmax(0, 1fr);
   align-items: baseline;
-  gap: 9px;
-  padding: 6px 0;
+  gap: 8px;
+  padding: 5px 0;
   border-bottom: 1px solid var(--color-border-hair);
 }
 .knowledge-facts div:last-child { border-bottom: 0; }
-.knowledge-facts div::before {
-  content: '';
-  width: 5px;
-  height: 5px;
-  border-radius: 1px;
-  background: var(--color-accent-soft);
-  transform: translateY(-1px) rotate(45deg);
+.knowledge-fact-mark {
+  display: block;
+  width: 15px;
+  height: 15px;
+  color: color-mix(in srgb, var(--rail-tint, var(--color-accent-strong)) 70%, var(--color-muted-2));
+  transform: translateY(2px);
 }
-.knowledge-facts dt { color: var(--color-muted); font-size: 11px; }
+.knowledge-fact-mark > svg { width: 100%; height: 100%; }
+.knowledge-facts dt { color: var(--color-muted); font-size: 10.5px; }
 .knowledge-facts dd {
   min-width: 0;
   margin: 0;
   color: var(--color-ink);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: -0.01em;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 560;
+  letter-spacing: -0.008em;
   line-height: 1.5;
   text-align: right;
   overflow-wrap: anywhere;
 }
 
+/*
+ * The two notes, in two tones and a fixed order.
+ *
+ * Lavender first for the scientific point, amber second for the "did you know".
+ * Both used to be the coral wash, which meant that a specimen with two notes
+ * showed two identical blocks and the eye read them as one paragraph in a box.
+ * The mark, the label colour and the ground all move together, and the order is
+ * enforced by the component rather than authored per entry, so no specimen can
+ * put its curiosity above its physics.
+ */
 .knowledge-notes {
   display: grid;
-  gap: 8px;
-  padding: 16px 20px;
+  gap: 7px;
+  padding: 14px 17px;
   border-bottom: 1px solid var(--color-border-hair);
 }
 .knowledge-note {
-  padding: 11px 13px;
+  padding: 10px 12px;
   border-radius: var(--radius-sm);
   background: var(--color-accent-wash);
 }
 .knowledge-note h4 {
-  margin: 0 0 5px;
+  margin: 0 0 4px;
   color: var(--color-accent-deep);
-  font-size: 10px;
-  font-weight: 650;
-  letter-spacing: 0.08em;
+  font-size: 9px;
+  font-weight: 680;
+  letter-spacing: 0.1em;
 }
-.knowledge-note p { margin: 0; color: var(--color-ink-2); font-size: 11.5px; line-height: 1.6; }
+.knowledge-note h4 > svg { color: currentColor; }
+.knowledge-note p { margin: 0; color: var(--color-ink-2); font-size: 11px; line-height: 1.58; }
+.knowledge-note[data-tone='science'] {
+  background: color-mix(in srgb, var(--color-lavender) 8%, var(--color-surface-raised));
+}
+.knowledge-note[data-tone='science'] h4 { color: color-mix(in srgb, var(--color-lavender) 78%, var(--color-ink)); }
+.knowledge-note[data-tone='curio'] {
+  background: color-mix(in srgb, var(--color-pending) 10%, var(--color-surface-raised));
+}
+.knowledge-note[data-tone='curio'] h4 { color: color-mix(in srgb, var(--color-pending) 82%, var(--color-ink)); }
 
 /* -------------------------------------------------------------- actions --- */
-.knowledge-actions { display: grid; gap: 8px; padding: 16px 20px; }
-.knowledge-actions-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 8px; }
+.knowledge-actions { display: grid; gap: 7px; padding: 14px 17px; }
+.knowledge-actions-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 7px; }
 .knowledge-actions a,
 .knowledge-actions button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  min-height: 38px;
-  padding: 0 14px;
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 12px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   color: var(--color-ink-2);
   background: var(--color-surface-raised);
-  font-size: 11.5px;
+  font-size: 11px;
   font-weight: 580;
   text-align: center;
   transition: border-color 180ms ease, color 180ms ease, background 180ms ease;
@@ -1123,45 +1567,65 @@
 .knowledge-actions a:hover,
 .knowledge-actions button:hover { border-color: var(--color-accent-line); color: var(--color-accent-deep); }
 .knowledge-actions .knowledge-primary {
-  min-height: 42px;
+  min-height: 40px;
   border-color: transparent;
   color: #fff;
   background: var(--color-accent-strong);
-  font-size: 12.5px;
+  box-shadow: 0 8px 18px rgba(200, 92, 72, 0.16);
+  font-size: 12px;
   font-weight: 620;
 }
 .knowledge-actions .knowledge-primary:hover { color: #fff; background: var(--color-accent-deep); }
 
-.knowledge-credits { padding: 0 20px 22px; }
+.knowledge-credits { padding: 0 17px 20px; }
 .knowledge-credits summary {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 12px 0;
+  gap: 6px;
+  padding: 11px 0;
   border-top: 1px solid var(--color-border-hair);
   color: var(--color-muted);
   cursor: pointer;
-  font-size: 9.5px;
+  font-size: 9px;
   font-weight: 660;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.13em;
   text-transform: uppercase;
   list-style: none;
 }
+.knowledge-credits summary > svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  color: color-mix(in srgb, var(--color-accent-strong) 62%, var(--color-muted-2));
+}
 .knowledge-credits summary::-webkit-details-marker { display: none; }
+/* Drawn, not lettered: `+` and `–` in a text run are two different glyph widths
+   and two different optical weights, so the marker jumped sideways and got
+   lighter on open. A 1 px cross whose vertical bar is scaled to zero does not. */
 .knowledge-credits summary::after {
-  content: '+';
+  content: '';
+  width: 9px;
+  height: 9px;
+  margin-left: auto;
+  background:
+    linear-gradient(currentColor, currentColor) center/9px 1px no-repeat,
+    linear-gradient(currentColor, currentColor) center/1px 9px no-repeat;
   color: var(--color-muted-2);
-  font-family: var(--font-mono);
-  font-size: 13px;
+  transition: transform 220ms var(--ease-reveal), color 180ms ease;
 }
 .knowledge-credits[open] summary { color: var(--color-accent-deep); }
-.knowledge-credits[open] summary::after { content: '–'; }
-.knowledge-credit { display: grid; gap: 2px; padding: 0 0 12px; }
+/* Rotated 45° and its vertical bar erased: the plus becomes a minus by turning,
+   which is one animation instead of a glyph swap. */
+.knowledge-credits[open] summary::after {
+  background: linear-gradient(currentColor, currentColor) center/9px 1px no-repeat;
+  transform: rotate(180deg);
+}
+.knowledge-credit { display: grid; gap: 2px; padding: 0 0 11px; }
 .knowledge-credit:last-child { padding-bottom: 0; }
-.knowledge-credit b { color: var(--color-ink-2); font-size: 11px; font-weight: 620; }
+.knowledge-credit b { color: var(--color-ink-2); font-size: 10.5px; font-weight: 620; }
 .knowledge-credit em {
   color: var(--color-accent-deep);
-  font-size: 10px;
+  font-size: 9.5px;
   font-style: normal;
   font-weight: 600;
 }
@@ -1169,88 +1633,19 @@
 .knowledge-credit span {
   overflow: hidden;
   color: var(--color-muted-2);
-  font-family: var(--font-mono);
   font-size: 9.5px;
+  letter-spacing: -0.005em;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .knowledge-credit a:hover { color: var(--color-accent-strong); }
 .knowledge-credit small { margin-top: 3px; color: var(--color-muted); font-size: 10px; line-height: 1.55; }
 
-/* ============================================== the strip below the fold === */
-.library-strip {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 14px;
-  margin-top: 20px;
-}
-
-.library-strip-card {
-  display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
-  gap: 10px;
-  padding: 15px 15px 14px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-}
-.library-strip-kind {
-  margin: 0;
-  color: var(--color-lavender);
-  font-size: 9.5px;
-  font-weight: 650;
-  letter-spacing: 0.11em;
-  text-transform: uppercase;
-}
-.library-strip-card h3 {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: 16px;
-  font-weight: 650;
-  letter-spacing: -0.028em;
-  line-height: 1.16;
-}
-.library-strip-visual { height: 76px; border-radius: var(--radius-sm); }
-.library-strip-visual .library-mark { width: 56%; height: 84%; }
-.library-strip-card button {
-  justify-self: start;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  min-height: 32px;
-  padding: 0 12px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  color: var(--color-ink-2);
-  background: var(--color-surface-raised);
-  font-size: 11px;
-  font-weight: 600;
-  transition: border-color 180ms ease, color 180ms ease;
-}
-.library-strip-card button:hover { border-color: var(--color-accent-line); color: var(--color-accent-deep); }
-
-.library-strip-note { grid-template-rows: auto minmax(0, 1fr) auto; background: var(--color-surface-2); }
-.library-strip-note .library-strip-kind { color: var(--color-muted); font-style: normal; }
-.library-strip-note p:not(.library-strip-kind) {
-  margin: 0;
-  color: var(--color-muted);
-  font-size: 11.5px;
-  line-height: 1.62;
-}
-.library-strip-links { display: grid; gap: 6px; }
-.library-strip-links a {
-  color: var(--color-accent-deep);
-  font-size: 11.5px;
-  font-weight: 600;
-}
-.library-strip-links a:hover { color: var(--color-accent-strong); }
-
 /* ============================================================ breakpoints === */
-/* 1440-class laptops: the panels give back 36 px and 30 px, all of it to the
-   specimen. */
+/* 1440-class laptops: the panels give back 30 px, all of it to the specimen. */
 @media (max-width: 1440px) {
-  .knowledge-head h3 { font-size: 22px; }
-  .library-asset { padding: 8px 10px 8px 8px; }
+  .knowledge-head h3 { font-size: 19.5px; }
+  .library-asset { padding: 6px 9px 6px 7px; }
 }
 
 /*
@@ -1259,19 +1654,19 @@
  * its transition and stays out of the tab order at the same time.
  */
 @media (max-width: 1180px) {
-  .library-body { grid-template-columns: clamp(236px, 25%, 280px) minmax(0, 1fr); }
+  .library-body { grid-template-columns: clamp(230px, 25%, 272px) minmax(0, 1fr); }
   .library-body.is-empty { grid-template-columns: minmax(0, 1fr); }
   .library-viewer { grid-template-rows: auto minmax(0, 1fr) auto; }
   .library-sheet-toggle {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-height: 40px;
+    min-height: 38px;
     border: 0;
     border-top: 1px solid var(--color-border-hair);
     color: var(--color-accent-deep);
     background: var(--color-surface-2);
-    font-size: 11.5px;
+    font-size: 11px;
     font-weight: 600;
   }
   .library-knowledge {
@@ -1288,36 +1683,37 @@
     transition: transform 320ms var(--ease-reveal), visibility 320ms;
   }
   .library-knowledge.is-open { visibility: visible; transform: none; }
-  .library-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
-/* One column, and the rail turns into a horizontal shelf above the viewer: a
-   400 px vertical list would push the specimen off the screen entirely. */
+/*
+ * One column, and the rail turns into a horizontal shelf above the viewer: a
+ * 400 px vertical list would push the specimen off the screen entirely.
+ *
+ * The section stays exactly one screen tall here, and that is a change from the
+ * band this replaced. It used to give the workspace an explicit height derived
+ * from a measured constant, and the first version of this rule kept doing that —
+ * `100svh − header − 168px`, with 168 standing in for the head band plus the
+ * subject switcher. It was 31 px wrong at 768 and 36 px wrong at 390, so the
+ * bottom of the three panels went under the fold at both, and
+ * `reference-audit/measure.mjs` reported it as CUT at both. Which is the third
+ * time this project has paid for the same mistake — see DESIGN.md §2.
+ *
+ * So there is no override at all now. The stage grid keeps its screen-tall height
+ * from the desktop rule, the two `auto` rows measure themselves, and the
+ * workspace is whatever the `1fr` row is left with: 723 px on a 768 tablet, 566
+ * on a 390 phone. When a band's height is not predictable, make the layout do the
+ * subtraction.
+ */
 @media (max-width: 860px) {
-  .library { --library-head: auto; }
   .library-head {
     grid-template-columns: minmax(0, 1fr);
     align-items: start;
-    gap: 10px;
-    min-height: 0;
-    padding-bottom: 18px;
+    gap: 9px;
   }
   /* The lede repeats what the heading and the live count already say, and on a
      phone it is 42 px of the height budget the workspace needs. */
   .library-head-lede { display: none; }
   .library-head-count { margin-top: 2px; }
-  /*
-   * Same budget as the desktop rule, spelled out because `--library-head` is
-   * `auto` here and `calc()` cannot take an `auto`.
-   *
-   * 132 px is the one-column head band (kicker + heading + counts + its own
-   * padding) plus the sliver of the strip that has to stay visible below the
-   * fold — measured, not guessed, and re-checked by `reference-audit/measure.mjs`
-   * at 768 and 390.
-   */
-  .library-app {
-    height: clamp(460px, calc(100svh - var(--header-h) - var(--section-gap) - 132px), 780px);
-  }
   .library-chrome { grid-template-columns: minmax(0, 1fr); }
   .library-search { width: 100%; }
   .library-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
@@ -1333,40 +1729,178 @@
     mask-image: linear-gradient(90deg, transparent 0, #000 10px, #000 calc(100% - 14px), transparent 100%);
   }
   .library-rail-list > li { flex: none; }
-  .library-asset { width: 226px; grid-template-columns: 44px minmax(0, 1fr); gap: 10px; }
-  .library-asset .rail-visual { width: 44px; height: 44px; border-radius: 13px; }
-  .library-asset b { font-size: 14.5px; }
+  /* The rail is a horizontal shelf here, so a vertical position marker beside it
+     would be pointing along an axis that no longer scrolls. Its own edge mask
+     already turns to match. */
+  .library-rail .scroll-thumb { display: none; }
+  .library-asset { width: 214px; grid-template-columns: 40px minmax(0, 1fr); gap: 9px; }
+  .library-asset .rail-visual { width: 40px; height: 40px; }
+  .library-asset b { font-size: 13.5px; }
   .library-asset small { -webkit-line-clamp: 1; }
-  .library-viewer-title b { font-size: 18px; }
+  .library-viewer-title b { font-size: 16px; }
   .library-viewer-tags span:nth-child(2) { display: none; }
-  /* The rail moves along the bottom so it never covers the specimen's head. */
-  .stage-tools {
+  /*
+   * The rail moves along the bottom so it never covers the specimen's head, and
+   * it becomes one horizontal band: the group divider is a vertical rule here,
+   * and the group title would cost a second row for one word, so it goes.
+   */
+  /*
+   * One column of four is still fine at 390 px, but at the top-left of a short
+   * phone stage it sits on the specimen's head. Both control groups go to the
+   * bottom and become one horizontal band: camera on the left, clips on the
+   * right, and the caption and switch move above them.
+   */
+  .stage-rail {
     top: auto;
     bottom: 12px;
-    left: 50%;
+    left: 12px;
+    display: flex;
     width: auto;
-    max-width: calc(100% - 28px);
-    flex-direction: row;
-    overflow-x: auto;
-    transform: translateX(-50%);
   }
-  .stage-caption { bottom: 74px; }
-  .stage-spin { bottom: 74px; }
-  .stage-hint { bottom: 60px; }
+  .stage-rail-group { display: flex; }
+  .stage-tool { width: 42px; flex: none; }
+  .stage-clips {
+    right: 12px;
+    bottom: 12px;
+    left: auto;
+    transform: none;
+    overflow-x: auto;
+    max-width: calc(100% - 260px);
+    scrollbar-width: none;
+  }
+  .stage-clips::-webkit-scrollbar { display: none; }
+  .stage-caption { bottom: 76px; max-width: 52%; }
+  .stage-spin { bottom: 76px; }
+  .stage-hint,
+  .model-stage-hint { max-width: 58%; }
 }
 
 @media (max-width: 620px) {
-  .library { padding-bottom: 64px; }
-  .library-head h2 { font-size: 25px; }
+  .library-head h2 { font-size: 24px; }
   .library-viewer-tags { display: none; }
-  .library-strip { grid-template-columns: minmax(0, 1fr); }
   .library-knowledge { height: min(82svh, 620px); }
+  .knowledge-head,
+  .library-knowledge section,
+  .knowledge-notes,
+  .knowledge-actions { padding-inline: 15px; }
+  /*
+   * Phone: both control groups go icon-only.
+   *
+   * A 348 px stage cannot hold four labelled camera cells *and* five labelled
+   * clip cells on one line — the first version capped the clip row at 88 px, which
+   * showed two of the T-rex's five states and hid the rest behind a scroll nobody
+   * would find. Dropping the words fits 4 + 5 = nine 34 px controls in 324 px with
+   * room to spare, every state is one tap away, and the words survive on `title`
+   * and `aria-label` where a screen reader still reads them.
+   */
+  .stage-tool { width: 34px; height: 34px; }
+  .stage-tool span { display: none; }
+  .stage-clips .stage-tool { width: 34px; height: 34px; }
+  .stage-clips-title { display: none; }
+  .stage-clips { max-width: none; padding: 4px; }
+  .stage-caption { max-width: 58%; }
 }
 
+/*
+ * Reduced motion.
+ *
+ * The auto-rotate mark stops turning and the switch stops travelling, but the
+ * control keeps working: the state is still readable from the knob's position and
+ * the accent, which is the reason the switch is drawn rather than animated into
+ * legibility. `orbit.spinning` itself is already forced off upstream by
+ * `createLibraryStage`.
+ */
 @media (prefers-reduced-motion: reduce) {
   .stage-status i { animation: none; }
+  .stage-guide { animation: none; }
+  .stage-pin-card { animation: none; }
+  .stage-spin[aria-pressed='true'] .stage-spin-mark .glyph-turn { animation: none; }
   .library-knowledge,
-  .stage-spin::after,
+  .stage-switch,
+  .stage-switch em,
+  .stage-pin,
+  .stage-pin-dot,
   .library-asset,
-  .library-subject { transition: none; }
+  .library-subject,
+  .scroll-thumb { transition: none; }
 }
+
+/* ====================================================== browser surfaces === */
+/*
+ * The parts nobody drew.
+ *
+ * Three of the four scrollers in this section are internal — the rail, the
+ * knowledge panel, the subject strip — and until now every one of them showed
+ * the operating system's own trough: a 15 px grey channel down the inside edge
+ * of a warm ivory card, in a section whose entire argument is that it was built
+ * rather than assembled. The selection colour was the browser's blue.
+ */
+.library ::selection {
+  color: var(--color-ink);
+  background: color-mix(in srgb, var(--color-accent-strong) 26%, transparent);
+}
+/*
+ * The scrollbars are drawn, not configured. See `ScrollThumb.tsx`.
+ *
+ * What was here asked for a 6 px bar the way every stylesheet does — the standard
+ * `scrollbar-width: thin` / `scrollbar-color` pair *plus* a sized
+ * `::-webkit-scrollbar` block — and got neither. Chromium treats the two as
+ * mutually exclusive: any non-`auto` standard value discards the whole
+ * pseudo-element block, so the 6 px was dropped and Chromium drew its own
+ * "thin" instead, which measured ~12 px with a thumb as long as the ratio asked
+ * for. `studio.css` had already recorded this failure in full; this file
+ * committed it anyway, one section over.
+ *
+ * So: hidden the one way every engine agrees on — `scrollbar-width: none` and
+ * `display: none` say the same thing, so nothing has to choose between them —
+ * and replaced with a 3 px length-capped indicator this section owns.
+ */
+.library-rail-list,
+.library-knowledge-scroll {
+  scrollbar-width: none;
+}
+.library-rail-list::-webkit-scrollbar,
+.library-knowledge-scroll::-webkit-scrollbar { display: none; }
+
+/* The two panels that host an indicator become its containing block. */
+.library-rail,
+.library-knowledge { position: relative; }
+
+.scroll-thumb {
+  position: absolute;
+  z-index: 4;
+  top: var(--sb-offset, 0);
+  right: 5px;
+  width: 3px;
+  height: var(--sb-length, 0);
+  border-radius: 999px;
+  /* `--sb-shown` is 0 until the scroller actually overflows, so a short rail or
+     a one-screen knowledge panel shows nothing at all. */
+  opacity: calc(var(--sb-shown, 0) * 0.3);
+  background: var(--color-border-strong);
+  pointer-events: none;
+  transition: opacity 240ms var(--ease-reveal), background-color 240ms var(--ease-reveal);
+}
+
+.library-rail:hover .scroll-thumb,
+.library-knowledge:hover .scroll-thumb { opacity: calc(var(--sb-shown, 0) * 0.62); }
+
+/* Last, and qualified to the same weight as the hover rule above, so a scroll
+   in progress outranks the pointer merely being in the panel. */
+.library-rail .scroll-thumb[data-moving],
+.library-knowledge .scroll-thumb[data-moving] {
+  opacity: var(--sb-shown, 0);
+  background: var(--color-muted-2);
+}
+
+/* One focus ring for the whole section, in the accent rather than in the
+   platform's blue, and offset far enough to clear a 46 px circular well. */
+.library :focus-visible {
+  outline: 2px solid var(--color-accent-strong);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
+}
+.library-search input:focus-visible { outline: none; }
+.library .stage-pin-dot:focus-visible { outline-offset: 3px; border-radius: 50%; }
+.library a { text-underline-offset: 0.22em; }
+.library input { caret-color: var(--color-accent-strong); }

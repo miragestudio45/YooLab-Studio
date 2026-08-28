@@ -21,15 +21,25 @@ that no source with verifiable commercial-use rights was found. See
 `planned` manifest entries. They render as stated gaps with no controls, because
 there is nothing behind a control to run.
 
-## The virtual lab does not exist
+## The chemistry and physics bench does not exist
 
-The Practice & STEM section carries one working thing — the Formula workshop —
-and an outline of a lab bench that has nothing behind it. There is deliberately
-no button on that half of the section: a disabled "Bắt đầu" would be the one
-piece of furniture on the page that lies.
+The Practice & STEM section now carries three working labs — the Formula
+workshop, a guided drone flight and a six-axis robot cell — and the outline of a
+lab bench that used to sit beside the workshop is gone with it. What is still
+missing is what that outline was promising: wet-lab work. Instruments,
+procedures, reagents and titration are not started, and nothing on the page
+claims otherwise any more.
 
-Chemistry and physics lab work (instruments, procedures, reagents) is the next
-large piece of work and is not started.
+Two honest notes about what the three labs *are*:
+
+- **The drone and the robot are procedural.** Every mesh in both is built from
+  Three.js primitives at runtime. That is a licensing decision rather than an
+  aesthetic one — see [THIRD_PARTY_ASSETS.md](THIRD_PARTY_ASSETS.md) — and it
+  holds up at the size the stage renders them, but neither is a scanned or
+  authored model the way the Formula car is.
+- **The drone flies one course and the robot runs one cell.** Both flight model
+  and kinematics are general; the content is not. A second course or a second
+  cell layout is data, but there is only one of each today.
 
 ## Two cell models were rejected, not lost
 
@@ -39,6 +49,34 @@ cell in the Library is therefore YooLab-authored procedural geometry rather than
 a scanned mesh, and there is **no neuron**. Recorded in
 [THIRD_PARTY_ASSETS.md](THIRD_PARTY_ASSETS.md) so nobody re-adds them believing
 the surrounding repository's MIT licence covered them.
+
+## Human anatomy now ships, but twelve organs is not a body
+
+This used to be the headline gap. It is closed: the biology shelf carries
+**twelve human organs** from the Human Reference Atlas under CC BY 4.0 — heart,
+lungs, brain, eye, liver, gallbladder, pancreas, ileum, large intestine, kidney,
+spleen and one thymic lobe. The gap was never engineering, it was a licence, and
+it was closed by finding a source whose terms are published and checkable rather
+than by relaxing the rule. The nine unverifiable meshes stay rejected and stay on
+the record in [THIRD_PARTY_ASSETS.md](THIRD_PARTY_ASSETS.md).
+
+What is honestly still missing:
+
+- **No skeleton, no muscle, no vessels, no nerves.** Twelve organs is an organ
+  shelf, not a body. There is no way to see where any of them sits relative to
+  the others, because each mesh is loaded alone and the HRA's shared body-space
+  coordinates are not used to place them together.
+- **Three entries are a part, not the organ**, and each says so in its own title
+  and readout rather than in a footnote: `small_intestine.glb` is the ileum,
+  `thymus.glb` is the left lobe, `kidney.glb` is the left kidney.
+- **No anatomy pins on the organs.** The T-rex's pins bind to rig joints; these
+  meshes have no rig, so the pin machinery has nothing to attach to. The named
+  structures are in the knowledge panel as text instead of on the model.
+- **Two authored colours are diagram colours, not tissue colours** — the
+  gallbladder's pure green and the optic chiasm's highlighter yellow. Both are
+  desaturated at runtime to a tissue-plausible ceiling, hue preserved. That is a
+  correction applied to the source's own values, and it is recorded in
+  THIRD_PARTY_ASSETS.md rather than done quietly.
 
 ## Commercial terms are not stated anywhere
 
@@ -90,7 +128,7 @@ the page logged to `console.error`.
 
 Captured and looked at, at 1920 / 1512 / 1440 / 1366 / 1024 / 768 / 390: the
 hero, all three creature chapters, the product bridge, the workflow ribbon,
-YooStudio, all 26 Library experiences, Practice, Education, the sample lessons
+YooStudio, all 28 Library experiences, Practice, Education, the sample lessons
 and the CTA. No horizontal overflow at any width, no console errors on any shot.
 
 Two companions to the screenshots, because a picture is bad at proving a number:
@@ -138,7 +176,7 @@ report says `scrolls` rather than `CUT`:
 |---|---|---|
 | Product bridge | 700 px | The two states stack; the arrow turns vertical |
 | YooStudio | 700 px | Editor keeps its height, the section scrolls |
-| Practice & STEM | 1000 px | Workshop card and lab note stack |
+| Practice & STEM | 1180 px | Rail becomes a row of tabs above the stage; below 1000 the brief column moves under it |
 | Education | 1000 px | Role panel stacks under the switcher |
 | Sample lessons | 700 px | Four cards become one column |
 
@@ -146,7 +184,7 @@ Library, the hero, the three creature chapters and the CTA compose in one
 viewport at **every** tested size, 390 to 1920.
 
 The alternative for the four above would be shrinking the evidence — a 200 px
-product shot in Education, a thumbnail-sized car in Practice — to win an
+product shot in Education, a thumbnail-sized lab stage in Practice — to win an
 arithmetic argument. What each of them does instead is put its heading, its claim
 and the top of its primary visual in the first screen, and let the rest follow.
 That is a composition, not an overflow, and it is why the probe distinguishes the

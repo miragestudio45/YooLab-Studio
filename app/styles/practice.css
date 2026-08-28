@@ -1,0 +1,890 @@
+/* =============================================================== practice === */
+/*
+ * Thực hành & STEM — the three-lab hub.
+ *
+ * One composition, and it is the argument the section makes before a word is
+ * read: a large live stage, a brief welded to its right edge, and a narrow rail
+ * of three beside both. The previous build's `1.18fr 0.82fr` pair of cards was
+ * the right shape for one product and one absence; this is the shape for three
+ * products where only one can be looked at at a time.
+ *
+ * Everything vertical here is a `clamp` whose middle term is `vh`, for the
+ * reason the education section already learned: a flat padding value is correct
+ * on a 1080 display and wrong on a 1366×768 laptop, where the section's own
+ * heading plus a constant would push the stage's bottom edge off the screen.
+ */
+.practice {
+  --practice-head: clamp(96px, 14vh, 150px);
+  --stage-min: clamp(360px, calc(100svh - var(--practice-head) - 280px), 620px);
+  padding: calc(var(--header-h) + var(--section-gap)) 0 clamp(44px, 6.5vh, 88px);
+  scroll-margin-top: 0;
+  /* The lavender note in the section chain: ivory → a breath of lavender-ivory
+     → ivory. Four units of value; the point is that the eye never meets an
+     edge, not that anyone can name the colour. */
+  background: linear-gradient(180deg, var(--color-bg) 0%, #f7f2f4 48%, var(--color-bg) 100%);
+}
+
+.practice-head { min-height: var(--practice-head); }
+
+/*
+ * Stage plus rail. The stage takes roughly four fifths, which is the ratio at
+ * which a 3D panel stops reading as an illustration beside a menu and starts
+ * reading as the thing the section is about.
+ */
+.practice-hub {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(232px, 20.5%, 312px);
+  gap: clamp(14px, 1.5vw, 24px);
+  align-items: stretch;
+  margin-top: clamp(16px, 2.4vh, 34px);
+}
+
+/* The application: a running experience and what it is, inside one frame. */
+.practice-main {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1.78fr) minmax(258px, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.practice-stage {
+  position: relative;
+  min-width: 0;
+  min-height: var(--stage-min);
+  background: var(--color-surface-2);
+  transition: opacity 320ms var(--ease-reveal);
+}
+/* Held at zero while the outgoing lab is disposed and the incoming one asks for
+   its context. See the swap note in `PracticeSection`. */
+.practice-stage.is-swapping { opacity: 0; }
+
+/* ------------------------------------------------------------------ brief --- */
+
+.practice-brief {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  padding: clamp(20px, 2.8vh, 32px) clamp(20px, 1.9vw, 32px);
+  border-left: 1px solid var(--color-border-hair);
+  transition: opacity 320ms var(--ease-reveal);
+}
+.practice-brief.is-swapping { opacity: 0.32; }
+
+.practice-brief-index {
+  margin: 0 0 10px;
+  color: var(--color-accent-deep);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.practice-brief h3 {
+  margin: 0 0 10px;
+  font-family: var(--font-display);
+  font-size: clamp(20px, 1.55vw, 27px);
+  font-weight: 690;
+  letter-spacing: -0.036em;
+  line-height: 1.13;
+}
+
+.practice-brief-summary {
+  margin: 0;
+  color: var(--color-ink-2);
+  font-size: 13px;
+  line-height: 1.66;
+}
+
+/*
+ * Three capabilities, each a mark and two lines.
+ *
+ * The mark is what makes this a capability list rather than three more
+ * sentences: the eye finds "can I drive it" by the shape of the wheel beside it
+ * instead of by reading three labels in sequence. Same reasoning, same drawing
+ * hand and same 20-unit grid as the Library's readout table.
+ */
+.practice-capabilities {
+  margin: clamp(14px, 2.2vh, 24px) 0 0;
+  padding: clamp(14px, 2.2vh, 22px) 0 0;
+  border-top: 1px solid var(--color-border-hair);
+  list-style: none;
+}
+.practice-capabilities li {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: clamp(6px, 1vh, 10px) 0;
+}
+.practice-capabilities i {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  color: var(--color-accent-deep);
+  background: var(--color-accent-wash);
+  place-items: center;
+}
+.practice-capabilities svg { width: 18px; height: 18px; }
+.practice-capabilities b {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 660;
+  letter-spacing: -0.012em;
+}
+.practice-capabilities span {
+  display: block;
+  margin-top: 2px;
+  color: var(--color-muted);
+  font-size: 11.5px;
+  line-height: 1.48;
+}
+
+.practice-cta {
+  display: inline-flex;
+  min-height: 48px;
+  margin-top: clamp(14px, 2.4vh, 26px);
+  padding: 0 22px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border: 0;
+  border-radius: var(--radius-md);
+  color: #fff;
+  background: var(--color-accent-strong);
+  box-shadow: 0 12px 30px rgba(180, 88, 70, 0.26);
+  font-size: 13px;
+  font-weight: 640;
+  transition: transform 200ms ease, background-color 200ms ease;
+}
+.practice-cta span { font-size: 17px; line-height: 1; }
+.practice-cta:hover { background: var(--color-accent-deep); transform: translateY(-1px); }
+
+/* ------------------------------------------------------------------- rail --- */
+
+.practice-rail {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: clamp(8px, 1vh, 12px);
+}
+
+.practice-rail-item {
+  display: grid;
+  flex: 1 1 0;
+  min-height: 92px;
+  padding: clamp(12px, 1.6vh, 18px) clamp(12px, 1vw, 18px);
+  grid-template-columns: 56px minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  text-align: left;
+  transition: border-color 220ms ease, background-color 220ms ease, box-shadow 220ms ease;
+}
+.practice-rail-item:hover { background: var(--color-surface-raised); }
+/*
+ * Active gets the coral border and the raised surface. Nothing else changes —
+ * no scale, no shadow ramp, no second accent. One selected item in a list of
+ * three needs exactly one signal, and a rail where the inactive rows also
+ * shimmer is a rail with no selected row.
+ */
+.practice-rail-item.is-active {
+  border-color: var(--color-accent-line);
+  background: var(--color-surface-raised);
+  box-shadow: 0 10px 26px rgba(180, 88, 70, 0.09);
+}
+
+/*
+ * The tile is a drawn mark, not a photograph.
+ *
+ * Two of these three labs are built entirely from primitives at runtime, so
+ * there is no mesh to bake a thumbnail from and no render that would be the
+ * object rather than a picture of a guess. The Library's rule applies: a
+ * picture in a rail is either the thing itself or visibly a diagram of it. All
+ * three are diagrams, so all three read as one set.
+ */
+.practice-rail-item i {
+  display: grid;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-sm);
+  color: var(--color-muted);
+  background: linear-gradient(160deg, #fffdf9, #f2ebe0);
+  box-shadow: inset 0 0 0 1px var(--color-border-hair);
+  place-items: center;
+  transition: color 220ms ease;
+}
+.practice-rail-item i svg { width: 30px; height: 30px; }
+.practice-rail-item.is-active i { color: var(--color-accent-deep); }
+
+.practice-rail-item span { display: block; min-width: 0; }
+.practice-rail-item b {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--color-muted-2);
+  font-size: 11px;
+  font-weight: 680;
+  letter-spacing: 0.05em;
+}
+.practice-rail-item.is-active b { color: var(--color-accent-deep); }
+.practice-rail-item em {
+  display: block;
+  color: var(--color-ink);
+  font-size: 12.5px;
+  font-style: normal;
+  font-weight: 620;
+  letter-spacing: -0.018em;
+  line-height: 1.34;
+}
+
+.practice-rail-note {
+  display: flex;
+  margin: 0;
+  padding: 11px 14px;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid var(--color-border-hair);
+  border-radius: var(--radius-md);
+  color: var(--color-muted);
+  font-size: 11.5px;
+}
+.practice-rail-note svg { width: 15px; height: 15px; flex: 0 0 auto; color: var(--color-accent-deep); }
+
+/* --------------------------------------------------------------- benefits --- */
+/*
+ * Deliberately secondary: no card, no surface, one hairline above it. These are
+ * four claims about the section that has just been demonstrated, and a claim
+ * given the same visual weight as the thing it describes stops being a caption
+ * and starts competing.
+ */
+.practice-benefits {
+  display: grid;
+  margin: clamp(16px, 2.4vh, 30px) 0 0;
+  padding: clamp(16px, 2.2vh, 26px) 0 0;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(14px, 2vw, 34px);
+  border-top: 1px solid var(--color-border-hair);
+  list-style: none;
+}
+.practice-benefits li {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+.practice-benefits i {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  color: var(--color-accent-deep);
+  place-items: center;
+}
+.practice-benefits svg { width: 20px; height: 20px; }
+.practice-benefits b {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 650;
+  letter-spacing: -0.012em;
+}
+.practice-benefits span {
+  display: block;
+  margin-top: 2px;
+  color: var(--color-muted);
+  font-size: 11.5px;
+  line-height: 1.46;
+}
+
+/* ==================================================================== lab === */
+/*
+ * The chrome over a running lab. One implementation, three labs — see
+ * `LabChrome.tsx` for why the composition is fixed.
+ *
+ * Every element here is `pointer-events: none` unless it is a control, because
+ * the whole frame is a drag surface: an invisible box over the stage that eats
+ * a pointer-down is the most annoying bug a 3D viewer can have, and it is
+ * invisible in a screenshot.
+ */
+.lab {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  color: var(--color-ink);
+  touch-action: none;
+}
+.lab:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -3px; }
+.lab[data-grabbing='true'] { cursor: grabbing; }
+.lab-view { position: absolute; inset: 0; }
+.lab canvas { display: block; }
+
+.lab-status {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  margin: 0;
+  padding: 10px 18px;
+  align-items: center;
+  gap: 10px;
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  color: var(--color-muted);
+  background: rgba(255, 253, 249, 0.9);
+  box-shadow: var(--shadow-card);
+  font-size: 12px;
+}
+.lab-status i {
+  width: 13px;
+  height: 13px;
+  border: 2px solid var(--color-accent-soft);
+  border-top-color: var(--color-accent-strong);
+  border-radius: 50%;
+  animation: lab-spin 760ms linear infinite;
+}
+.lab-status.is-error { color: var(--color-accent-deep); }
+.lab-status.is-error i { border-color: var(--color-accent-line); animation: none; }
+
+@keyframes lab-spin { to { transform: rotate(360deg); } }
+
+/* ------------------------------------------------------------------ badge --- */
+
+.lab-badge {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  display: flex;
+  margin: 0;
+  padding: 6px 12px;
+  align-items: center;
+  gap: 7px;
+  border-radius: 999px;
+  color: var(--color-muted);
+  background: rgba(255, 253, 249, 0.86);
+  box-shadow: inset 0 0 0 1px var(--color-border-hair);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  font-size: 9.5px;
+  font-weight: 680;
+  letter-spacing: 0.09em;
+  pointer-events: none;
+  text-transform: uppercase;
+}
+.lab-badge i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-muted-2);
+}
+.lab-badge.is-live { color: #2f5f33; }
+.lab-badge.is-live i {
+  background: var(--color-sage);
+  animation: lab-pulse 2s ease-in-out infinite;
+}
+
+@keyframes lab-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+/* ------------------------------------------------------------------ steps --- */
+
+.lab-steps {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: flex;
+  max-width: calc(100% - 190px);
+  margin: 0;
+  padding: 5px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 3px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 253, 249, 0.86);
+  box-shadow: inset 0 0 0 1px var(--color-border-hair);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  list-style: none;
+  pointer-events: none;
+}
+.lab-steps li { display: flex; }
+/* The chip is a `p` in the two labs whose steps are a state machine and a
+   `button` in the one whose steps are three views of the same model. Both get
+   the same box; only the button takes the pointer back from the strip. */
+.lab-step {
+  display: flex;
+  margin: 0;
+  padding: 5px 9px;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  border-radius: var(--radius-xs);
+  color: var(--color-muted-2);
+  background: transparent;
+  font-size: 10.5px;
+  font-weight: 600;
+  transition: color 240ms ease, background-color 240ms ease;
+}
+button.lab-step { pointer-events: auto; }
+button.lab-step:hover { color: var(--color-ink-2); background: rgba(117, 91, 70, 0.06); }
+button.lab-step.is-current:hover { color: var(--color-accent-deep); background: var(--color-accent-wash); }
+.lab-step b {
+  display: grid;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: rgba(117, 91, 70, 0.09);
+  place-items: center;
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+.lab-step b svg { width: 11px; height: 11px; }
+.lab-step.is-done { color: #2f5f33; }
+.lab-step.is-done b { color: #fff; background: var(--color-sage); }
+.lab-step.is-current {
+  color: var(--color-accent-deep);
+  background: var(--color-accent-wash);
+}
+.lab-step.is-current b { color: #fff; background: var(--color-accent-strong); }
+
+/* ------------------------------------------------------- brief and hint --- */
+
+.lab-brief {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  max-width: min(44ch, calc(100% - 330px));
+  pointer-events: none;
+}
+.lab-objective {
+  margin: 0;
+  padding: 9px 14px;
+  border-radius: var(--radius-md);
+  color: var(--color-ink);
+  background: rgba(255, 253, 249, 0.9);
+  box-shadow: inset 0 0 0 1px var(--color-border-hair), var(--shadow-card);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  font-size: 12.5px;
+  font-weight: 560;
+  line-height: 1.5;
+}
+/*
+ * The tint is the whole signal — there is no accent rule down its edge.
+ *
+ * A 2 px lavender bar on the left was doing nothing the colour was not already
+ * doing: the objective above it is near-white and this is lavender, which is
+ * the same two-tone convention the Library's knowledge panel uses for its notes.
+ * A stripe on top of that is a second marker for one distinction. What the block
+ * did need was more opacity: at 0.42 over a blurred 3D scene it went thin
+ * wherever the car's black bodywork was behind it.
+ */
+.lab-hint {
+  margin: 7px 0 0;
+  padding: 9px 14px;
+  border-radius: var(--radius-xs);
+  color: var(--color-ink-2);
+  background: rgba(221, 210, 242, 0.74);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  font-size: 11.5px;
+  line-height: 1.55;
+}
+
+/* ---------------------------------------------------------------- actions --- */
+
+.lab-actions {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.lab-button {
+  display: inline-flex;
+  min-height: 38px;
+  padding: 0 14px;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--color-ink-2);
+  background: rgba(255, 253, 249, 0.92);
+  box-shadow: inset 0 0 0 1px var(--color-border-hair), var(--shadow-card);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  font-size: 11.5px;
+  font-weight: 620;
+  transition: color 200ms ease, background-color 200ms ease;
+}
+.lab-button svg { width: 15px; height: 15px; }
+.lab-button:hover { color: var(--color-ink); background: var(--color-surface-raised); }
+.lab-button.is-active { color: var(--color-lavender); }
+.lab-button.is-primary {
+  color: #fff;
+  background: var(--color-accent-strong);
+  box-shadow: 0 10px 24px rgba(180, 88, 70, 0.26);
+}
+.lab-button.is-primary:hover { background: var(--color-accent-deep); }
+.lab-button:disabled { opacity: 0.55; cursor: default; }
+
+/* ---------------------------------------------------------------- readout --- */
+
+/*
+ * Above the actions, on the right.
+ *
+ * It has been in two wrong places already, and both were the same mistake:
+ * every other edge of this frame is spoken for. Bottom centre collided with the
+ * objective line, which is a sentence that wants forty characters where the
+ * readout is a pill that wants two hundred pixels. Top centre collided with the
+ * step strip, which grows a chip for every beat a lab has. The gap between the
+ * step strip and the action row is the one band nothing else claims.
+ */
+.lab-readout {
+  position: absolute;
+  right: 16px;
+  bottom: 62px;
+  display: flex;
+  padding: 7px 14px;
+  align-items: baseline;
+  gap: 5px;
+  border-radius: 999px;
+  color: var(--color-muted);
+  background: rgba(255, 253, 249, 0.9);
+  box-shadow: inset 0 0 0 1px var(--color-border-hair);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  font-size: 10.5px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.lab-readout b { color: var(--color-ink); font-size: 14px; font-weight: 680; letter-spacing: -0.02em; }
+.lab-readout b.is-ok { color: #2f5f33; font-size: 11.5px; }
+.lab-readout i { width: 1px; height: 12px; margin: 0 5px; background: var(--color-border); }
+
+/* ------------------------------------------------------------------ flash --- */
+
+.lab-flash {
+  position: absolute;
+  top: 62px;
+  left: 50%;
+  display: flex;
+  margin: 0;
+  padding: 9px 16px;
+  align-items: center;
+  gap: 8px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 620;
+  pointer-events: none;
+  animation: lab-flash 2.8s var(--ease-reveal) forwards;
+}
+.lab-flash svg { width: 16px; height: 16px; }
+.lab-flash--success { color: #2f5f33; background: rgba(214, 232, 210, 0.94); }
+.lab-flash--warn { color: var(--color-accent-deep); background: rgba(249, 217, 205, 0.94); }
+
+@keyframes lab-flash {
+  0% { opacity: 0; transform: translate(-50%, -8px); }
+  10%, 78% { opacity: 1; transform: translate(-50%, 0); }
+  100% { opacity: 0; transform: translate(-50%, -6px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lab-flash { animation: lab-flash-static 2.8s steps(1) forwards; }
+  .lab-badge.is-live i { animation: none; }
+  @keyframes lab-flash-static {
+    0%, 88% { opacity: 1; transform: translateX(-50%); }
+    100% { opacity: 0; transform: translateX(-50%); }
+  }
+}
+
+/* --------------------------------------------------------------- key legend --- */
+/*
+ * The keyboard, drawn.
+ *
+ * The brief for this section asks for the controls to be shown on screen, and
+ * this is why: a lab whose only statement of its controls is a sentence in the
+ * objective line has told the student once, in prose, at the moment they were
+ * reading something else. Three rows of keycaps are readable at a glance and
+ * stay readable while both hands are busy.
+ */
+.lab-keys {
+  position: absolute;
+  top: 62px;
+  left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  pointer-events: none;
+}
+.lab-keys p {
+  display: flex;
+  margin: 0;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-muted);
+  font-size: 10px;
+}
+.lab-keys kbd {
+  display: grid;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 4px;
+  border-radius: 5px;
+  color: var(--color-ink-2);
+  background: rgba(255, 253, 249, 0.92);
+  box-shadow: inset 0 0 0 1px var(--color-border-hair), 0 1px 0 rgba(117, 91, 70, 0.12);
+  place-items: center;
+  font-family: inherit;
+  font-size: 9.5px;
+  font-weight: 660;
+}
+.lab-keys span { margin-left: 4px; }
+
+/* ------------------------------------------------------------------- pads --- */
+/*
+ * Hidden on pointer-fine devices, and the only control surface on a phone.
+ * `onPointerDown`/`onPointerUp` rather than click, because holding is the
+ * gesture — see `LabPad`.
+ */
+.lab-pad {
+  position: absolute;
+  bottom: 74px;
+  left: 16px;
+  display: none;
+  grid-template-areas:
+    '. up .'
+    'left . right'
+    '. down .';
+  gap: 5px;
+}
+.lab-pad--lift {
+  right: 16px;
+  left: auto;
+  grid-template-areas: 'up' 'down';
+}
+.lab-pad button {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  border: 0;
+  border-radius: 50%;
+  color: var(--color-ink-2);
+  background: rgba(255, 253, 249, 0.92);
+  box-shadow: inset 0 0 0 1px var(--color-border-hair), var(--shadow-card);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  place-items: center;
+  font-size: 17px;
+  line-height: 1;
+  touch-action: none;
+}
+.lab-pad button:active { color: #fff; background: var(--color-accent-strong); }
+
+/*
+ * Two triggers, not one.
+ *
+ * `pointer: coarse` is the correct test and it is not a sufficient one: a
+ * narrow window on a laptop has no room for a legend *or* for the corner it
+ * would sit in, and a device-emulated capture does not always report a coarse
+ * pointer at all — which is how a mobile screenshot ended up with the keycap
+ * legend printed straight across the step strip. Either condition now switches
+ * the lab to pads. The keyboard still works wherever there is one; it just
+ * stops being advertised where it cannot be shown.
+ */
+@media (pointer: coarse), (max-width: 700px) {
+  .lab-pad { display: grid; }
+  .lab-keys { display: none; }
+}
+
+/* --------------------------------------------------------------- advanced --- */
+/*
+ * Six raw joint sliders, behind a disclosure.
+ *
+ * They are a truthful interface to a six-axis arm and a useless one to a
+ * beginner: nobody forms the intention "put the gripper over the blue box" in
+ * joint space. They earn their place the moment a student has driven the tool
+ * around for a minute and starts wondering what is actually moving — which is
+ * why this control does not exist until step 02.
+ */
+.lab-advanced {
+  position: absolute;
+  /* Bottom-anchored, stacked above the readout — which is itself above the
+     action row. Anchoring it from the top instead left `top` and `bottom` both
+     set on a flex column, which stretches the box between them and parks the
+     disclosure button against the step strip. */
+  right: 16px;
+  bottom: 106px;
+  display: flex;
+  max-width: 244px;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 7px;
+}
+.lab-advanced > button {
+  display: inline-flex;
+  min-height: 32px;
+  padding: 0 12px;
+  align-items: center;
+  gap: 7px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--color-muted);
+  background: rgba(255, 253, 249, 0.9);
+  box-shadow: inset 0 0 0 1px var(--color-border-hair);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  font-size: 10.5px;
+  font-weight: 620;
+}
+.lab-advanced > button svg { width: 14px; height: 14px; }
+.lab-advanced.is-open > button { color: var(--color-accent-deep); background: var(--color-surface-raised); }
+
+.lab-joints {
+  width: 244px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 253, 249, 0.94);
+  box-shadow: inset 0 0 0 1px var(--color-border-hair), var(--shadow-card);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.lab-joints label {
+  display: grid;
+  grid-template-columns: 62px minmax(0, 1fr) 32px;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+  color: var(--color-muted);
+  font-size: 9.5px;
+}
+.lab-joints b { color: var(--color-ink-2); font-size: 10px; font-weight: 660; text-align: right; }
+.lab-joints input[type='range'] {
+  width: 100%;
+  height: 3px;
+  margin: 0;
+  border-radius: 2px;
+  background: var(--color-border);
+  appearance: none;
+  -webkit-appearance: none;
+}
+.lab-joints input[type='range']::-webkit-slider-thumb {
+  width: 13px;
+  height: 13px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--color-accent-strong);
+  appearance: none;
+  -webkit-appearance: none;
+}
+.lab-joints input[type='range']::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--color-accent-strong);
+}
+
+/* ============================================================ responsive === */
+
+/*
+ * The rail turns into a row of tabs before anything else changes.
+ *
+ * At 1180 the rail is under 230 px and its two-line titles start wrapping to
+ * three, which pushes the stage's minimum height into the fold. A horizontal
+ * strip above the stage costs 78 px of height and gives the stage back the full
+ * width, which is the trade that keeps the 3D readable on a laptop.
+ */
+@media (max-width: 1180px) {
+  .practice-hub { grid-template-columns: minmax(0, 1fr); }
+  .practice-rail {
+    display: grid;
+    order: -1;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .practice-rail-item { min-height: 72px; grid-template-columns: 44px minmax(0, 1fr); }
+  .practice-rail-item i { width: 44px; height: 44px; }
+  .practice-rail-item i svg { width: 24px; height: 24px; }
+  .practice-rail-note { grid-column: 1 / -1; justify-content: center; }
+}
+
+@media (max-width: 1000px) {
+  .practice-main { grid-template-columns: minmax(0, 1fr); }
+  .practice-stage { min-height: clamp(340px, 46svh, 480px); }
+  .practice-brief { border-top: 1px solid var(--color-border-hair); border-left: 0; }
+  .practice-benefits { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: clamp(14px, 2.4vh, 22px); }
+  /*
+   * The bottom edge stops being shared.
+   *
+   * On a wide stage the objective sits left and the actions sit right with
+   * three hundred pixels between them. Below a thousand there is no such gap:
+   * at 768 the sentence ran straight under the "Đóng kẹp" button. So the
+   * objective takes the full width on its own row and everything else stacks
+   * around it — actions under it on the right, readout under it on the left.
+   */
+  .lab-steps { max-width: calc(100% - 170px); }
+  .lab-brief { right: 14px; left: 14px; bottom: 58px; max-width: none; }
+  .lab-actions { right: 14px; bottom: 12px; }
+  .lab-readout { right: auto; bottom: 14px; left: 14px; }
+  .lab-advanced { right: 14px; bottom: 104px; }
+}
+
+@media (max-width: 700px) {
+  .practice-rail { grid-template-columns: minmax(0, 1fr); }
+  .practice-rail-item { min-height: 62px; }
+  .practice-benefits { grid-template-columns: minmax(0, 1fr); }
+  .practice-brief { padding: 20px; }
+
+  /*
+   * The phone layout for a live lab.
+   *
+   * Everything that floated in a corner of a 900 px stage stacks instead: the
+   * steps become a scrollable strip under the badge, the objective sits at the
+   * bottom above the pads, and the readout moves out of the pads' way. The
+   * controls stay at 46 px because a control that is hard to hit is a control
+   * that teaches nothing.
+   */
+  .practice-stage { min-height: clamp(320px, 52svh, 440px); }
+  .lab-steps {
+    top: 58px;
+    right: 12px;
+    left: 12px;
+    max-width: none;
+    justify-content: flex-start;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+  }
+  .lab-step span { white-space: nowrap; }
+  .lab-badge { top: 12px; left: 12px; }
+  .lab-brief { right: 12px; bottom: 12px; left: 12px; max-width: none; }
+  .lab-objective { font-size: 12px; }
+  .lab-actions { top: 12px; right: 12px; bottom: auto; }
+  .lab-button span { display: none; }
+  .lab-button { min-width: 38px; padding: 0 11px; }
+  .lab-button.is-primary span { display: inline; }
+  .lab-readout { top: 100px; right: auto; bottom: auto; left: 12px; }
+  .lab-pad { bottom: 96px; left: 12px; }
+  .lab-pad--lift { right: 12px; left: auto; }
+  /*
+   * No advanced mode on a phone.
+   *
+   * It is the one control in this section that is genuinely optional — six
+   * joint sliders for a student who has already driven the tool around and
+   * started wondering what moves — and on a 390 px stage it has nowhere to go
+   * that is not already a D-pad. Progressive disclosure has to be allowed to
+   * end at "not here". The Cartesian controls, which are the lesson, are
+   * untouched.
+   */
+  .lab-advanced { display: none; }
+  .lab-joints { width: min(244px, calc(100vw - 40px)); }
+}

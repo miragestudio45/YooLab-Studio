@@ -23,6 +23,34 @@ Provenance research and the reasoning behind each decision is in
 | Modification | Renamed from `bacteria-wall-nih.glb`. Geometry untouched. The file carries no materials, so YooLab's `tissue` preset is applied at runtime in `ModelStage.tsx`. |
 | Required attribution | The entry's `attributionInstructions` field asks for "A.C. Vinal, Wake Technical Community College". Carried in `app/lib/library/manifest.ts` (`credits`) and displayed to users in the Library's "Nguồn & giấy phép" panel. |
 
+### `public/asset/T-rex/T-rex.glb`
+
+| | |
+| --- | --- |
+| Name | Animated Tyrannosaurus Rex Dinosaur Running Loop |
+| Author | **LasquetiSpice** ([sketchfab.com/LasquetiSpice](https://sketchfab.com/LasquetiSpice)) |
+| Licence | **CC BY 4.0** — <http://creativecommons.org/licenses/by/4.0/> |
+| Origin | [Sketchfab](https://sketchfab.com/3d-models/animated-tyrannosaurus-rex-dinosaur-running-loop-38007d947ae74dea83988cb0b08ee053) |
+| Verified how | The file carries its own provenance: `asset.extras` in the GLB declares `author`, `license`, `source` and `title`, written by `glTF-Transform v4.3.0`. Nothing here was inferred from a page title. |
+| Modification | None to the geometry, the rig or the five clips (`run`, `bite`, `roar`, `attack_tail`, `idle`). Two runtime adaptations, neither written back to the file: `ModelStage` maps the asset's `KHR_materials_pbrSpecularGlossiness` material onto metallic-roughness (three.js dropped that extension in r155, and without the mapping the hand-painted skin does not load at all), and it flattens the `bn_Spine` position track so the animal performs in place instead of walking out of the viewer. |
+| Required attribution | CC BY 4.0 requires author, licence and source. All three are carried in `app/lib/library/subjects/biology.ts` (`credits` on the `trex` entry) and displayed to users under "Nguồn & giấy phép" in the Library's knowledge panel. |
+
+### `public/asset/Library/Biology/anatomy/*.glb` — 12 human organs
+
+| | |
+| --- | --- |
+| Name | Human Reference Atlas 3D Reference Object Library — Visible Human Male reference objects, release **v1.2** |
+| Files | `heart`, `lungs`, `brain`, `eye`, `liver`, `gallbladder`, `pancreas`, `small_intestine`, `intestine`, `kidney`, `spleen`, `thymus` — 6.4 MB total |
+| Authors | Heidi Schlehlein, Bruce W. Herr II, Ellen M. Quardokus, Andreas Bueckle, Katy Börner |
+| Publisher | Human BioMolecular Atlas Program (**HuBMAP**) |
+| Licence | **CC BY 4.0** — <https://creativecommons.org/licenses/by/4.0/> |
+| Origin | [humanatlas.io/3d-reference-library](https://humanatlas.io/3d-reference-library) |
+| Obtained via | [`HongChao6/open-anatomy-studio`](https://github.com/HongChao6/open-anatomy-studio) (MIT code, commit `8c0e6f3`… `origin/HEAD` at retrieval), whose own `THIRD_PARTY_ASSETS.md` records the HRA origin, the v1.2 release, the CC BY 4.0 terms, the Meshopt optimisation step and the intermediary it came through ([`tejasghalsasi/anatomy-atelier@1da7761`](https://github.com/tejasghalsasi/anatomy-atelier/tree/1da776126a81dd803fd12d22e6723522db3bb3b5/public/models)) |
+| Verified how | The upstream record publishes SHA-256 checksums for three of the twelve files. All three were recomputed against the bytes actually committed here and **match**: `gallbladder.glb` `0d3fa986…dc9da3`, `small_intestine.glb` `2a96d7d5…e094df`, `thymus.glb` `5b355875…66d448`. So the provenance record describes these exact files, not a similar set. |
+| Modification | **None to any geometry, and nothing written back to any file.** The twelve GLBs are redistributed byte-identical to the intermediary's Meshopt-compressed versions, and filenames are kept exactly as that intermediary set them rather than renamed to the Vietnamese titles, so the published checksums keep pointing at the right files. Everything below is a **runtime** adaptation in `ModelStage`'s `organ` preset, applied to the loaded materials only: (1) every file requires `EXT_meshopt_compression` and `KHR_mesh_quantization`, which the shared loader already registers; (2) each material is re-made as physical to add a wet specular sheen while keeping the mesh's own anatomical `baseColorFactor`, its `map` and its `COLOR_0` vertex colours — the heart, lungs, thymus and eye carry their colour in that attribute rather than in the factor, and the eye carries it *only* there plus a shared palette atlas; (3) two meshes that are closed opaque envelopes around the parts the model exists to show — `VH_M_kidney_capsule_L` and `VH_M_sclera_L` — are rendered translucent, which is disclosed in both entries' own on-screen description; (4) a chroma ceiling is applied so no surface exceeds a tissue-plausible saturation. Ten of the twelve are unaffected. It moves exactly two authored values, both of which are diagram colours rather than tissue colours: `Gall_Mat` is `rgb(0,136,0)` — pure green with the red and blue channels at zero — and the `retina` material inside `brain.glb` is a highlighter yellow. Hue is preserved in both; only the saturation comes down. |
+| Required attribution | CC BY 4.0 requires author, licence and source. All three are carried in `app/lib/library/subjects/human-body.ts` (`HRA_CREDIT`, one block shared by all twelve entries) and displayed to users under "Nguồn & giấy phép" in the Library's knowledge panel. |
+| Scope disclosure | Three titles deliberately do **not** name a whole organ, because three of the meshes are not one. Upstream records that `small_intestine.glb` contains `VH_M_ileum` and `thymus.glb` contains `VH_M_thymus_lobe_L`, so the Library calls them **"Hồi tràng"** and **"Thùy tuyến ức trái"**, and both say so in their own `subtitle`, `description` and readout. `kidney.glb` is the left kidney and is titled "Thận" with the side named in its subtitle. A teaching model that overstates what it shows is worse than no model. |
+
 ### Models **not** shipped, and why
 
 Two further NIH meshes were available through the same repository and were
@@ -35,6 +63,33 @@ rejected after checking their licences:
 
 They are recorded here so nobody re-adds them later believing the MIT licence of
 the surrounding repository covered them. It does not.
+
+Nine further meshes were rejected in the 2026-08-28 pass, from
+`reference-sources/anatomy/public/models/` — `heart`, `brain`, `lungs`, `liver`,
+`kidneys`, `eyeball`, `intestine`, `pancreas`, `skin`, plus the painted
+illustration set in `public/anatomy/*/`:
+
+| Model set | Licence | Decision |
+| --- | --- | --- |
+| 9 human organ GLBs + 45 organ illustrations | **None findable** | Rejected — unverifiable |
+
+The reason is that there is nothing to verify against. The surrounding repository
+declares no licence, its README is an unmodified `vinext-starter`, it ships no
+`THIRD_PARTY` file, and unlike the T-rex above **none of the nine GLBs carries any
+`asset.extras`** — every one reports only `{"generator":"glTF-Transform v4.4.2"}`.
+So the author is unknown, the origin is unknown, and the commercial-use rights are
+unknown, which is exactly the condition PRODUCT.md forbids shipping under.
+
+**Resolved, and not by relaxing the rule.** The organs were the obvious next
+expansion of the biology shelf, and this row was written asking whoever supplied
+that repository to name the source of those nine files. The answer was better than
+that: a different repository, carrying the **Human Reference Atlas** set under a
+licence that is published, specific and checkable — recorded above, and now
+shipping as twelve entries. The nine unverifiable files stay rejected and stay on
+this list, because the reason they were rejected has not changed and the next
+person to find them sitting in `reference-sources/` should read this before
+reaching for them. `app/lib/library/subjects/human-body.ts` repeats the reasoning
+at the point where somebody would be tempted.
 
 ---
 
@@ -103,7 +158,10 @@ the surrounding repository covered them. It does not.
 | [CloudyLo001 / mintdotgg periodic table](https://github.com/mintdotgg/mint-playground) | MIT | **No code copied.** Studied as an architectural reference for the periodic-table experience; YooLab's implementation is a rewrite. Credited because the element dataset was obtained through it and because the experience design informed ours. |
 | [IlliniOpenEdu/PhysicsSims](https://github.com/IlliniOpenEdu/PhysicsSims) | MIT | **No code copied.** Studied for simulation-module architecture. `ProjectileLab.tsx` is a YooLab implementation. |
 | [yuryuri/cell-architecture-studio](https://github.com/yuryuri/cell-architecture-studio) | MIT | **No code copied.** Studied for specimen/organelle information architecture; supplied the public-domain GLB above. |
-| [thebuggeddev/anatomy](https://github.com/thebuggeddev/anatomy) | **No licence declared** | **Nothing taken** — no code, no CSS, no fonts, no models. Visual and UX architecture reference only. |
+| [HongChao6/open-anatomy-studio](https://github.com/HongChao6/open-anatomy-studio) | MIT | **No code copied.** The intermediary the twelve Human Reference Atlas organ meshes were obtained through, and the reason their provenance is checkable: its own `THIRD_PARTY_ASSETS.md` records the HRA release, the CC BY 4.0 terms, the Meshopt step and the SHA-256 checksums that were recomputed here. The meshes are HuBMAP’s under CC BY 4.0, not this repository’s under MIT — credited above accordingly. |
+| [mintdotgg/mint-playground — `quadrotor-sandbox`](https://github.com/mintdotgg/mint-playground/tree/main/experiences/quadrotor-sandbox) | MIT | **Code adapted, no assets taken.** The flight core in `app/lib/drone/flight.ts` is derived from this experience: the six-degree-of-freedom rigid-body integrator, the first-order motor lag, the control-allocation mixer, the derivative-on-measurement PID with conditional integration, the cascaded position→velocity→attitude→rate controller, the seeded sinusoidal wind model and the sink-rate landing grades. Its own upstream is [`CloudyLo001/quadrotorsim`](https://github.com/CloudyLo001/quadrotorsim) at `a6f968c`, whose `UPSTREAM.md` records that the developer approved publication of the Playground adaptation under that mirror's MIT licence. YooLab's copy retunes the airframe to a lighter trainer, drops acro and stabilized modes, drops Rapier, and replaces the release-position hold with a brake-to-stop anchor. **None of its art was used**: the sandbox's aircraft, city, props, audio and panorama load from Mint CDN artifacts under terms this project has not verified, so the quadrotor in `app/lib/drone/rig.ts` is built from Three.js primitives instead. |
+| [Open-Industry-Project](https://github.com/Open-Industry-Project/Open-Industry-Project) | MIT | **No code copied, no assets taken.** A Godot warehouse simulator, studied as the engineering reference for `app/lib/robot/cell.ts`: the six-axis joint layout (base yaw, shoulder, elbow, forearm roll, wrist pitch, tool roll), the ±180/±135/±160/±180/±120/±360 degree joint-limit table, shortest-path joint interpolation, and the teach-a-waypoint-then-replay model of automation that the lab's fifth step is built on. Everything here is re-authored in Three.js — the arm, the conveyor, the trays and the workpieces are all primitives generated at runtime, and the analytic three-link IK replaces its iterative CCD solver. Its OPC-UA / EtherNet/IP / Modbus stack is deliberately not modelled. |
+| [thebuggeddev/anatomy](https://github.com/thebuggeddev/anatomy) | **No licence declared** | **Nothing taken** — no code, no CSS, no fonts, no models, no prose. Visual and UX architecture reference only: what a specimen readout is *made of* (a measured table led by per-row marks, a scientific note and a curiosity note in two tints, a list of real-world links), which are categories rather than content. Every sentence in YooLab's panels is written here, about specimens this repository ships. Its nine organ GLBs were **rejected** — see "Models **not** shipped, and why" above. |
 
 ## Fonts
 
@@ -121,6 +179,12 @@ no third-party terms:
 - `public/asset/bee/*`, `public/asset/fish/*`, `public/asset/Library/Car/*` — the
   bee, clownfish, jellyfish, Formula car, sprue and the eight-piece toolkit,
   including all their textures.
+- The quadrotor airframe in `app/lib/drone/rig.ts` and its four-gate course —
+  every mesh a Three.js primitive generated at runtime, positioned from the
+  flight model's own rotor table. No drone mesh file exists in this repository
+  and none was downloaded; see the `quadrotor-sandbox` row above for why.
+- The six-axis robot cell in `app/lib/robot/cell.ts` — arm, gripper, conveyor,
+  trays, workpieces, floor markings and stack light, all procedural.
 - The procedural animal cell in `CellStudio.tsx` — every organelle generated from
   Three.js primitives at runtime; no mesh file involved.
 - The globe engine in `GlobeExplorer.tsx`, which renders the public-domain

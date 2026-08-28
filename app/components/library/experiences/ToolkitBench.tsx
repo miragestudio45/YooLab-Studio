@@ -59,7 +59,7 @@ const GROUPS: Group[] = [
         preset: 'plastic',
         // A metre of straight edge is the least interesting silhouette in the
         // set seen end-on, so it is turned onto a diagonal across the frame.
-        framing: { yaw: 0.85, pitch: 0.52, fill: 0.92, roll: 0.62 },
+        framing: { yaw: 0.85, pitch: 0.44, fill: 0.84, orient: [0, 0, Math.PI / 2] as [number, number, number] },
         use: 'Đo chiều dài và kẻ đường thẳng khi đánh dấu chi tiết.',
         note:
           'Đặt vạch 0 trùng mép cần đo, không đặt mép thước — mép thước thường dày hơn vạch 0 nên đo từ mép luôn dài hơn thực tế.',
@@ -70,7 +70,7 @@ const GROUPS: Group[] = [
         alias: 'Pencil',
         url: '/asset/Library/Car/pencil.glb',
         preset: 'natural',
-        framing: { yaw: 1.1, pitch: 0.42, fill: 0.9, roll: 0.58 },
+        framing: { yaw: 0.42, pitch: 0.34, fill: 0.8, orient: [0, 0, Math.PI / 2] as [number, number, number] },
         use: 'Đánh dấu vị trí cắt, khoan và dán trước khi thao tác.',
         note:
           'Dấu bút chì xoá được nên mọi phép đo đều đánh bằng bút chì trước. Nét càng mảnh thì sai số khi cắt theo dấu càng nhỏ.',
@@ -81,7 +81,7 @@ const GROUPS: Group[] = [
         alias: 'Eraser',
         url: '/asset/Library/Car/eraser.glb',
         preset: 'rubber',
-        framing: { yaw: 0.7, pitch: 0.34, fill: 0.82 },
+        framing: { yaw: 0.62, pitch: 0.32, fill: 0.76 },
         use: 'Xoá dấu bút chì sau khi đã cắt hoặc lắp xong.',
         note:
           'Dụng cụ hoàn thiện, không phải dụng cụ sửa sai: dấu bút chì còn lại trên chi tiết sẽ hiện rõ dưới lớp sơn.',
@@ -99,7 +99,7 @@ const GROUPS: Group[] = [
         alias: 'Scissors',
         url: '/asset/Library/Car/scissor.glb',
         preset: 'steel',
-        framing: { yaw: 0.95, pitch: 0.46, fill: 0.92 },
+        framing: { yaw: 0.95, pitch: 0.38, fill: 0.84, orient: [0, 0, Math.PI / 2] as [number, number, number] },
         use: 'Cắt giấy, decal và các chi tiết mỏng.',
         note:
           'Cắt bằng phần gần trục kéo cho lực lớn nhất; phần mũi chỉ dùng để tỉa những đoạn ngắn cần chính xác.',
@@ -111,7 +111,7 @@ const GROUPS: Group[] = [
         alias: 'Box cutter',
         url: '/asset/Library/Car/boxCutter.glb',
         preset: 'steel',
-        framing: { yaw: 1.15, pitch: 0.4, fill: 0.92, roll: 0.3 },
+        framing: { yaw: 0.45, pitch: 0.38, fill: 0.8 },
         use: 'Rọc mép chi tiết nhựa và gọt phần bavia còn sót.',
         note:
           'Rọc nhiều lượt nhẹ thay vì một lượt mạnh. Một lượt mạnh làm nhựa nứt theo thớ, và vết nứt đó không sửa được.',
@@ -123,7 +123,7 @@ const GROUPS: Group[] = [
         alias: 'Cutting mat',
         url: '/asset/Library/Car/cuttingMatt.glb',
         preset: 'rubber',
-        framing: { yaw: 0.6, pitch: 0.62, fill: 0.94 },
+        framing: { yaw: 0.6, pitch: 0.44, fill: 0.82 },
         use: 'Mặt nền tự liền vết, bảo vệ bàn và giữ lưỡi dao bền.',
         note:
           'Lớp giữa của thảm mềm hơn hai mặt ngoài nên vết dao khép lại sau mỗi lần cắt. Cắt trực tiếp trên mặt bàn cứng sẽ làm lưỡi dao cùn rất nhanh.',
@@ -141,7 +141,7 @@ const GROUPS: Group[] = [
         alias: 'Screwdriver',
         url: '/asset/Library/Car/screwdriver.glb',
         preset: 'steel',
-        framing: { yaw: 1.15, pitch: 0.42, fill: 0.92, roll: 0.45 },
+        framing: { yaw: 0.48, pitch: 0.34, fill: 0.8, orient: [0, 0, Math.PI / 2] as [number, number, number] },
         use: 'Siết và tháo vít khi ghép các khối của mô hình.',
         note:
           'Đầu vít phải khớp đúng rãnh. Đầu nhỏ hơn rãnh sẽ trượt và làm tròn rãnh vít — sau đó không còn dụng cụ nào tháo được con vít đó.',
@@ -152,7 +152,7 @@ const GROUPS: Group[] = [
         alias: 'Paint jar',
         url: '/asset/Library/Car/paintJar.glb',
         preset: 'plastic',
-        framing: { yaw: 0.8, pitch: 0.3, fill: 0.86 },
+        framing: { yaw: 0.8, pitch: 0.22, fill: 0.76 },
         use: 'Sơn phủ chi tiết sau khi đã lắp và làm sạch bavia.',
         note:
           'Sơn hai lớp mỏng cho màu đều hơn một lớp dày. Lớp dày chảy xuống các cạnh và làm mất chi tiết nổi trên bề mặt.',
@@ -162,6 +162,61 @@ const GROUPS: Group[] = [
   },
 ];
 
+/*
+ * Why this bench is framed like the rest of the Library, and no longer like a
+ * product shoot.
+ *
+ * These eight were authored on their own camera rules and were the only place in
+ * the Library that used them. Two numbers say it:
+ *
+ *   - **`roll`.** Every other specimen in the manifest either omits it or, in the
+ *     jellyfish's one case, nudges it by `-0.05` — under three degrees. Four
+ *     tools here were carrying 0.3 to 0.62, which is seventeen to **thirty-five**
+ *     degrees of frame tilt. That is not a nudge, it is a different house style,
+ *     and switching to this bench after a heart or a T-rex read as the viewer
+ *     itself going crooked.
+ *   - **`pitch`.** The rest of the Library lives between 0.10 and 0.30 and
+ *     clusters at 0.14–0.20. This bench ran 0.30 to 0.62 — looking steeply down
+ *     at the tools rather than across at them, which on a long tool compounds
+ *     the tilt instead of cancelling it.
+ *
+ * `roll` is gone entirely. `pitch` is a different matter and deliberately does
+ * *not* all come down to the Library's usual band, because once the tools are
+ * laid flat they are being read the way you read something on a bench — from
+ * above. A specimen with volume can be met side-on at 0.16; a ruler lying on the
+ * grid at that angle is a two-pixel sliver, and the cutting mat had already been
+ * carrying 0.62 for exactly this reason. So the flat-lying tools sit around
+ * 0.34–0.44 and the standing ones (the paint jar, the eraser) stay near 0.22.
+ * That is elevation, which the room shares; it is not frame tilt, which the room
+ * does not.
+ *
+ * The rotation is about **Z**, not X, and that is not arbitrary. The ruler
+ * measures 0.004 x 0.300 x 0.030: its long axis is Y but its *thin* axis is X,
+ * so tipping it about X only stands it on its edge — a 30 cm blade seen end-on,
+ * which is barely better than the column it started as. Turning about Z sends
+ * the thin axis to vertical and lays the tool flat on the grid, which is where a
+ * ruler and a pair of scissors actually sit. The same turn suits the pencil and
+ * the screwdriver, whose cross-sections are square.
+ *
+ *
+ * `yaw` moved as well, for every tool whose long axis ends up along X. A yaw
+ * near 1.15 puts the camera almost *down that axis*: the pencil came back as a
+ * stubby cylinder with its point hidden behind itself, the screwdriver as a
+ * handle aimed at the viewer, and the box cutter as an anonymous lump with its
+ * blade edge-on. Those three sit near 0.45 now, the three-quarter view that
+ * shows a long tool end to end. The ruler and the scissors keep a wider yaw
+ * because both are broad enough to survive it.
+ *
+ * Note the box cutter needs no `orient` — it was authored lying along X already,
+ * at 0.150 x 0.008 x 0.041. It was only ever the camera that was wrong, which is
+ * why it looked broken in the same way as the tools that *were* standing up.
+ * `fill` also came down, from the 0.86–0.94 these were authored at. That is the
+ * right instinct for a compact subject and the wrong one here, because `fill`
+ * fits the *projected bounding box*: six of the eight tools are long and thin,
+ * so a box filling 92% of the frame put the tool itself corner to corner,
+ * longer than the panel is tall. A ruler that spans the whole viewer stops
+ * reading as a ruler — there is no room left around it to give it a size.
+ */
 const ALL_TOOLS = GROUPS.flatMap((group) => group.tools);
 
 export function ToolkitBench({ params }: { params?: Record<string, string> }) {
