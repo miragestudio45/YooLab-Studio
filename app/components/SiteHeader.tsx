@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { BrandMark } from './BrandMark';
-import { StartWithYooLabButton } from './StartWithYooLabButton';
+import { UserMenu } from './UserMenu';
 
 /**
  * Navigation follows the journey, in order: see it, use the tool, find the
@@ -97,9 +97,7 @@ export function SiteHeader() {
         <nav className="desktop-nav" aria-label="Các khu vực của YooLab">
           {links.map(([label, href]) => <a href={href} key={href}>{label}</a>)}
         </nav>
-        <StartWithYooLabButton className="header-cta">
-          Bắt đầu với YooLab <span aria-hidden="true">↗</span>
-        </StartWithYooLabButton>
+        <UserMenu variant="desktop" />
         <button
           className="menu-toggle"
           type="button"
@@ -119,7 +117,7 @@ export function SiteHeader() {
         {links.map(([label, href], index) => (
           <a href={href} key={href} onClick={() => setOpen(false)}><span>0{index + 1}</span>{label}</a>
         ))}
-        <StartWithYooLabButton className="mobile-nav-cta" onClick={() => setOpen(false)}>Bắt đầu với YooLab →</StartWithYooLabButton>
+        <UserMenu variant="mobile" onNavigate={() => setOpen(false)} />
       </nav>
     </header>
   );

@@ -190,10 +190,13 @@ async function confirmResetPasswordSmsGlobal(data: { otpCode: string; phoneNumbe
   }
 }
 
+// Real shape of StudioUserProfile/GetMine's `data`; only `id`, `fullName`
+// and `imageUrl` are actually used on this site right now, the rest is kept
+// loosely typed since the endpoint returns more than that.
 export type UserDetail = {
   id: number;
   fullName?: string;
-  emailAddress?: string;
+  imageUrl?: string | null;
   [key: string]: unknown;
 };
 
@@ -206,6 +209,33 @@ async function getUserDetailRequest(): Promise<UserDetail> {
   });
   if (!response.data.data) throw new Error('User data not found');
   return response.data.data;
+}
+
+function sessionCookieOptions(): Cookies.CookieAttributes {
+  const options: Cookies.CookieAttributes = { path: '/' };
+  if (typeof window !== 'undefined' && DOMAIN && window.location.hostname.includes(DOMAIN.replace(/^\./, ''))) {
+    options.domain = DOMAIN;
+  }
+  return options;
+}
+
+function clearSessionCookies(): void {
+  const options = sessionCookieOptions();
+  Cookies.remove(ACCESS_TOKEN_KEY, options);
+  Cookies.remove('encryptedAccessToken', options);
+  Cookies.remove('refreshToken', options);
+  Cookies.remove('tenantId', options);
+  Cookies.remove(ACCESS_TOKEN_PERMISSIONS, options);
+}
+
+// Same endpoint as the reference app's `authService.logout` — the session
+// cookies are cleared locally either way, even if the request itself fails.
+async function logout(): Promise<void> {
+  try {
+    await http.request({ method: 'get', url: '/api/TokenAuth/LogOut' });
+  } finally {
+    clearSessionCookies();
+  }
 }
 
 const authService = {
@@ -222,6 +252,7 @@ const authService = {
   confirmResetPasswordEmailGlobal,
   confirmResetPasswordSmsGlobal,
   getUserDetailRequest,
+  logout,
 };
 
 export default authService;

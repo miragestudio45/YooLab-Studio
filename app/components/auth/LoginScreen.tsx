@@ -6,7 +6,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import authService from '../../lib/auth/auth-service';
 import { openDeeplinkProject } from '../../lib/auth/deeplink';
 import { describeApiError } from '../../lib/auth/http';
-import { discardPendingTab, openBlankTab } from '../../lib/auth/session';
+import { showToast } from '../../lib/toast';
 import { ForgotPasswordModal } from './ForgotPasswordModal';
 import { GoogleSocialButton } from './GoogleSocialButton';
 import { signInWithApple, signInWithFacebook, type SocialResult } from './social-handlers';
@@ -80,22 +80,21 @@ export function LoginScreen() {
     setBanner(null);
     if (!validate()) return;
 
-    // Opened synchronously, still inside this click's user-gesture window —
-    // openDeeplinkProject() redirects it once the account's project is
-    // resolved, or closes it on failure. Only plain email/password login
-    // does this; social login below just goes home, same as the reference.
-    openBlankTab();
     setPending(true);
     try {
       await authService.login({ userNameOrEmailAddress: account, password, rememberClient: remember });
       if (remember) window.localStorage.setItem(REMEMBER_KEY, account);
       else window.localStorage.removeItem(REMEMBER_KEY);
       setBanner({ kind: 'success', text: 'Đăng nhập thành công' });
-      void openDeeplinkProject();
-      setStudioLinkVisible(true);
+      showToast('Đăng nhập thành công');
+      // Resolves the account's project first — a tab only opens once one is
+      // actually confirmed to exist (or a new one is created), never before.
+      // Only plain email/password login does this; social login below just
+      // goes home, same as the reference app.
+      const opened = await openDeeplinkProject();
+      setStudioLinkVisible(opened);
       setTimeout(() => router.push('/'), 500);
     } catch (error) {
-      discardPendingTab();
       setBanner({ kind: 'error', text: describeApiError(error) });
     } finally {
       setPending(false);
@@ -105,6 +104,7 @@ export function LoginScreen() {
   const onSocialResult = (result: SocialResult) => {
     if (result.status === 'success') {
       setBanner({ kind: 'success', text: 'Đăng nhập thành công' });
+      showToast('Đăng nhập thành công');
       router.replace('/');
     } else {
       setBanner({ kind: 'error', text: result.message });

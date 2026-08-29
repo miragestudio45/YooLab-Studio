@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { openDeeplinkProject } from '../lib/auth/deeplink';
-import { isLoggedIn, openBlankTab } from '../lib/auth/session';
+import { isLoggedIn } from '../lib/auth/session';
 
 /**
  * The site's one call to action: already logged in resolves the account's
@@ -24,7 +24,6 @@ export function StartWithYooLabButton({
   const handleClick = () => {
     onClick?.();
     if (isLoggedIn()) {
-      openBlankTab();
       void openDeeplinkProject();
       return;
     }

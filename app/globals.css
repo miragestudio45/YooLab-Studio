@@ -29,6 +29,7 @@
 @import './styles/exp-earth.css';
 @import './styles/exp-toolkit.css';
 @import './styles/auth.css';
+@import './styles/toast.css';
 
 /* ==========================================================================
    YooLab design tokens
@@ -377,6 +378,79 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 }
 .header-cta:hover { background: var(--brand-deep); transform: translateY(-1px); }
 .header-cta span { color: var(--brand-soft); }
+
+.user-menu--desktop {
+  position: relative;
+  justify-self: end;
+}
+
+.user-menu-trigger {
+  display: flex;
+  padding: 0;
+  border: none;
+  background: none;
+  border-radius: 50%;
+  line-height: 0;
+}
+
+.user-menu-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1.5px solid rgba(255, 255, 255, 0.6);
+}
+
+.user-menu-avatar--fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--brand);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.user-menu-dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 20;
+  min-width: 180px;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-lift);
+}
+
+.user-menu-dropdown .user-menu-name {
+  margin: 0 0 8px;
+  padding: 0 4px;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--color-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.user-menu-logout {
+  width: 100%;
+  padding: 9px 10px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 620;
+  text-align: left;
+  cursor: pointer;
+}
+
+.user-menu-logout:hover {
+  background: var(--color-border-hair);
+}
 
 .menu-toggle, .mobile-nav { display: none; }
 
@@ -3006,10 +3080,37 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
     background: var(--brand);
     font-weight: 620;
   }
+  .mobile-nav .user-menu--mobile {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 10px;
+    padding: 10px 4px;
+  }
+  .mobile-nav .user-menu-identity {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+  .mobile-nav .user-menu-identity .user-menu-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .mobile-nav .user-menu--mobile .user-menu-logout {
+    flex-shrink: 0;
+    width: auto;
+    border-radius: 999px;
+    padding: 8px 14px;
+  }
 }
 
 @media (max-width: 860px) {
-  .header-cta { display: none; }
+  .header-cta, .user-menu--desktop { display: none; }
   .site-header-inner { grid-template-columns: auto minmax(0, 1fr) auto; }
   .site-footer { grid-template-columns: 1fr; }
   .footer-links { margin-top: 20px; }

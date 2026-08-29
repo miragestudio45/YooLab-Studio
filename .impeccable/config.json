@@ -26,6 +26,12 @@
         ],
         "createdAt": "2026-08-27T02:30:04.694Z",
         "reason": "False positive: .bridge-arrow i::after is the zero-box CSS triangle idiom (width:0;height:0 with transparent top/bottom borders), so border-left draws the arrowhead on a 1px hairline. There is no card and no accent stripe."
+      },
+      {
+        "rule": "layout-transition",
+        "value": "max-height 300ms ease, opacity 200ms ease, background-color 300ms ease, color 300ms ease",
+        "createdAt": "2026-08-29T01:45:39.752Z",
+        "reason": "Pre-existing mobile-nav accordion open/close transition, shipped since commit c44e73a, predates and is unrelated to this session's auth work"
       }
     ]
   }
