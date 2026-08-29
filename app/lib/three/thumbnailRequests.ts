@@ -30,6 +30,29 @@ export const CLOWNFISH_THUMBNAIL: ThumbnailRequest = {
 };
 
 /*
+ * The T-rex, three quarters on and posed mid-bite.
+ *
+ * `natural`, because this is the one Library model that arrives with real
+ * painted textures — a teal-and-rust hide over a normal and an occlusion map —
+ * and any preset here would throw the skin away and bake a grey lizard. The
+ * `poseTime` lands inside the first clip (`run`) rather than in the bind pose:
+ * a T-posed theropod is a plank, and the rail chip has 56 px to say "dinosaur".
+ * `targetY` aims high because the tail is half the bounding box and none of the
+ * animal's identity is in it.
+ */
+export const TREX_THUMBNAIL: ThumbnailRequest = {
+  url: '/asset/T-rex/T-rex.glb',
+  preset: 'natural',
+  width: 224,
+  height: 224,
+  yaw: 1.02,
+  pitch: 0.16,
+  poseTime: 0.45,
+  zoom: 1.04,
+  targetY: 0.62,
+};
+
+/*
  * The two below are baked small on purpose.
  *
  * The three creature thumbnails above are also used at card size elsewhere on

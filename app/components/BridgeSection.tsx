@@ -3,10 +3,10 @@
 import { useEffect, useState } from 'react';
 import {
   CreatureStage,
-  StageIcon,
   type BeePartKey,
   type CreatureStageMode,
 } from './library/CreatureStage';
+import { LibraryIcon } from './library/LibraryIcons';
 
 type FeatureIconName = 'rotate' | 'structure' | 'motion' | 'annotation';
 type ToolIconName = 'model' | 'text' | 'audio' | 'effects';
@@ -292,7 +292,6 @@ export function BridgeSection() {
               appearance="bridge"
               autoSpin={autoSpin}
               creature="bee"
-              floorGrid
               gridVisible={effectsEnabled}
               framing={{ yaw: 0.62, pitch: 0.16, fill: 0.94, animate: true }}
               initialSpin={false}
@@ -372,7 +371,7 @@ export function BridgeSection() {
                       onClick={() => setSelectedAnimation(index)}
                       key={animation.title}
                     >
-                      <span><StageIcon name={animation.icon} /></span>
+                      <span><LibraryIcon name={animation.icon} /></span>
                       <b>{animation.title}</b>
                       <small>{animation.note}</small>
                     </button>

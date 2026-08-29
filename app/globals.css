@@ -22,6 +22,7 @@
  */
 @import './styles/library.css';
 @import './styles/sections.css';
+@import './styles/practice.css';
 @import './styles/studio.css';
 @import './styles/exp-cells.css';
 @import './styles/exp-molecule.css';
@@ -29,6 +30,7 @@
 @import './styles/exp-earth.css';
 @import './styles/exp-toolkit.css';
 @import './styles/auth.css';
+@import './styles/toast.css';
 
 /* ==========================================================================
    YooLab design tokens
@@ -377,6 +379,79 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 }
 .header-cta:hover { background: var(--brand-deep); transform: translateY(-1px); }
 .header-cta span { color: var(--brand-soft); }
+
+.user-menu--desktop {
+  position: relative;
+  justify-self: end;
+}
+
+.user-menu-trigger {
+  display: flex;
+  padding: 0;
+  border: none;
+  background: none;
+  border-radius: 50%;
+  line-height: 0;
+}
+
+.user-menu-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1.5px solid rgba(255, 255, 255, 0.6);
+}
+
+.user-menu-avatar--fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--brand);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.user-menu-dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 20;
+  min-width: 180px;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-lift);
+}
+
+.user-menu-dropdown .user-menu-name {
+  margin: 0 0 8px;
+  padding: 0 4px;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--color-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.user-menu-logout {
+  width: 100%;
+  padding: 9px 10px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 620;
+  text-align: left;
+  cursor: pointer;
+}
+
+.user-menu-logout:hover {
+  background: var(--color-border-hair);
+}
 
 .menu-toggle, .mobile-nav { display: none; }
 
@@ -2150,9 +2225,18 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
   transition: background-color 240ms ease;
 }
 .bridge-viewer:not(.is-effects-on) .bridge-viewport { background: color-mix(in srgb, var(--color-surface) 72%, var(--color-lavender-soft)); }
+/* The bridge drives the same `CreatureStage` the Library does but supplies its
+   own toolbar, so the stage's own chrome is hidden here. `.stage-rail` replaced
+   `.stage-tools` when the rail was regrouped; `.stage-guide` is the card that
+   replaced `.stage-hint`, and both names are listed so a stage that still emits
+   the old ones stays covered. */
+.bridge-viewport .stage-rail,
+.bridge-viewport .stage-clips,
 .bridge-viewport .stage-tools,
 .bridge-viewport .stage-caption,
+.bridge-viewport .stage-guide,
 .bridge-viewport .stage-hint,
+.bridge-viewport .stage-pins,
 .bridge-viewport .stage-spin { display: none; }
 
 .bridge-orbit-control {
@@ -3006,10 +3090,37 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
     background: var(--brand);
     font-weight: 620;
   }
+  .mobile-nav .user-menu--mobile {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 10px;
+    padding: 10px 4px;
+  }
+  .mobile-nav .user-menu-identity {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+  .mobile-nav .user-menu-identity .user-menu-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .mobile-nav .user-menu--mobile .user-menu-logout {
+    flex-shrink: 0;
+    width: auto;
+    border-radius: 999px;
+    padding: 8px 14px;
+  }
 }
 
 @media (max-width: 860px) {
-  .header-cta { display: none; }
+  .header-cta, .user-menu--desktop { display: none; }
   .site-header-inner { grid-template-columns: auto minmax(0, 1fr) auto; }
   .site-footer { grid-template-columns: 1fr; }
   .footer-links { margin-top: 20px; }

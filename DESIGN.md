@@ -48,18 +48,27 @@ arrival gives its primary block a height derived from `--fit-h` minus its own he
 band, and lets secondary rows fall below the fold on purpose — that sliver is what
 still invites the scroll.
 
-**Prefer measuring the head band to estimating it.** The Library and Education
-declare `--library-head` / `--edu-head` because their bands are one predictable
-row. YooStudio does not: its heading wraps to a third line below 1000 px, and every
-version of this that subtracted an estimated `--tool-head` from the viewport cut
-the bottom of the editor at whichever width the estimate was wrong — 24 px out on a
-1366, 53 px out on a 768. `.tool-stage` is now one screen-tall grid — an `auto`
-heading row over a `minmax(0, 1fr)` row holding the workspace and the narrative
-column — so the arithmetic is done by the layout engine against the real heading.
-When a band's height is not predictable, make the layout do the subtraction.
+**Never estimate a head band. Make the layout subtract it.** Education still
+declares `--edu-head`, and it is the last section that does. Every other version of
+that idea has been retired after the same failure: a token guesses a band's height,
+the band gains a line, and the bottom of the section's product goes under the fold
+at whichever width the guess was wrong. YooStudio paid for it first — an estimated
+`--tool-head` cut the editor by 24 px on a 1366 and 53 px on a 768 — and the Library
+paid for it twice, once with `--library-head` when the band grew to carry the
+subject switcher, and once again on the phone regime with a hand-measured `168px`
+that was 31 px wrong at 768 and 36 px wrong at 390.
+
+Both are now one screen-tall grid whose `auto` rows measure themselves and whose
+`minmax(0, 1fr)` row holds the product:
+
+- `.tool-stage` — an `auto` heading row over the workspace and narrative column.
+- `.library-stage` — `auto` head band, `auto` subject switcher, then the three
+  panels. At every regime from 1920 down to 390 the panels land 15–22 px above the
+  fold, and `measure.mjs` asserts it at all seven widths with no `fitAbove`
+  exemption.
 
 **And measure width against width.** The counterpart mistake is deriving one axis
-from the other. A later version of this section sized the editor's *width* from the
+from the other. A later version of YooStudio sized the editor's *width* from the
 viewport *height*, to hold the 1920 × 1237 source frame's aspect ratio; on a
 1920 × 911 browser window that produced a 1122 px editor beside a 622 px narrative
 column, and the section's proportions became a function of how tall the visitor's
@@ -67,10 +76,28 @@ window happened to be. The narrative column is now a bounded width
 (`clamp(250px, 18.6vw, 344px)`) and the workspace takes the remainder — the only
 thing in the section that stretches horizontally.
 
-Below 700 px a fitted section stops being fitted and scrolls: a phone cannot hold a
-heading, a workspace and a readout at once without 9 px type. Which sections give up
-the promise, and where, is recorded in KNOWN_LIMITATIONS.md and asserted by
-`measure.mjs`.
+Most fitted sections stop being fitted below 700–1000 px and scroll: a phone cannot
+hold a heading, a two-up diagram and a readout at once without 9 px type. Which
+sections give up the promise, and where, is recorded in KNOWN_LIMITATIONS.md and
+asserted by `measure.mjs`. The Library is the exception and gives up nothing — see
+below.
+
+## 2b. The Library is a chapter of the snap track
+
+`.library` carries `data-snap`, which makes it the seventh and last anchor of
+`lib/story/snap.ts`. That became possible only when the section stopped having
+anything below its fold: it used to end in a four-card "related" strip, and a
+magnetic anchor on a section whose content continues past the viewport settles the
+visitor onto a boundary they were scrolling *through*. The strip is gone (it
+repeated three rows already in the rail 800 px above it), so the section is exactly
+one screen and the snap has something honest to settle on.
+
+Below 860 px it still reserves one screen and simply lets its own panels be
+shorter — the phone does not get a different promise, it gets a smaller workspace
+(566 px at 390, 723 px at 768). It can do that where Education and Practice cannot
+because its own narrow regime removes height rather than stacking it: the asset
+rail becomes a short horizontal shelf and the knowledge panel leaves the flow
+entirely as a bottom sheet.
 
 ## 3. Type — one family
 
@@ -256,3 +283,107 @@ through a band of cover glass at the card's edge while the editor's own surface
 stays crisp. That is what keeps it a material rather than the decorative wash the
 craft floor rejects. Its outer radius is the card's radius plus the bezel, and
 `.tool-story` uses the same sum so the two surfaces on that row share a corner.
+
+---
+
+## 11. The Library — one mark set, one stage chrome
+
+The Library is judged as an application, and two shared contracts are what stop it
+reading as twelve loosely related panels.
+
+### Every mark is drawn, on one grid
+
+`app/components/library/LibraryIcons.tsx` is the section's whole vocabulary: a
+20-unit box, a 2-unit margin, `currentColor`, 1.5 stroke, round caps and joins.
+Stage controls, motion clips, the readout glyphs beside each measurement, the five
+panel-section marks and the seven subject marks all come from it. There is no icon
+font, no Unicode glyph standing in for a mark, and no second grid — the four camera
+controls used to be drawn on a 16-unit box at 1.3 stroke while everything around
+them was on 20 at 1.5, and side by side in one rail that reads as a softness on
+exactly those four.
+
+Two rules inside it are worth keeping:
+
+- **Arcs are computed, not eyeballed.** Every `A` command has its endpoints on the
+  circle it claims. The auto-rotate mark is two opposed 300° arcs on one r=6.4
+  circle, which is why it survives being spun by CSS.
+- **A clip is drawn as its action, not as its animal.** Five silhouettes of the
+  same dinosaur at 15 px are five identical smudges, so `bite` is a toothed jaw
+  opening, `roar` is a mouth with sound leaving it, `tail` is a whip with a
+  direction.
+
+`LibraryMark.tsx` is the *other* set and stays separate on purpose: those are
+40-unit **diagrams** of a concept for the asset rail, colour-coded by subject
+through `currentColor`. A mark says "this is what a plant cell is"; an icon says
+"this button rotates the camera". The bacteria mark is the one to look at to see
+the rule working — it is the only cell mark with no ring near its centre, and that
+absence is how the row says "nhân sơ" at 46 px.
+
+### The stage chrome is one composition, split along one line
+
+`StageChrome.tsx` owns everything a visitor sees over a running canvas, and the
+split is: what you do to the **camera** is a column, what the **specimen** does is
+a row.
+
+| Anchor | Holds | Why there |
+|---|---|---|
+| top-left | four camera controls | the corner a subject never occupies |
+| bottom-centre | the specimen's clips | their axis is time, so they sit side by side |
+| top-right | the three-line guide card | leaves for good on first drag, scroll or pin |
+| bottom-left | name + surface caption | — |
+| bottom-right | auto-rotate, as a real switch | it is a state, not a press |
+
+The rail carried the clips too for one round. That made it nine cells and 410 px
+of a 715 px stage — more chrome than specimen down one edge — and it drew the
+T-rex's head behind its own glass. A control group that grows past about a third of
+the frame's height is in the wrong axis.
+
+The auto-rotate mark turns, slowly, only while the state is on. It is the only
+place in this section where an icon reports state by moving, and
+`prefers-reduced-motion` stops it in the stylesheet.
+
+### Fitting a rigged specimen
+
+Three things a games-pipeline asset needs that a static mesh does not, all of them
+in `ModelStage`:
+
+- **`lockRoot`** — authored clips travel. All five T-rex clips animate
+  `bn_Spine.translation`, so without flattening that one track the animal walks out
+  of the panel within two seconds. Resolve the joint through the object graph, not
+  by matching the track name: `GLTFLoader` deletes `. : / [ ]` from node names, so
+  `bn_Spine.4_4` is addressed as `bn_Spine4_4` and cannot be told from
+  `bn_Spine1.5_5` by any string test. Depth in the hierarchy settles it.
+- **`spinSafe`** — a fit is exact for one direction and the stage then turns away
+  from it. A twelve-metre subject grows by nearly half between three-quarters and
+  broadside, so `fill: 0.94` silently becomes `fill: 1.3`. `spinSafeBox` squares
+  the footprint to its circumscribed radius **divided by what a square prism
+  projects at the authored yaw** — the version without that divisor
+  over-corrected by up to 41%, which is its own visible defect.
+- **`refreshSkinnedBounds`** — `Box3` reads a `SkinnedMesh`'s cached box, and three
+  computes it from `skeleton.boneMatrices`, which only the renderer refreshes. A
+  fit solved between `mixer.update(poseTime)` and the first frame is solved against
+  the bind pose. Not applied to `CreatureStage`: the bee, fish and jellyfish are
+  normalised to authored world sizes with `fill` values hand-tuned against the old
+  box, and correcting it under them would re-frame three finished chapters.
+
+### Anatomy pins
+
+An anchor names a **joint**, so the label travels with the animation — the jaw pin
+stays on the jaw through a bite. Positions are written to CSS custom properties
+every frame rather than to React state, so six pins on a moving skeleton cost no
+renders. A pin on the far side of the subject drops to a third opacity instead of
+disappearing: a set of six that keeps falling to three reads as a bug, and a solid
+label on the animal's flank claims the joint is where it is not. Appearance lives
+in `library.css` and only `--on` / `--hit` are forwarded inline, which is what lets
+a pin the visitor deliberately opened override the dimming.
+
+### The knowledge panel's content model
+
+Small type throughout — nothing above 12.5 px except the specimen's name — and six
+blocks in a fixed order: the authored one-line `poetic` in italic lavender, the
+description, the glyph-led measurement table, the anatomy list, the goals, then two
+notes and the real-world links. The two notes are **two tints in a fixed order**,
+lavender for the mechanism and amber for the curiosity, ordered by the component
+rather than by each entry — a column of identically tinted callouts is a column
+with no callouts in it, and no specimen gets to put its curiosity above its
+physics.

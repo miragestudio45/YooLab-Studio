@@ -3,7 +3,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { createProceduralEnvironment, exploreEnvironmentPalette } from './environment';
-import { loadLibraryGltf } from './creatures';
+import { loadLibraryGltf, refreshSkinnedBounds, registerSpecularGlossiness } from './creatures';
 
 /**
  * Offscreen thumbnail baker.
@@ -77,6 +77,10 @@ function ensureRuntime(): Runtime {
   const loader = new GLTFLoader();
   loader.setDRACOLoader(draco);
   loader.setMeshoptDecoder(MeshoptDecoder);
+  // Same extension set as the live stages. A rail chip that bakes a grey model
+  // beside a viewer that shows a painted one is the inconsistency this whole
+  // module exists to avoid.
+  registerSpecularGlossiness(loader);
   const environment = createProceduralEnvironment(renderer, exploreEnvironmentPalette);
   runtime = { renderer, loader, draco, environment };
   return runtime;
@@ -207,6 +211,10 @@ async function bake(request: ThumbnailRequest): Promise<string | null> {
     mixer = new THREE.AnimationMixer(visual);
     mixer.clipAction(gltf.animations[0]).play();
     mixer.update(request.poseTime);
+    // Same reason as in `ModelStage`: a skinned box is the bind pose until the
+    // skeleton has been evaluated, and a rail chip framed on the bind pose bakes
+    // a small animal in a large empty circle.
+    refreshSkinnedBounds(visual);
   }
 
   visual.updateMatrixWorld(true);

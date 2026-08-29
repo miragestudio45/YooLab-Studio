@@ -1,172 +1,11 @@
-/* ============================================================== practice === */
 /*
- * One real thing, and one honest gap — composed as such.
+ * Editorial sections.
  *
- * The previous layout put them in a `1.18fr 0.82fr` pair of matching cards, which
- * gave a section with one working experience and one stated absence the shape of
- * a section with two products. It also opened with a three-line heading at 70 px
- * and then 100 px of nothing before the cards, so on a 1366×768 laptop you landed
- * on a headline and the top edge of a photograph.
- *
- * Now: the head band is one row, the Formula workshop is a wide two-part card
- * that reads as an application, and the lab bench is a narrow column beside it
- * with no frame of its own and nothing to click. The asymmetry is the point — it
- * is what tells the truth about the section before a word is read.
+ * The hands-on section moved out to `practice.css` when it became a hub with
+ * three live labs in it: at that size it was going to want this file to itself,
+ * and a stylesheet that four unrelated sections edit at once is the thing this
+ * split exists to prevent.
  */
-.practice {
-  --practice-head: clamp(104px, 15.5vh, 158px);
-  padding: calc(var(--header-h) + var(--section-gap)) 0 clamp(48px, 7vh, 92px);
-  scroll-margin-top: 0;
-  /* The lavender note in the section chain: ivory -> a breath of lavender-ivory
-     -> ivory. It is four units of value; the point is that the eye never meets
-     an edge, not that anyone can name the colour. */
-  background: linear-gradient(180deg, var(--color-bg) 0%, #f7f2f4 48%, var(--color-bg) 100%);
-}
-
-.practice-head { min-height: var(--practice-head); }
-
-.practice-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 2.3fr) minmax(258px, 1fr);
-  gap: clamp(20px, 2.4vw, 40px);
-  align-items: stretch;
-  margin-top: clamp(20px, 3vh, 40px);
-}
-
-/*
- * The workshop card is itself two columns: the experience on the left at the size
- * of a real preview, what it is on the right. A stacked visual-over-body card at
- * this width would have put the three modes below the fold on every laptop.
- */
-.practice-live {
-  display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(280px, 0.95fr);
-  min-height: 0;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  background: var(--color-surface);
-  box-shadow: var(--shadow-card);
-}
-
-.practice-visual {
-  position: relative;
-  /* The ceiling matters as much as the floor here: capped at 460 px, the card
-     ended two thirds of the way down a 1080 display and left the bottom third of
-     the section empty. */
-  min-height: clamp(280px, calc(100svh - var(--practice-head) - 268px), 620px);
-  background: var(--color-surface-2);
-}
-.practice-visual img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.practice-open {
-  position: absolute;
-  bottom: 18px;
-  left: 18px;
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 46px;
-  padding: 0 22px;
-  border: 0;
-  border-radius: var(--radius-md);
-  color: #fff;
-  background: var(--color-accent-strong);
-  box-shadow: 0 14px 34px rgba(180, 88, 70, 0.32);
-  font-size: 13px;
-  font-weight: 620;
-  transition: transform 200ms ease, background 200ms ease;
-}
-.practice-open:hover { background: var(--color-accent-deep); transform: translateY(-2px); }
-
-.practice-body {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  justify-content: center;
-  padding: clamp(20px, 2.6vh, 30px) clamp(20px, 2vw, 30px);
-}
-
-.practice-tag {
-  align-self: start;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  color: #2f5f33;
-  background: rgba(118, 157, 116, 0.16);
-  font-size: 9.5px;
-  font-weight: 660;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-}
-.practice-tag--pending { color: var(--color-pending); background: rgba(176, 138, 74, 0.14); }
-
-.practice-live h3,
-.practice-next h3 {
-  margin: 12px 0 8px;
-  font-family: var(--font-display);
-  font-size: clamp(20px, 1.6vw, 26px);
-  font-weight: 680;
-  letter-spacing: -0.036em;
-  line-height: 1.14;
-}
-.practice-live p,
-.practice-next p { margin: 0; color: var(--color-ink-2); font-size: 13px; line-height: 1.66; }
-
-.practice-modes { margin: clamp(12px, 2vh, 18px) 0 0; padding: 0; border-top: 1px solid var(--color-border-hair); list-style: none; }
-.practice-modes li {
-  display: grid;
-  grid-template-columns: 74px minmax(0, 1fr);
-  gap: 14px;
-  padding: clamp(8px, 1.3vh, 11px) 0;
-  border-bottom: 1px solid var(--color-border-hair);
-}
-.practice-modes li:last-child { border-bottom: 0; }
-.practice-modes b {
-  color: var(--color-accent-deep);
-  font-size: 10.5px;
-  font-weight: 680;
-  letter-spacing: 0.07em;
-}
-.practice-modes span { color: var(--color-muted); font-size: 12px; line-height: 1.5; }
-
-/*
- * The stated gap. No card, no border, no button.
- *
- * It used to be a full peer card with a 260 px instrument drawing in it, which
- * made a thing that does not exist look like half the section's offering. It is a
- * column with a rule down its left edge now: present, explained, obviously not a
- * product. The drawing survives at a third of the size, as a mark rather than as
- * a picture.
- */
-.practice-next {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  justify-content: center;
-  gap: 0;
-  padding: clamp(20px, 2.6vh, 30px) 0 clamp(20px, 2.6vh, 30px) clamp(20px, 2vw, 32px);
-  border-left: 1px solid var(--color-border);
-}
-.practice-art {
-  width: clamp(88px, 34%, 122px);
-  height: auto;
-  margin-bottom: clamp(14px, 2.2vh, 24px);
-  color: var(--color-muted-2);
-}
-.practice-next p { color: var(--color-muted); font-size: 12.5px; }
-.practice-pending-note { margin-top: 14px !important; color: var(--color-muted) !important; font-size: 12px !important; }
-.practice-pending-note a,
-.practice-pending-note button {
-  padding: 0;
-  border: 0;
-  border-bottom: 1px solid var(--color-accent-line);
-  color: var(--color-accent-deep);
-  background: transparent;
-  font: inherit;
-  font-weight: 620;
-}
 
 /* ============================================================= education === */
 /*
@@ -585,35 +424,9 @@
   .education-points li { padding: clamp(4px, 0.72vh, 9px) 0; }
   .education-copy h3 { font-size: clamp(21px, min(2.1vw, 2.9vh), 28px); }
   .education-cta { margin-top: clamp(12px, 1.8vh, 26px); }
-  .practice-grid { grid-template-columns: minmax(0, 1.85fr) minmax(228px, 1fr); }
-}
-
-/*
- * The workshop card keeps its two columns down to 900 px.
- *
- * Collapsing it at 1180 was what broke 1024×768: a stacked visual-over-body card
- * is 510 px tall where the side-by-side one is 385, and 1024 is a landscape
- * screen with 768 px of height to spend. Two columns is also simply the better
- * composition wherever there is width for it — the three modes belong beside the
- * car, not underneath a photograph of it.
- */
-@media (max-width: 1000px) {
-  .practice-grid { grid-template-columns: minmax(0, 1fr); gap: 0; }
-}
-
-@media (max-width: 900px) {
-  .practice-live { grid-template-columns: minmax(0, 1fr); }
-  .practice-visual { min-height: clamp(230px, 30svh, 340px); }
 }
 
 @media (max-width: 1000px) {
-  /* No frame, no border-left: below the two-column regime the gap is the rule. */
-  .practice-next {
-    padding: clamp(22px, 3vh, 30px) 0 0;
-    border-top: 1px solid var(--color-border);
-    border-left: 0;
-  }
-  .practice-art { width: 92px; }
   .education-panel { grid-template-columns: minmax(0, 1fr); gap: 26px; align-items: start; }
   /* Full width now, so the visual no longer needs to be tall to hold its own
      against the copy beside it. */
@@ -633,7 +446,6 @@
 }
 
 @media (max-width: 700px) {
-  .practice-live { border-radius: var(--radius-md); }
   .education-points li { grid-template-columns: 24px minmax(0, 1fr); }
   /* The third column becomes a second line under the label rather than a
      100 px-wide paragraph. */

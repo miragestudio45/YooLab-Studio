@@ -87,7 +87,19 @@ export function LibraryViewer({
   }
 
   if (view.type === 'model') {
-    return <ModelStage url={view.url} preset={view.preset} framing={view.framing} label={item.title} />;
+    return (
+      <ModelStage
+        url={view.url}
+        preset={view.preset}
+        framing={view.framing}
+        clips={view.clips}
+        defaultClip={view.defaultClip}
+        lockRoot={view.lockRoot}
+        shell={view.shell}
+        anchors={view.anchors}
+        label={item.title}
+      />
+    );
   }
 
   if (view.type === 'experience' && view.key === 'formula-workshop') {

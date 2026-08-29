@@ -61,6 +61,27 @@ const DEFAULT_FILL = 0.82;
 const MIN_ZOOM = 0.42;
 const MAX_ZOOM = 2.6;
 
+/**
+ * The smallest near plane this rig will ask for, and the unit of the distance
+ * floor below.
+ *
+ * It has to be a constant of the *rig* rather than whatever near the camera
+ * happens to be carrying. The floor used to read `camera.near * 4`, and
+ * `libraryEnvironment` builds its camera with `near = 0.05`, so every fit
+ * inherited a 0.2-unit floor from a number that has nothing to do with the
+ * subject. For everything this viewer had shipped that was harmless — a cell, a
+ * molecule, a twelve-metre theropod are all authored at a scale where 0.2 is
+ * noise, which is exactly why the old comment could claim the floor
+ * "practically never binds".
+ *
+ * The Human Reference Atlas organs are the case that breaks the assumption:
+ * they are authored at **true anatomical scale in metres**, so an eyeball is
+ * 0.024 across and the floor sat at nearly ten times its ideal distance. The
+ * eye was fitted at `fill: 0.84` and rendered spanning about a fifth of the
+ * frame — a marble on a table, with the authored fill silently discarded.
+ */
+const MIN_NEAR = 0.01;
+
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
 
 /**
@@ -79,6 +100,42 @@ export function orbitDirection(yaw: number, pitch: number, out = new THREE.Vecto
 export function subjectBox(object: THREE.Object3D): THREE.Box3 {
   object.updateMatrixWorld(true);
   return new THREE.Box3().setFromObject(object);
+}
+
+/**
+ * The box a subject occupies from *every* yaw, not just the authored one.
+ *
+ * `fitBox` is exact for the direction it is given, and every Library stage that
+ * auto-rotates then turns the camera away from that direction. For a roughly
+ * cubic specimen — a cell, a molecule, a chunk of bacterial wall — that does not
+ * matter, because a cube is about as wide from any angle. For a long subject it
+ * matters enormously: the T-rex is twelve metres nose to tail and about three
+ * wide, so a fit solved three-quarters on is solved against a silhouette that
+ * grows by nearly half on its way to broadside — and `fill: 0.94` quietly becomes
+ * `fill: 1.3` with the animal's head outside the frame.
+ *
+ * The worst case is easy to name: the widest a footprint rectangle can ever look
+ * under yaw is the radius of its circumscribed circle, `hypot(hx, hz)`. Getting
+ * `fitBox` to *see* that number is the fiddly part, and the obvious version was
+ * wrong. Squaring the footprint to a box of half-side `hypot(hx, hz)` looks
+ * yaw-invariant and is not: a square prism projects between `s` and `s·√2`
+ * depending on where its corners fall, so the first attempt over-corrected by up
+ * to 41% and the dinosaur came back too small with an empty band above it. The
+ * side is therefore divided by what a square prism actually projects at the
+ * authored yaw, `|cos y| + |sin y|`, so the number `fitBox` reads is the worst
+ * case exactly rather than the worst case times the diagonal.
+ *
+ * Vertical extent is left alone. The orbit rig moves yaw only; pitch is fixed for
+ * the whole of a specimen's life on screen.
+ */
+export function spinSafeBox(box: THREE.Box3, yaw: number): THREE.Box3 {
+  const centre = box.getCenter(new THREE.Vector3());
+  const half = box.getSize(new THREE.Vector3()).multiplyScalar(0.5);
+  const footprint = Math.hypot(half.x, half.z);
+  const projected = Math.abs(Math.cos(yaw)) + Math.abs(Math.sin(yaw));
+  const side = footprint / Math.max(projected, 1e-3);
+  const safe = new THREE.Vector3(side, half.y, side);
+  return new THREE.Box3(centre.clone().sub(safe), centre.clone().add(safe));
 }
 
 export function fitBox(
@@ -188,11 +245,16 @@ export function fitBox(
     halfDepth = Math.max(halfDepth, Math.abs(w));
     distance = Math.max(distance, w + u / spanH, w + v / spanV);
   }
-  // Floor: never inside the subject, never through the near plane. With the
-  // corner solution above this practically never binds — it is here so a
-  // degenerate box (a single plane, a zero-size subject) cannot produce a
-  // camera at the origin.
-  distance = Math.max(distance, halfDepth * 1.08 + camera.near * 4);
+  /*
+   * Floor: never inside the subject, never through the near plane.
+   *
+   * Both terms are now in the subject's own units. `halfDepth * 1.08` is what
+   * keeps the lens outside the box, and `MIN_NEAR * 4` is the degenerate-case
+   * guard the floor was written for — a single plane or a zero-size subject,
+   * where the corner solve returns 0 and would put the camera at the origin.
+   * Nothing here reads `camera.near` any more: see `MIN_NEAR`.
+   */
+  distance = Math.max(distance, halfDepth * 1.08 + MIN_NEAR * 4);
 
   // Generous both ways: the visitor can zoom to MIN_ZOOM of this distance and
   // orbit to any angle, so the planes have to hold for the whole reachable
@@ -203,7 +265,7 @@ export function fitBox(
     target,
     minDistance: distance * MIN_ZOOM,
     maxDistance: distance * MAX_ZOOM,
-    near: Math.max(0.01, distance * MIN_ZOOM - reach * 1.2),
+    near: Math.max(MIN_NEAR, distance * MIN_ZOOM - reach * 1.2),
     far: distance * MAX_ZOOM + reach * 3,
   };
 }
@@ -233,11 +295,14 @@ export function createSubjectFit(
   object: THREE.Object3D,
   camera: THREE.PerspectiveCamera,
   options: FitOptions,
+  /** Fit for the whole yaw sweep of an idle orbit. See `spinSafeBox`. */
+  spinSafe = false,
 ): SubjectFit {
   // Captured once, on purpose. The caller re-centres the subject on the aim
   // point straight after this call, and later frames may be mid-animation; both
   // would move a live box and make the framing breathe.
-  const box = subjectBox(object);
+  const measured = subjectBox(object);
+  const box = spinSafe ? spinSafeBox(measured, options.yaw) : measured;
   const fit: SubjectFit = {
     box,
     current: fitBox(box, camera, options),

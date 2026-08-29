@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { ToastHost } from './components/ToastHost';
 
 const TITLE = 'YooLab — Biến kiến thức thành trải nghiệm 3D/XR';
 const DESCRIPTION =
@@ -81,7 +82,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         />
         <script dangerouslySetInnerHTML={{ __html: REVEAL_BOOTSTRAP }} />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        <ToastHost />
+      </body>
     </html>
   );
 }

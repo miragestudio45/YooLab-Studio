@@ -1,7 +1,6 @@
 import authService from './auth-service';
 import { URL_SHARE_HOTSPOT360, URL_SHARE_MODEL3D, URL_SHARE_TOUR360 } from './config';
 import { http, type AbpResponse } from './http';
-import { discardPendingTab, redirectPendingTab } from './session';
 
 // Ported from the reference app's `useResolveDeeplink` hook
 // (src/hooks/use-resolve-deeplink.ts) and `deeplink-context.service.ts` /
@@ -83,22 +82,21 @@ async function buildDeeplinkUrl(accountId: number | string): Promise<string | nu
 }
 
 /**
- * Resolves the account's project and opens it in a new tab — redirecting
- * whatever tab `openBlankTab()` opened at the triggering click, or opening a
- * fresh one directly if none is pending. Only a plain email/password login
- * calls this; social login just goes home, same as the reference app.
+ * Resolves the account's project and only then opens it in a new tab — the
+ * account and the project are both confirmed to exist (or a new project is
+ * created) before any window.open() happens, never the other way around.
+ * Only a plain email/password login calls this; social login just goes
+ * home, same as the reference app. Returns whether a tab was actually opened.
  */
-export async function openDeeplinkProject(): Promise<void> {
+export async function openDeeplinkProject(): Promise<boolean> {
   try {
     const account = await authService.getUserDetailRequest();
     const url = await buildDeeplinkUrl(account.id);
-    if (!url) {
-      discardPendingTab();
-      return;
-    }
-    if (!redirectPendingTab(url)) window.open(url, '_blank', 'noopener,noreferrer');
+    if (!url) return false;
+    window.open(url, '_blank', 'noopener,noreferrer');
+    return true;
   } catch (error) {
-    discardPendingTab();
     console.error('[deeplink] failed to resolve project', error);
+    return false;
   }
 }
