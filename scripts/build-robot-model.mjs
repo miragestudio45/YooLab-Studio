@@ -1,249 +1,87 @@
 /**
- * Prepares the Open-Industry six-axis arm and its suction tool for the web.
+ * Prepares the Open-Industry warehouse and its robot cell for the web.
  *
- * The upstream files are Godot import artifacts, and three of the things that
- * makes them are wrong here rather than merely large:
+ * Everything the robot lab shows is an Open Industry Project asset: the building
+ * shell, the concrete floor, the six-axis arm, its suction tool, the Euro pallet
+ * and the AGV. They arrive as Godot import artifacts and all need the same two
+ * things done before a browser can have them.
  *
- *   - **COLOR_0 / COLOR_1.** Godot writes custom per-vertex data into these
- *     slots. glTF says a `COLOR_n` attribute is a vertex colour, so
- *     `GLTFLoader` sets `vertexColors: true` and three.js *multiplies* the
- *     base colour by it — the arm renders in whatever those channels happen to
- *     hold, which is not paint. Dropping them is a correctness fix that
- *     happens to save bytes.
- *   - **TEXCOORD_1.** A lightmap UV set. Nothing here bakes lightmaps, and a
- *     second UV channel that no material samples is dead weight.
- *   - **TANGENT.** Explicit tangents for a normal map three.js is perfectly
- *     happy to differentiate in the fragment shader. On a smooth-shaded
- *     industrial casting the two are visually indistinguishable.
+ * **Geometry.** Four vertex attributes come off every mesh — see `DEFAULT_DROP`
+ * in `lib/glb.mjs` for why each one goes, and note that dropping `COLOR_0` is a
+ * correctness fix rather than a size one. Positions, normals, `TEXCOORD_0` and
+ * indices are copied byte for byte. No vertex is moved, welded, decimated or
+ * re-indexed.
  *
- * Positions, normals, TEXCOORD_0 and indices are copied through byte for byte.
- * No geometry is moved, welded, decimated or re-indexed.
+ * **Textures.** Two kinds, handled differently:
+ *
+ *   - *Embedded* — `Pallet.glb` is 13.7 MB for 3,144 triangles and `AGV.glb` is
+ *     18.2 MB for 54,278, because both carry 4K PNGs inside the GLB. Those are
+ *     re-encoded in place to WebP at 1024².
+ *   - *External* — the wall, roof, framing and floor pieces reference `.tres`
+ *     materials that live beside them, so their GLBs carry placeholder colours
+ *     and no images at all. Those texture sets are exported separately below and
+ *     bound by material name at runtime in `lib/robot/warehouse.ts`.
+ *
+ * Nothing is written back to the reference copies under `reference-sources/`.
  *
  * Run: node scripts/build-robot-model.mjs
  */
 
-import { readFileSync, writeFileSync, mkdirSync, statSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { statSync } from 'node:fs';
+import sharp from 'sharp';
+import { readGlb, writeGlb, repackGlb, countTriangles } from './lib/glb.mjs';
 
 const OIP = 'reference-sources/Open-Industry-Project-master/Open-Industry-Project-master/assets/3DModels';
+const OUT = 'public/asset/practice/robot';
 
-const JOBS = [
-  [`${OIP}/Six-axis/Six-Axis_01.glb`, 'public/asset/practice/robot/six-axis.glb'],
-  [`${OIP}/EOATSuction/EOAT_Suction.glb`, 'public/asset/practice/robot/eoat-suction.glb'],
+/**
+ * Models copied through, as [source, destination, embedded-texture cap].
+ *
+ * The cap is the longest edge an embedded image is resampled to. `null` leaves
+ * the file's images alone — the arm and its tool carry none, and the wall and
+ * roof kit's images live outside the GLB.
+ */
+const MODELS = [
+  // The cell.
+  [`${OIP}/Six-axis/Six-Axis_01.glb`, 'six-axis.glb', null],
+  [`${OIP}/EOATSuction/EOAT_Suction.glb`, 'eoat-suction.glb', null],
+  // The building shell. `Wall_A` carries the X-bracing seen in the reference
+  // screenshot; `Wall_D` is the same 10 × 12 m section with a plain frame, at a
+  // sixth of the triangles, for the runs the camera never faces.
+  [`${OIP}/WallsAndRoof/Wall_A.glb`, 'wall-braced.glb', null],
+  [`${OIP}/WallsAndRoof/Wall_D.glb`, 'wall-plain.glb', null],
+  [`${OIP}/WallsAndRoof/Roof_A.glb`, 'roof.glb', null],
+  [`${OIP}/WallsAndRoof/Floor.glb`, 'floor-tile.glb', null],
+  [`${OIP}/WallsAndRoof/Light_A.glb`, 'light.glb', null],
+  // The furniture.
+  [`${OIP}/Pallet.glb`, 'pallet.glb', 1024],
+  [`${OIP}/AGV/AGV.glb`, 'agv.glb', 1024],
 ];
 
-/** Attributes removed from every primitive. See the header for why each goes. */
-const DROP = new Set(['TANGENT', 'TEXCOORD_1', 'COLOR_0', 'COLOR_1']);
-
-const GLB_MAGIC = 0x46546c67;
-const CHUNK_JSON = 0x4e4f534a;
-const CHUNK_BIN = 0x004e4942;
-
-function readGlb(path) {
-  const buffer = readFileSync(path);
-  if (buffer.readUInt32LE(0) !== GLB_MAGIC) throw new Error(`${path} is not a GLB`);
-  let offset = 12;
-  let json = null;
-  let bin = null;
-  while (offset + 8 <= buffer.length) {
-    const length = buffer.readUInt32LE(offset);
-    const type = buffer.readUInt32LE(offset + 4);
-    const body = buffer.subarray(offset + 8, offset + 8 + length);
-    if (type === CHUNK_JSON) json = JSON.parse(body.toString('utf8'));
-    if (type === CHUNK_BIN) bin = body;
-    offset += 8 + length + ((4 - (length % 4)) % 4);
-  }
-  if (!json) throw new Error(`${path} has no JSON chunk`);
-  return { json, bin: bin ?? Buffer.alloc(0) };
-}
-
-/** GLB requires both chunks to be 4-byte aligned; JSON pads with spaces. */
-function writeGlb(path, json, bin) {
-  const jsonBytes = Buffer.from(JSON.stringify(json), 'utf8');
-  const jsonPad = (4 - (jsonBytes.length % 4)) % 4;
-  const binPad = (4 - (bin.length % 4)) % 4;
-  const total = 12 + 8 + jsonBytes.length + jsonPad + (bin.length ? 8 + bin.length + binPad : 0);
-
-  const out = Buffer.alloc(total);
-  let cursor = 0;
-  out.writeUInt32LE(GLB_MAGIC, cursor); cursor += 4;
-  out.writeUInt32LE(2, cursor); cursor += 4;
-  out.writeUInt32LE(total, cursor); cursor += 4;
-
-  out.writeUInt32LE(jsonBytes.length + jsonPad, cursor); cursor += 4;
-  out.writeUInt32LE(CHUNK_JSON, cursor); cursor += 4;
-  jsonBytes.copy(out, cursor); cursor += jsonBytes.length;
-  out.fill(0x20, cursor, cursor + jsonPad); cursor += jsonPad;
-
-  if (bin.length) {
-    out.writeUInt32LE(bin.length + binPad, cursor); cursor += 4;
-    out.writeUInt32LE(CHUNK_BIN, cursor); cursor += 4;
-    bin.copy(out, cursor); cursor += bin.length;
-    out.fill(0, cursor, cursor + binPad);
-  }
-
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, out);
-}
-
-function strip(json, bin) {
-  /* Drop the attributes first, so the reachability sweep below sees the real
-     survivor set rather than the original one. */
-  let dropped = 0;
-  for (const mesh of json.meshes ?? []) {
-    for (const primitive of mesh.primitives) {
-      for (const name of Object.keys(primitive.attributes)) {
-        if (!DROP.has(name)) continue;
-        delete primitive.attributes[name];
-        dropped += 1;
-      }
-    }
-  }
-
-  /*
-   * Rebuild the buffer from the accessors that are still referenced, rather
-   * than editing the old one in place. An orphaned bufferView is still bytes
-   * in the file: the only way to actually shed them is to copy the survivors
-   * into a fresh buffer and renumber.
-   */
-  const usedAccessors = new Set();
-  for (const mesh of json.meshes ?? []) {
-    for (const primitive of mesh.primitives) {
-      for (const index of Object.values(primitive.attributes)) usedAccessors.add(index);
-      if (primitive.indices != null) usedAccessors.add(primitive.indices);
-      for (const target of primitive.targets ?? []) {
-        for (const index of Object.values(target)) usedAccessors.add(index);
-      }
-    }
-  }
-  /* Anything else that can hold an accessor index. None of these appear in
-     these two files, but a silent drop would be a corrupt file rather than a
-     smaller one. */
-  for (const animation of json.animations ?? []) {
-    for (const sampler of animation.samplers) {
-      usedAccessors.add(sampler.input);
-      usedAccessors.add(sampler.output);
-    }
-  }
-  for (const skin of json.skins ?? []) {
-    if (skin.inverseBindMatrices != null) usedAccessors.add(skin.inverseBindMatrices);
-  }
-
-  const accessorMap = new Map();
-  const nextAccessors = [];
-  const nextViews = [];
-  const parts = [];
-  let byteOffset = 0;
-
-  for (const [index, accessor] of (json.accessors ?? []).entries()) {
-    if (!usedAccessors.has(index)) continue;
-
-    const copy = { ...accessor };
-    if (accessor.bufferView != null) {
-      const view = json.bufferViews[accessor.bufferView];
-      const start = (view.byteOffset ?? 0) + (accessor.byteOffset ?? 0);
-      /* Interleaved views would need their stride preserved; these files are
-         tightly packed, so a flat copy is exact. Assert rather than corrupt. */
-      if (view.byteStride != null) {
-        throw new Error('interleaved bufferView — this script only handles tightly packed accessors');
-      }
-      const size = ELEMENT_SIZE[accessor.type] * COMPONENT_SIZE[accessor.componentType] * accessor.count;
-      const bytes = bin.subarray(start, start + size);
-
-      /* Every accessor's component type must be aligned to its own size. */
-      const alignment = COMPONENT_SIZE[accessor.componentType];
-      const padding = (alignment - (byteOffset % alignment)) % alignment;
-      if (padding) {
-        parts.push(Buffer.alloc(padding));
-        byteOffset += padding;
-      }
-
-      copy.bufferView = nextViews.length;
-      copy.byteOffset = 0;
-      nextViews.push({
-        buffer: 0,
-        byteOffset,
-        byteLength: size,
-        ...(view.target != null ? { target: view.target } : {}),
-      });
-      parts.push(Buffer.from(bytes));
-      byteOffset += size;
-    }
-
-    accessorMap.set(index, nextAccessors.length);
-    nextAccessors.push(copy);
-  }
-
-  const remap = (index) => {
-    const next = accessorMap.get(index);
-    if (next == null) throw new Error(`accessor ${index} survived a reference but not the copy`);
-    return next;
-  };
-  for (const mesh of json.meshes ?? []) {
-    for (const primitive of mesh.primitives) {
-      for (const [name, index] of Object.entries(primitive.attributes)) {
-        primitive.attributes[name] = remap(index);
-      }
-      if (primitive.indices != null) primitive.indices = remap(primitive.indices);
-      for (const target of primitive.targets ?? []) {
-        for (const [name, index] of Object.entries(target)) target[name] = remap(index);
-      }
-    }
-  }
-  for (const animation of json.animations ?? []) {
-    for (const sampler of animation.samplers) {
-      sampler.input = remap(sampler.input);
-      sampler.output = remap(sampler.output);
-    }
-  }
-  for (const skin of json.skins ?? []) {
-    if (skin.inverseBindMatrices != null) skin.inverseBindMatrices = remap(skin.inverseBindMatrices);
-  }
-
-  json.accessors = nextAccessors;
-  json.bufferViews = nextViews;
-  const nextBin = Buffer.concat(parts);
-  json.buffers = nextBin.length ? [{ byteLength: nextBin.length }] : [];
-  /* Images are external here; if that ever changes, the sweep above would need
-     to carry image bufferViews too. Fail loudly rather than drop a texture. */
-  if ((json.images ?? []).some((image) => image.bufferView != null)) {
-    throw new Error('embedded image bufferView — not handled');
-  }
-
-  return { dropped, bin: nextBin };
-}
-
-const ELEMENT_SIZE = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT2: 4, MAT3: 9, MAT4: 16 };
-const COMPONENT_SIZE = { 5120: 1, 5121: 1, 5122: 2, 5123: 2, 5125: 4, 5126: 4 };
-
-const kb = (bytes) => Math.round(bytes / 1024);
-
-for (const [from, to] of JOBS) {
-  const { json, bin } = readGlb(from);
-  const before = statSync(from).size;
-  const { dropped, bin: nextBin } = strip(json, bin);
-  writeGlb(to, json, nextBin);
-  const after = statSync(to).size;
-  console.log(
-    `${to}  ${kb(before)} KB → ${kb(after)} KB  (${dropped} attributes dropped, `
-    + `${Math.round((1 - after / before) * 100)}% smaller)`,
-  );
-}
-
-/* ------------------------------------------------------------- textures --- */
-
-/*
- * The upstream texture set is 4096² PNGs: 13.3 MB for the arm and 1.6 MB for
- * the tool. The arm never occupies more than ~450 px of stage height, at which
- * point a 1024 map is already being sampled below its top mip — so the extra
- * 12 MB buys nothing that can be seen.
+/**
+ * External texture sets, as [material name in the GLB, source stem, size, maps].
  *
- * Normal maps get the higher quality setting. Lossy chroma subsampling on a
- * tangent-space normal shifts the encoded direction rather than the colour, and
- * on the arm's large flat castings that shows up as visible blotching in the
- * specular response long before it would be noticeable on the base colour.
+ * The material names are the join: the GLBs name their materials `Wall_01`,
+ * `Framing_01` and so on, and the `.tres` files beside them are
+ * `Building_Wall_01.tres`, `Building_Framing_01.tres`. One-to-one, so the
+ * runtime can bind by name without a second mapping table to keep in sync.
+ *
+ * Normal maps are dropped for the steel framing: at the distance the camera
+ * ever sees a roof truss from, a 1024 normal map on a girder is 100 kB spent on
+ * something invisible. Base colour and ORM carry the read.
  */
-const TEXTURES = [
+const TEX = `${OIP}/WallsAndRoof/Textures`;
+const TEXTURE_SETS = [
+  ['Wall_01', 'BuildingPart_Wall_01', 1024, ['BaseColor', 'Normal', 'ORM']],
+  ['Framing_01', 'BuildingPart_Framing_01', 512, ['BaseColor', 'ORM']],
+  ['Framing_02', 'BuildingPart_Framing_02', 512, ['BaseColor', 'ORM']],
+  ['Roof_01', 'BuildingPart_Roof_01', 1024, ['BaseColor', 'ORM']],
+  ['Floor_A', 'BuildingPart_Floor_A', 1024, ['BaseColor', 'Normal', 'ORM']],
+  ['Light_A', 'BuildingPart_Light_A', 256, ['BaseColor', 'Emissive']],
+];
+
+/** The arm's own set, which lives in its model directory rather than the kit's. */
+const ARM_TEXTURES = [
   ['Six-axis/Textures/Six-Axis_01_BaseColor.png', 'six-axis-basecolor', 1024, 82],
   ['Six-axis/Textures/Six-Axis_01_Normal.png', 'six-axis-normal', 1024, 90],
   ['Six-axis/Textures/Six-Axis_01_ORM.png', 'six-axis-orm', 1024, 84],
@@ -252,11 +90,81 @@ const TEXTURES = [
   ['EOATSuction/Textures/EOAT_Baked_ORM.png', 'eoat-orm', 512, 84],
 ];
 
-const { default: sharp } = await import('sharp');
+const kb = (bytes) => Math.round(bytes / 1024);
 
-for (const [file, name, size, quality] of TEXTURES) {
-  const from = `${OIP}/${file}`;
-  const to = `public/asset/practice/robot/${name}.webp`;
-  await sharp(from).resize({ width: size, height: size }).webp({ quality, effort: 6 }).toFile(to);
-  console.log(`${to}  ${kb(statSync(from).size)} KB @4096 → ${kb(statSync(to).size)} KB @${size}`);
+/*
+ * Normal and ORM maps get the higher quality setting.
+ *
+ * Lossy chroma subsampling on a tangent-space normal shifts the encoded
+ * *direction* rather than the colour, and on the arm's large flat castings that
+ * shows up as visible blotching in the specular response long before it would be
+ * noticeable on a base colour.
+ */
+const quality = (name) => (/normal|orm/i.test(name) ? 90 : 82);
+
+let totalBefore = 0;
+let totalAfter = 0;
+
+for (const [from, name, imageCap] of MODELS) {
+  const to = `${OUT}/${name}`;
+  const { json, bin } = readGlb(from);
+  const before = statSync(from).size;
+
+  const { removed, bin: nextBin } = await repackGlb(json, bin, {
+    encodeImage: imageCap
+      ? async (data) => ({
+        data: await sharp(data)
+          .resize({ width: imageCap, height: imageCap, fit: 'inside', withoutEnlargement: true })
+          .webp({ quality: 84, effort: 6 })
+          .toBuffer(),
+        mimeType: 'image/webp',
+      })
+      : undefined,
+  });
+
+  const after = writeGlb(to, json, nextBin);
+  totalBefore += before;
+  totalAfter += after;
+  console.log(
+    `${name.padEnd(18)} ${String(kb(before)).padStart(6)} KB → ${String(kb(after)).padStart(5)} KB`
+    + `  ${String(countTriangles(json)).padStart(6)} tris  (${removed} attributes dropped)`,
+  );
 }
+
+console.log('');
+
+for (const [material, stem, size, maps] of TEXTURE_SETS) {
+  for (const map of maps) {
+    const from = `${TEX}/${stem}_${map}.png`;
+    const to = `${OUT}/${material.toLowerCase()}-${map.toLowerCase()}.webp`;
+    await sharp(from)
+      .resize({ width: size, height: size, fit: 'inside', withoutEnlargement: true })
+      .webp({ quality: quality(map), effort: 6 })
+      .toFile(to);
+    totalBefore += statSync(from).size;
+    totalAfter += statSync(to).size;
+    console.log(
+      `${(material + '/' + map).padEnd(24)} ${String(kb(statSync(from).size)).padStart(6)} KB`
+      + ` → ${String(kb(statSync(to).size)).padStart(5)} KB @${size}`,
+    );
+  }
+}
+
+console.log('');
+
+for (const [file, name, size, q] of ARM_TEXTURES) {
+  const from = `${OIP}/${file}`;
+  const to = `${OUT}/${name}.webp`;
+  await sharp(from).resize({ width: size, height: size }).webp({ quality: q, effort: 6 }).toFile(to);
+  totalBefore += statSync(from).size;
+  totalAfter += statSync(to).size;
+  console.log(
+    `${name.padEnd(24)} ${String(kb(statSync(from).size)).padStart(6)} KB`
+    + ` → ${String(kb(statSync(to).size)).padStart(5)} KB @${size}`,
+  );
+}
+
+console.log(
+  `\ntotal ${(totalBefore / 1048576).toFixed(1)} MB → ${(totalAfter / 1048576).toFixed(2)} MB`
+  + `  (${Math.round((1 - totalAfter / totalBefore) * 100)}% smaller)`,
+);

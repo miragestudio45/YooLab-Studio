@@ -64,8 +64,13 @@ import { createPracticeRoom } from '../../lib/three/practiceRoom';
 
 /* -------------------------------------------------------------- constants --- */
 
-/** The room is a cell hall: 14 m across, for a 3 m robot. */
-const ROOM_SPAN = 14;
+/**
+ * Span handed to the shared room, metres.
+ *
+ * Only the pixel-ratio governor and the (now hidden) grid read it — the visible
+ * room is the 50 × 40 m warehouse in `warehouse.ts`.
+ */
+const ROOM_SPAN = 50;
 /** Joint slew, degrees per second at 100% speed. Upstream's default is 45. */
 const JOINT_RATE = 62;
 /** Cartesian jog, metres per second. */
@@ -235,9 +240,61 @@ export function RobotLab() {
     let disposed = false;
     const room = createPracticeRoom(host, { mount, span: ROOM_SPAN, fov: 32 });
     const { stage } = room;
-    /* The cell paints its own floor markings and everything in it is bolted
-       down, so the shared blob shadow would be a smudge under a fixed machine. */
+
+    /*
+     * The Library's studio furniture comes off.
+     *
+     * `createPracticeRoom` is still worth keeping — it owns the renderer setup,
+     * the resize plumbing, the hard pause when the canvas is off screen, the
+     * adaptive pixel-ratio governor and the ordered teardown, and none of that
+     * should be written twice. What has to go is everything it draws: this lab
+     * stands in a 50 × 40 m warehouse, and an ivory backdrop plate, a lavender
+     * measuring grid and a floor disc inside a building are three surfaces
+     * fighting the walls.
+     */
     room.shadow.mesh.visible = false;
+    room.ground.visible = false;
+    stage.grid.mesh.visible = false;
+    stage.backdrop.mesh.visible = false;
+    /* Nothing of the clear colour survives inside a closed building; this is
+       what shows for the frame or two before the shell arrives. */
+    stage.renderer.setClearColor(0x2b2e33, 1);
+
+    /*
+     * Relit for an interior.
+     *
+     * The studio rig is four lights aimed at a specimen on a plate a metre
+     * across, and in a warehouse it reads as a spotlight on one wall. Rather
+     * than rebuild it, the existing lights are retuned in place: the hemisphere
+     * becomes the diffuse bounce off a concrete floor, the key becomes daylight
+     * through the roof, and the two decorative fills go out. Traversing for them
+     * is the honest way to reach lights the stage does not expose — and it
+     * cannot mistake anything else, because a `THREE.Light` is the only thing in
+     * the scene at this point.
+     */
+    stage.scene.traverse((node) => {
+      if (node instanceof THREE.HemisphereLight) {
+        node.color.setHex(0xdfe6ef);
+        node.groundColor.setHex(0x8d8378);
+        node.intensity = 1.15;
+      } else if (node instanceof THREE.DirectionalLight && node === stage.keyLight) {
+        node.color.setHex(0xfff2df);
+        node.intensity = 2.1;
+        node.position.set(-22, 34, 16);
+      } else if (node instanceof THREE.DirectionalLight || node instanceof THREE.PointLight) {
+        node.intensity = 0;
+      }
+    });
+    /* The shadow camera has to cover the cell, not a specimen. Left at its
+       studio extents the arm cast a shadow that stopped a metre from its base. */
+    const shadowCamera = stage.keyLight.shadow.camera;
+    shadowCamera.left = -14;
+    shadowCamera.right = 14;
+    shadowCamera.top = 14;
+    shadowCamera.bottom = -14;
+    shadowCamera.near = 1;
+    shadowCamera.far = 90;
+    shadowCamera.updateProjectionMatrix();
 
     let cell: RobotCellScene | null = null;
     const fk = createForwardKinematics();
@@ -275,17 +332,17 @@ export function RobotLab() {
      * also the angle anyone photographing a real cell shoots from and the
      * only one that shows the pallet pattern being built.
      */
-    let cameraPitch = 0.4;
+    let cameraPitch = 0.36;
     /* Framed on the working triangle — arm, pick station, pallet — with the
        racking behind it. At 11.2 the two rack bays took the upper third of the
        frame and the arm read as the smallest machine in the room. */
-    let cameraDistance = 11.0;
+    let cameraDistance = 15.5;
     let dragging = false;
     let previousX = 0;
     let previousY = 0;
     /* Aimed at the work, not at the machine: the pick station, the pallet and
        the arm's own wrist all sit forward and left of the base. */
-    const pivot = new THREE.Vector3(-0.8, 1.1, 0.7);
+    const pivot = new THREE.Vector3(-0.6, 1.35, 0.6);
 
     const onPointerDown = (event: PointerEvent) => {
       if ((event.target as Element | null)?.closest('button, a, input, label')) return;
@@ -312,7 +369,7 @@ export function RobotLab() {
     const onWheel = (event: WheelEvent) => {
       if (Math.abs(event.deltaY) < 2) return;
       event.preventDefault();
-      cameraDistance = THREE.MathUtils.clamp(cameraDistance * (1 + event.deltaY * 0.0012), 3.2, 24);
+      cameraDistance = THREE.MathUtils.clamp(cameraDistance * (1 + event.deltaY * 0.0012), 3.2, 42);
     };
 
     /* --- keyboard ---------------------------------------------------------- */
@@ -585,10 +642,37 @@ export function RobotLab() {
         pivot.y + Math.sin(cameraPitch) * cameraDistance,
         pivot.z + Math.cos(cameraYaw) * Math.cos(cameraPitch) * cameraDistance,
       );
+      /*
+       * Kept inside the building.
+       *
+       * Without this the zoom simply walks the eye out through a wall, and
+       * because the shell is single-sided the visitor ends up looking at the
+       * cell through the back of a corrugated panel — which reads as the model
+       * being broken rather than as the camera having left. Clamping the
+       * *position* rather than the distance means the orbit still turns freely
+       * when it is up against a wall; it just stops receding.
+       */
+      if (cell) {
+        const { halfWidth, halfDepth, height } = cell.warehouse.bounds;
+        cameraTarget.x = THREE.MathUtils.clamp(cameraTarget.x, -halfWidth, halfWidth);
+        cameraTarget.z = THREE.MathUtils.clamp(cameraTarget.z, -halfDepth, halfDepth);
+        cameraTarget.y = THREE.MathUtils.clamp(cameraTarget.y, 0.6, height - 1.5);
+      }
       stage.camera.position.lerp(cameraTarget, 1 - Math.exp(-9 * delta));
       stage.camera.lookAt(pivot);
 
       if (cell) {
+        /*
+         * The roof comes off when the camera looks down through it.
+         *
+         * Upstream's `Building` does the same at an 80° pitch, for the reason
+         * you cannot argue with: you cannot see into a building through its
+         * roof. The threshold here is lower because this camera never gets
+         * anywhere near vertical — at 0.4 rad the trusses frame the top of the
+         * shot, and by 0.75 they are between the eye and the cell.
+         */
+        cell.warehouse.roof.visible = cameraPitch < 0.68;
+
         const control = controlRef.current;
         const pulse = pulseRef.current;
         const step = JOINT_RATE * control.speed * delta;

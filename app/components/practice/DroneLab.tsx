@@ -18,14 +18,10 @@ import {
   tiltOf,
   type Sticks,
 } from '../../lib/drone/flight';
+import { createDroneRig, updatePropBlur } from '../../lib/drone/airframe';
+import { createCity, createSky, hitsObstacle, nearestSolid } from '../../lib/drone/city';
+import { COURSE_COLORS, createCourse } from '../../lib/drone/course';
 import { createDownwash, createMotionTrail } from '../../lib/drone/fx';
-import {
-  COURSE_COLORS,
-  createFlightHall,
-  hitsObstacle,
-  nearestSolid,
-} from '../../lib/drone/hall';
-import { createDroneRig, updatePropBlur } from '../../lib/drone/rig';
 import {
   CAMERA_LABELS,
   CAMERA_MODES,
@@ -47,19 +43,19 @@ import { createPracticeRoom } from '../../lib/three/practiceRoom';
  * two painted discs on empty ivory, one camera, a drone made of thirty boxes,
  * and no way to see what a good flight looks like.
  *
- * Each of those is now the thing it should have been:
+ * Each of those is now the thing it should have been, and three of the four are
+ * upstream's own:
  *
- *   **the room** is a netted indoor test cage with a marked flight box, gates on
- *   stands, a slalom, obstacle blocks and a wind fan (`lib/drone/hall.ts`). A
- *   course with no walls gives a pilot no sense of speed and nothing to judge
- *   altitude against.
- *   **the aircraft** is a modelled 7-inch quad (`lib/drone/rig.ts`), because the
- *   chase camera sits 1.1 m behind it and the onboard camera is *inside* it.
- *   **the cameras** are the sandbox's four, ported (`lib/drone/view.ts`) — and
- *   the onboard one is the reason a student understands what FPV means.
- *   **the autopilot** flies the course by moving the sticks through the same
- *   controller a human's inputs go through (`lib/drone/autopilot.ts`), so the
- *   panel can print what a good pilot would be doing right now.
+ *   **the city** is theirs — forty buildings on their street-grid plan, their
+ *   yard props, their mountain-horizon sky (`lib/drone/city.ts`).
+ *   **the aircraft** is theirs — the Mint quadrotor pack, assembled by their own
+ *   fit table (`lib/drone/airframe.ts`), which matters because the chase camera
+ *   sits 1.1 m behind it and the onboard camera is *inside* it.
+ *   **the cameras** are their four, ported (`lib/drone/view.ts`) — and the
+ *   onboard one is the reason a student understands what FPV means.
+ *   **the autopilot** is ours, and flies the course by moving the sticks through
+ *   the same controller a human's inputs go through (`lib/drone/autopilot.ts`),
+ *   so the panel can print what a good pilot would be doing right now.
  *
  * The lesson on top of it is still deliberately not a simulator. A flight
  * sandbox opens on a tuning panel, three flight modes and a city; a student who
@@ -78,7 +74,7 @@ const STEPS = [
 const COPY: { objective: string; hint: string }[] = [
   {
     objective: 'Nhấn Khởi động để bốn động cơ bắt đầu quay.',
-    hint: 'Drone chỉ bay khi động cơ đã khởi động. Trong lúc chờ, bạn vẫn kéo được khung hình để nhìn quanh sân bay thử nghiệm.',
+    hint: 'Drone chỉ bay khi động cơ đã khởi động. Trong lúc chờ, bạn vẫn kéo được khung hình để nhìn quanh thành phố.',
   },
   {
     objective: 'Giữ phím R để bay lên, tới khi drone chạm vòng mốc phía trên bãi đỗ.',
@@ -128,8 +124,14 @@ const PHYSICS_STEP = 1 / 200;
 const CRASH_SINK = 3.4;
 /** Tilt past which the aircraft has arrived on its side. */
 const CRASH_TILT = (58 * Math.PI) / 180;
-/** Cruise height the autopilot transits at, metres. */
-const CRUISE = 3.1;
+/**
+ * Cruise height the autopilot transits at, metres.
+ *
+ * Above the tallest gate and below the first ring of roofs — the plaza is open
+ * to 44 m in every direction, so a transit at 14 m clears the course furniture
+ * without ever needing to route around a building.
+ */
+const CRUISE = 14;
 /**
  * Battery, in seconds of hover.
  *
@@ -180,6 +182,7 @@ export function DroneLab() {
   const [armed, setArmed] = useState(false);
   const [finished, setFinished] = useState(false);
   const [hintOpen, setHintOpen] = useState(false);
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [flash, setFlash] = useState<{ text: string; tone: 'success' | 'warn'; key: number } | null>(null);
   const [telemetry, setTelemetry] = useState<Telemetry>({
     altitude: 0, speed: 0, climb: 0, battery: 100, proximity: 9,
@@ -204,18 +207,71 @@ export function DroneLab() {
     const mount = viewRef.current;
     if (!host || !mount) return;
 
-    const room = createPracticeRoom(host, { mount, span: 40, fov: 40 });
+    let disposed = false;
+    const room = createPracticeRoom(host, { mount, span: 120, fov: 44 });
     const { stage } = room;
-    /* The hall paints its own floor and the aircraft gets a downwash disc, which
-       is a better altitude cue than the shared blob and does not fight it. */
-    room.shadow.mesh.visible = false;
 
-    const hall = createFlightHall();
+    /*
+     * The studio furniture comes off, same as the robot cell.
+     *
+     * `createPracticeRoom` still owns everything worth keeping — renderer setup,
+     * resize plumbing, the hard pause when the canvas is off screen, the
+     * adaptive pixel-ratio governor, the ordered teardown. What has to go is
+     * every surface it draws: this lab flies over a 350 m city under a
+     * mountain-horizon sky, and an ivory backdrop plate and a lavender measuring
+     * grid inside that are two surfaces fighting the sky.
+     */
+    room.shadow.mesh.visible = false;
+    room.ground.visible = false;
+    stage.grid.mesh.visible = false;
+    stage.backdrop.mesh.visible = false;
+
+    /*
+     * Relit for daylight. The studio rig aims four lights at a specimen on a
+     * plate a metre across; over a city it reads as a spotlight on one façade.
+     * The hemisphere becomes sky-and-ground bounce, the key becomes the sun, and
+     * the two decorative fills go out.
+     */
+    stage.scene.traverse((node) => {
+      if (node instanceof THREE.HemisphereLight) {
+        node.color.setHex(0xbcd4f0);
+        node.groundColor.setHex(0x6b665e);
+        node.intensity = 1.5;
+      } else if (node instanceof THREE.DirectionalLight && node === stage.keyLight) {
+        node.color.setHex(0xfff3e2);
+        node.intensity = 2.4;
+        node.position.set(-60, 90, 50);
+      } else if (node instanceof THREE.DirectionalLight || node instanceof THREE.PointLight) {
+        node.intensity = 0;
+      }
+    });
+    /* The shadow camera has to cover the course, not a specimen. */
+    const shadowCamera = stage.keyLight.shadow.camera;
+    shadowCamera.left = -40;
+    shadowCamera.right = 40;
+    shadowCamera.top = 40;
+    shadowCamera.bottom = -40;
+    shadowCamera.near = 1;
+    shadowCamera.far = 260;
+    shadowCamera.updateProjectionMatrix();
+    /* The far plane has to clear the skybox; the studio's 200 m cut the city in
+       half at the second block. */
+    stage.camera.far = 1400;
+    stage.camera.updateProjectionMatrix();
+
+    const hall = createCourse();
     stage.scene.add(hall.group);
 
-    const rig = createDroneRig();
-    stage.scene.add(rig.root);
-    const FLOOR = rig.groundClearance;
+    /*
+     * The city, the sky and the aircraft all arrive over the network, so the lab
+     * mounts against an empty scene and fills in. The course above is procedural
+     * and is there immediately, which is what the camera has to look at while
+     * the 4.6 MB of models are on the wire.
+     */
+    let city: Awaited<ReturnType<typeof createCity>> | null = null;
+    let sky: Awaited<ReturnType<typeof createSky>> | null = null;
+    let rig: Awaited<ReturnType<typeof createDroneRig>> | null = null;
+    let FLOOR = 0.05;
 
     const motionTrail = createMotionTrail();
     stage.scene.add(motionTrail.line);
@@ -281,7 +337,7 @@ export function DroneLab() {
         (gate.glow.material as THREE.MeshBasicMaterial).opacity = 0.12;
       }
       (hall.landingMark.material as THREE.MeshBasicMaterial).color.set(COURSE_COLORS.SAGE);
-      rig.setArmed(false);
+      rig?.setArmed(false);
       setArmed(false);
       setCleared(0);
       setFinished(false);
@@ -293,6 +349,41 @@ export function DroneLab() {
     seat();
     recovery.point.set(hall.launchPad.x, 0, hall.launchPad.z);
     view.reset(state);
+
+    /*
+     * The world arrives in one piece.
+     *
+     * `Promise.all` rather than three independent loads, so the first frame the
+     * visitor sees is a finished city — buildings popping in one at a time over
+     * two seconds reads as a page still downloading, which is exactly what it
+     * is and exactly what nobody should have to watch.
+     */
+    Promise.all([createCity(), createSky(), createDroneRig()])
+      .then(([builtCity, builtSky, builtRig]) => {
+        if (disposed) {
+          builtCity.dispose();
+          builtSky.dispose();
+          builtRig.dispose();
+          return;
+        }
+        city = builtCity;
+        sky = builtSky;
+        rig = builtRig;
+        stage.scene.add(builtCity.group);
+        stage.scene.add(builtSky.mesh);
+        stage.scene.add(builtRig.root);
+        /* The skids set where the aircraft rests, and they are only known once
+           the parts are fitted — so the seat has to be redone against the real
+           number rather than the placeholder. */
+        FLOOR = builtRig.groundClearance;
+        seat();
+        view.reset(state);
+        setStatus('ready');
+      })
+      .catch((error) => {
+        console.error('Drone world failed to load', error);
+        if (!disposed) setStatus('error');
+      });
 
     /*
      * A crash is never expensive.
@@ -311,7 +402,7 @@ export function DroneLab() {
       state.armed = true;
       controller.reset(state, state.position.y);
       motionTrail.reset();
-      rig.setArmed(true);
+      rig?.setArmed(true);
       setArmed(true);
       if (controlRef.current.mode === 'auto') loadPlan();
     };
@@ -408,12 +499,28 @@ export function DroneLab() {
     let accumulator = 0;
     let hudElapsed = 0;
     let pulse = 0;
-    let fanSpin = 0;
 
     stage.renderer.setAnimationLoop(() => {
       timer.update();
       const delta = Math.min(timer.getDelta(), 0.05);
       if (!stage.active()) return;
+
+      /*
+       * Nothing runs until the city and the aircraft have landed.
+       *
+       * The alternative — null-guarding forty call sites — is how a render loop
+       * becomes unreadable. One gate at the top, two non-null locals below it,
+       * and the scene still draws so the loading state is a lit sky rather than
+       * a frozen frame.
+       */
+      if (!rig || !city) {
+        stage.noteFrame(delta);
+        stage.renderer.render(stage.scene, stage.camera);
+        return;
+      }
+      const aircraft = rig;
+      const world = city;
+
       const control = controlRef.current;
       const commands = commandRef.current;
 
@@ -421,7 +528,7 @@ export function DroneLab() {
       if (commands.disarm) {
         commands.disarm = false;
         state.armed = false;
-        rig.setArmed(false);
+        aircraft.setArmed(false);
         setArmed(false);
       }
       if (commands.arm) {
@@ -430,7 +537,7 @@ export function DroneLab() {
           state.armed = true;
           state.crashed = false;
           controller.reset(state, Math.max(state.position.y, FLOOR + 0.35));
-          rig.setArmed(true);
+          aircraft.setArmed(true);
           setArmed(true);
           if (control.mode === 'auto') loadPlan();
           if (stepRef.current === 0) {
@@ -492,12 +599,12 @@ export function DroneLab() {
         if (
           !state.crashed
           && state.position.y > FLOOR + 0.02
-          && hitsObstacle(hall.obstacles, state.position, VEHICLE.armLength)
+          && hitsObstacle(world.obstacles, state.position, VEHICLE.armLength)
         ) {
           state.crashed = true;
           state.armed = false;
           crashHold = 1.1;
-          rig.setArmed(false);
+          aircraft.setArmed(false);
           setArmed(false);
           pushFlash('Va vào chướng ngại vật — đưa drone về điểm gần nhất', 'warn');
         }
@@ -519,7 +626,7 @@ export function DroneLab() {
               state.crashed = true;
               state.armed = false;
               crashHold = 1.15;
-              rig.setArmed(false);
+              aircraft.setArmed(false);
               setArmed(false);
               pushFlash('Va chạm — đưa drone về điểm gần nhất', 'warn');
             } else if (!finishedRun) {
@@ -531,7 +638,7 @@ export function DroneLab() {
               if ((stepRef.current === 3 || control.mode === 'auto') && inZone) {
                 finishedRun = true;
                 state.armed = false;
-                rig.setArmed(false);
+                aircraft.setArmed(false);
                 setArmed(false);
                 setFinished(true);
                 (hall.landingMark.material as THREE.MeshBasicMaterial).color.set(COURSE_COLORS.SAGE);
@@ -549,14 +656,12 @@ export function DroneLab() {
          * A wall the aircraft bounces off would be a punishment; this is a
          * spring that pushes it back, so flying too far is a thing that gets
          * gently corrected rather than a thing that ends the lesson. */
-        const { halfLength, halfWidth, ceiling } = hall.bounds;
-        if (Math.abs(state.position.x) > halfLength) {
-          const over = Math.abs(state.position.x) - halfLength;
-          state.velocity.x -= Math.sign(state.position.x) * over * 2.6 * PHYSICS_STEP;
-        }
-        if (Math.abs(state.position.z) > halfWidth) {
-          const over = Math.abs(state.position.z) - halfWidth;
-          state.velocity.z -= Math.sign(state.position.z) * over * 2.6 * PHYSICS_STEP;
+        const { radius, ceiling } = world.bounds;
+        const outward = Math.hypot(state.position.x, state.position.z);
+        if (outward > radius) {
+          const pull = (outward - radius) * 2.4;
+          state.velocity.x -= (state.position.x / outward) * pull * PHYSICS_STEP;
+          state.velocity.z -= (state.position.z / outward) * pull * PHYSICS_STEP;
         }
         if (state.position.y > ceiling) {
           state.velocity.y -= (state.position.y - ceiling) * 3 * PHYSICS_STEP;
@@ -620,20 +725,16 @@ export function DroneLab() {
       (hall.landingMark.material as THREE.MeshBasicMaterial).opacity = stepRef.current === 3
         ? 0.4 + beat * 0.5
         : 0.6;
-      rig.beacon.intensity = state.armed ? 0.4 + beat * 0.7 : 0;
-      /* The fan spins whether or not anything is flying — it is the room's
-         weather, not the aircraft's. */
-      fanSpin += delta * 7.4;
-      hall.fan.rotation.z = fanSpin;
+      aircraft.beacon.intensity = state.armed ? 0.4 + beat * 0.7 : 0;
 
       /* --- projection ----------------------------------------------------- */
       interpolatePose(previous, state, accumulator / PHYSICS_STEP, drawn);
-      rig.root.position.copy(drawn.position);
-      rig.root.quaternion.copy(drawn.orientation);
+      aircraft.root.position.copy(drawn.position);
+      aircraft.root.quaternion.copy(drawn.orientation);
       for (let index = 0; index < 4; index += 1) {
-        rig.rotors[index].rotation.y = state.motorAngle[index];
+        aircraft.rotors[index].rotation.y = state.motorAngle[index];
       }
-      updatePropBlur(rig.blurs, state.motorOmega);
+      updatePropBlur(aircraft.blurs, state.motorOmega);
       const load = rotorLoad(state);
       downwash.update(state, load, 0);
       if (state.armed && !state.crashed) motionTrail.push(state.position);
@@ -645,7 +746,7 @@ export function DroneLab() {
         drawn.position.clone().setY(drawn.position.y + 0.35),
         1 - Math.exp(-3.4 * delta),
       );
-      view.update(stage.camera, state, delta, drawn, rig.gimbal);
+      view.update(stage.camera, state, delta, drawn, aircraft.gimbal);
 
       /* --- readout --------------------------------------------------------- */
       hudElapsed += delta;
@@ -657,7 +758,7 @@ export function DroneLab() {
           speed: Math.hypot(state.velocity.x, state.velocity.y, state.velocity.z),
           climb: state.velocity.y,
           battery: Math.round(battery * 100),
-          proximity: nearestSolid(hall.obstacles, hall.bounds, state.position),
+          proximity: nearestSolid(world.obstacles, state.position),
           roll: THREE.MathUtils.radToDeg(euler.z),
           pitch: THREE.MathUtils.radToDeg(euler.x),
           heading: THREE.MathUtils.radToDeg(euler.y),
@@ -673,6 +774,7 @@ export function DroneLab() {
     });
 
     return () => {
+      disposed = true;
       stage.renderer.setAnimationLoop(null);
       host.removeEventListener('keydown', onKeyDown);
       host.removeEventListener('keyup', onKeyUp);
@@ -686,7 +788,9 @@ export function DroneLab() {
       delete host.dataset.grabbing;
       motionTrail.dispose();
       downwash.dispose();
-      rig.dispose();
+      rig?.dispose();
+      sky?.dispose();
+      city?.dispose();
       hall.dispose();
       room.dispose();
     };
@@ -711,14 +815,21 @@ export function DroneLab() {
     : `Chặng ${Math.min(telemetry.leg + 1, telemetry.legs)} / ${telemetry.legs}`;
 
   return (
-    <div className="lab lab--panelled lab--drone" ref={hostRef} tabIndex={0} aria-label="Sân bay thử nghiệm drone">
+    <div className="lab lab--panelled lab--drone" ref={hostRef} tabIndex={0} aria-label="Trải nghiệm lái drone trên thành phố">
       <div className="lab-stage">
         <div
           ref={viewRef}
           role="img"
-          aria-label="Drone bốn cánh trong sân bay thử nghiệm trong nhà"
+          aria-label="Drone bốn cánh bay trên thành phố mô phỏng"
           className="lab-view"
         />
+
+        {status === 'loading' && (
+          <p className="lab-status"><i />Đang tải thành phố và drone…</p>
+        )}
+        {status === 'error' && (
+          <p className="lab-status is-error"><i />Không tải được mô hình. Hãy tải lại trang.</p>
+        )}
 
         <p className={`lab-badge${armed ? ' is-live' : ''}`}>
           <i aria-hidden="true" />

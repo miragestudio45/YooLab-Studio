@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { createSixAxisArm, type SixAxisArm } from './sixAxis';
+import { createWarehouse, loadProp, type Warehouse } from './warehouse';
 
 /**
  * A case-palletising cell, at true scale.
@@ -22,23 +23,30 @@ import { createSixAxisArm, type SixAxisArm } from './sixAxis';
  * and the cycle those numbers imply — six cases a layer, two layers, twelve
  * picks — is the cycle the lab runs.
  *
- * ## Why this is built rather than loaded
+ * ## What is loaded and what is generated
  *
- * The upstream project generates all of this procedurally too: its conveyors,
- * racks, fences and floor markings are Godot tool scripts that build meshes from
- * exported dimensions (`src/Conveyor/belt_conveyor.gd` is 1,700 lines of exactly
- * that). There is no conveyor asset to import. What is imported is the one thing
- * upstream *does* ship as art, and the one thing that cannot be convincingly
- * generated: the arm.
+ * Everything upstream ships as art is loaded, not imitated: the arm, its suction
+ * tool, the building shell, the concrete floor, the Euro pallet and the AGV.
+ *
+ * What is still generated here is exactly what upstream also generates. Its
+ * conveyors, racks, fences and floor markings are Godot tool scripts that build
+ * meshes from exported dimensions — `src/Conveyor/belt_conveyor.gd` is 1,700
+ * lines of precisely that — so there is no conveyor asset to import, and
+ * building one here is the same decision made again in a different language
+ * rather than a substitute for a file.
  *
  * ## The room
  *
- * The Library's ivory studio, like every other lab in this section — not the
- * upstream project's grey steel warehouse. That is a house rule and it is worth
- * stating why it survives contact with an industrial subject: a visitor moving
- * from the drone course to this cell should arrive somewhere they recognise. A
- * warehouse shell would also flood the frame with 40 m of corrugated wall to
- * light a 3 m robot, and the robot is the lesson.
+ * Upstream's warehouse, from upstream's own wall, roof and floor kit — see
+ * `warehouse.ts`. Every other lab in this section stands in the Library's ivory
+ * studio and this one used to as well, on the house rule that a visitor moving
+ * between them should arrive somewhere they recognise.
+ *
+ * That rule loses here. A palletising robot is not a specimen on a turntable; it
+ * is a machine that only means anything inside a building, and a 3 m arm in a
+ * white void has nothing to be 3 m *relative to*. The racking, the AGV and the
+ * 12 m corrugated walls are what make it read as industrial equipment rather
+ * than as a large white toy.
  */
 
 /* --------------------------------------------------------------- palette --- */
@@ -156,6 +164,8 @@ export type RobotCellScene = {
   setBeacon(state: 'idle' | 'run' | 'fault'): void;
   /** Puts every case back on the belt. */
   reset(): void;
+  /** The building. The lab hides its roof when the camera looks steeply down. */
+  warehouse: Warehouse;
   dispose(): void;
 };
 
@@ -200,7 +210,13 @@ export async function createRobotCellScene(): Promise<RobotCellScene> {
 
   /* ---------------------------------------------------------- the arm --- */
 
-  const arm = await createSixAxisArm();
+  const [arm, warehouse, palletProp, agvProp] = await Promise.all([
+    createSixAxisArm(),
+    createWarehouse({ width: 5, depth: 4 }),
+    loadProp('pallet'),
+    loadProp('agv'),
+  ]);
+  group.add(warehouse.group);
   /*
    * The arm's own shoulder sits at azimuth −90° in its base frame — the model
    * faces world −X at `j1 = 0`. Yawing the whole robot a quarter turn makes
@@ -294,27 +310,36 @@ export async function createRobotCellScene(): Promise<RobotCellScene> {
 
   /* --------------------------------------------------------- pallet --- */
 
-  const pallet = new THREE.Group();
+  /*
+   * Upstream's own `Pallet.glb`, not a stack of boxes.
+   *
+   * It is the object the whole cycle is aimed at and it sits at the centre of
+   * the frame, so it is the last thing that should be approximated — and there
+   * is a real one in the kit. `PALLET` above still carries its dimensions
+   * because `slotPosition` needs them, and they were taken from this mesh:
+   * 1.22 × 0.13 × 1.02 measured, a 1200 × 800 Euro pallet.
+   */
+  const pallet = palletProp.scene;
   pallet.position.set(LAYOUT.palletX, 0, LAYOUT.palletZ);
   group.add(pallet);
 
   /*
-   * A Euro pallet is three bottom boards, nine blocks and five top deck boards.
-   * Built out rather than approximated with one slab, because it is the object
-   * the whole cycle is aimed at and it sits at eye level in the frame.
+   * The AGV, parked at the racking where a forklift would be waiting for a
+   * finished pallet. It is scenery and it is load-bearing scenery: a driverless
+   * truck beside the racking is what says this cell is one station on a line
+   * rather than a machine on its own.
    */
-  const deckBoard = box(PALLET.x, 0.022, 0.1);
-  const bottomBoard = box(PALLET.x, 0.022, 0.145);
-  const blockGeometry = box(0.1, 0.1, 0.145);
-  for (let index = 0; index < 5; index += 1) {
-    add(deckBoard, palletMat, [0, PALLET.y - 0.011, (index - 2) * (PALLET.z / 4.6)], pallet);
-  }
-  for (const z of [-PALLET.z / 2 + 0.075, 0, PALLET.z / 2 - 0.075]) {
-    add(bottomBoard, palletMat, [0, 0.011, z], pallet);
-    for (const x of [-PALLET.x / 2 + 0.05, 0, PALLET.x / 2 - 0.05]) {
-      add(blockGeometry, palletMat, [x, 0.072, z], pallet);
-    }
-    add(box(PALLET.x, 0.022, 0.145), palletMat, [0, PALLET.y - 0.033, z], pallet);
+  const agv = agvProp.scene;
+  agv.position.set(LAYOUT.rackX + 2.4, 0, 4.6);
+  agv.rotation.y = -Math.PI * 0.62;
+  group.add(agv);
+
+  /* Two more pallets waiting to be filled, from the same mesh. */
+  for (const [x, z, yaw] of [[-2.25, -2.4, 0.06], [-3.9, -2.3, -0.1]] as const) {
+    const spare = pallet.clone(true);
+    spare.position.set(x, 0, z);
+    spare.rotation.y = yaw;
+    group.add(spare);
   }
 
   /* ---------------------------------------------------------- racks --- */
@@ -631,8 +656,12 @@ export async function createRobotCellScene(): Promise<RobotCellScene> {
     reset() {
       cases.forEach(homeCase);
     },
+    warehouse,
     dispose() {
       arm.dispose();
+      warehouse.dispose();
+      palletProp.dispose();
+      agvProp.dispose();
       for (const value of owned) value.dispose();
       /* The belt texture owns a canvas, so it is disposed explicitly rather
          than through `keep` — which only tracks geometries and materials. */

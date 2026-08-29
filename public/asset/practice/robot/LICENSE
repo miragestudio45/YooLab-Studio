@@ -22,12 +22,25 @@ THE SOFTWARE.
 
 ---
 
-The above notice covers `six-axis.glb`, `eoat-suction.glb` and the six WebP
-texture maps in this directory, which are derived from
-`assets/3DModels/Six-axis/` and `assets/3DModels/EOATSuction/` in the
-Open Industry Project (https://github.com/Open-Industry-Project/Open-Industry-Project).
+The notice above covers every file in this directory. They are derived from the
+Open Industry Project (https://github.com/Open-Industry-Project/Open-Industry-Project):
 
-Modifications, in full: four unused vertex attributes were removed from the two
-GLBs and their buffers repacked (see scripts/build-robot-model.mjs); the texture
-maps were resampled and re-encoded as WebP. No geometry was altered. Full detail
-in THIRD_PARTY_ASSETS.md at the repository root.
+  six-axis.glb, *six-axis-*.webp   assets/3DModels/Six-axis/
+  eoat-suction.glb, eoat-*.webp    assets/3DModels/EOATSuction/
+  wall-braced.glb                  assets/3DModels/WallsAndRoof/Wall_A.glb
+  wall-plain.glb                   assets/3DModels/WallsAndRoof/Wall_D.glb
+  roof.glb                         assets/3DModels/WallsAndRoof/Roof_A.glb
+  floor-tile.glb                   assets/3DModels/WallsAndRoof/Floor.glb
+  light.glb                        assets/3DModels/WallsAndRoof/Light_A.glb
+  wall_01-*, framing_0*-*,         assets/3DModels/WallsAndRoof/Textures/
+  roof_01-*, floor_a-*, light_a-*
+  pallet.glb                       assets/3DModels/Pallet.glb
+  agv.glb                          assets/3DModels/AGV/AGV.glb
+
+Modifications, in full: four unused vertex attributes were removed from every
+GLB and their buffers repacked; embedded textures were resampled and re-encoded
+as WebP; external texture sets were resampled and re-encoded as WebP. No
+geometry was altered — no vertex moved, welded, decimated or re-indexed, and
+every triangle count is unchanged. The build is reproducible with
+scripts/build-robot-model.mjs. Full detail in THIRD_PARTY_ASSETS.md at the
+repository root.

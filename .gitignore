@@ -45,3 +45,8 @@ next-env.d.ts
 /reference-sources/
 
 reference-sources.zip
+
+# Downloaded third-party sources, re-processed into public/asset by scripts/.
+# Not committed: they are inputs, and THIRD_PARTY_ASSETS.md records where they
+# come from and how to fetch them again.
+.cache/
