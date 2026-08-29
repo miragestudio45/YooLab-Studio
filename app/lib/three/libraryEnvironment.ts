@@ -2,9 +2,11 @@ import * as THREE from 'three';
 import { createProceduralEnvironment, type EnvironmentPalette } from './environment';
 import {
   createContactShadow,
+  createLearningGrid,
   createStudioBackdrop,
   type BackdropPalette,
   type ContactShadow,
+  type LearningGrid,
   type StudioBackdrop,
 } from './studioBackdrop';
 import { createVisibilityGate } from './visibility';
@@ -16,17 +18,41 @@ import { createVisibilityGate } from './visibility';
  * specimens reflect has to be the same room. Reusing the Explore palette here
  * put a cool blue cast in every highlight, which read as a specimen photographed
  * somewhere else and pasted in.
+ *
+ * **The levels below are the calibrated ones. The first set was over-lit and
+ * every pale specimen in the Library showed it.** The room was carrying
+ * `keyStrength: 5.2` into an environment map, plus a 2.5 directional key, plus a
+ * 5.0 point fill, plus a 1.25 hemisphere, at exposure 1.0, onto a backdrop whose
+ * centre was pure white. Four sources all pushing at once is not a bright room,
+ * it is a room with no shadow side: the fish's reflective scales, the
+ * jellyfish's three transmissive layers and the T-rex's painted hide each lost
+ * their own form to it, because ACES had already clipped the top of the curve
+ * before the surface's own highlight got there.
+ *
+ * What is *not* the fix is turning the exposure down and leaving the rig alone —
+ * that darkens the whole frame and keeps the flatness. The rig is rebalanced
+ * instead, so the ratios do the work: the key keeps most of its authority, the
+ * hemisphere and the point fill drop hardest (they are the two that were filling
+ * the shadow side to nothing), and exposure comes down a little on top so the
+ * specular hits have somewhere above the ground to live.
+ *
+ * The bee, fish and jellyfish shaders themselves are untouched — DESIGN.md calls
+ * them finished work, and they are. A specimen that reads as washed out under
+ * four uncontrolled sources is a lighting defect, not a shader one.
  */
 export const libraryEnvironmentPalette: EnvironmentPalette = {
-  zenith: 0xfffdf9,
-  horizon: 0xf6efe6,
-  ground: 0xece0d2,
-  keyColor: 0xfff8ef,
-  keyStrength: 5.2,
-  rimColor: 0xffe0cf,
-  rimStrength: 1.9,
-  fillColor: 0xf1e6f4,
-  fillStrength: 1.1,
+  zenith: 0xfffaf4,
+  horizon: 0xf5ece1,
+  /* Deeper than the horizon by a real step. This is the term that lands on a
+     specimen's underside, and at the old value it was returning almost the same
+     energy as the sky — which is why nothing in the Library had a shadow side. */
+  ground: 0xd9d1c3,
+  keyColor: 0xfff6ec,
+  keyStrength: 3.9,
+  rimColor: 0xffdcc8,
+  rimStrength: 1.62,
+  fillColor: 0xeee2f2,
+  fillStrength: 0.82,
 };
 
 /** Backstop behind the backdrop plate, from --color-surface. */
@@ -65,6 +91,12 @@ export type LibraryStage = {
   keyLight: THREE.DirectionalLight;
   backdrop: StudioBackdrop;
   shadow: ContactShadow;
+  /**
+   * The measured floor. Every Library stage has one; call `grid.fit(box)` with
+   * the same fitted box the contact shadow gets, right after the subject has
+   * been re-centred on its aim point.
+   */
+  grid: LearningGrid;
   reduceMotion: boolean;
   compact: boolean;
   /** Drawing-buffer size in device pixels; valid after the first resize. */
@@ -125,7 +157,7 @@ export function createLibraryStage(host: HTMLElement, options: LibraryStageOptio
   });
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = bridgeAppearance ? 0.86 : 1.0;
+  renderer.toneMappingExposure = bridgeAppearance ? 0.86 : 0.92;
   renderer.setClearColor(bridgeAppearance ? BRIDGE_CLEAR_COLOR : LIBRARY_CLEAR_COLOR, 1);
   let pixelRatio = Math.min(window.devicePixelRatio, compact ? 1.4 : 1.75);
   renderer.setPixelRatio(pixelRatio);
@@ -147,22 +179,27 @@ export function createLibraryStage(host: HTMLElement, options: LibraryStageOptio
      so the near surfaces are not carried by the environment alone. */
   const hemisphere = new THREE.HemisphereLight(
     bridgeAppearance ? 0xffeee8 : 0xfff6ec,
-    bridgeAppearance ? 0xd5c8d4 : 0xe4d5c4,
-    bridgeAppearance ? 0.92 : 1.25,
+    bridgeAppearance ? 0xd5c8d4 : 0xdccbb6,
+    bridgeAppearance ? 0.92 : 0.86,
   );
   scene.add(hemisphere);
-  const keyLight = new THREE.DirectionalLight(0xfff4e8, bridgeAppearance ? 1.9 : 2.5);
+  const keyLight = new THREE.DirectionalLight(0xfff4e8, bridgeAppearance ? 1.9 : 2.15);
   keyLight.position.set(-3.2, 4.4, 5.0);
   scene.add(keyLight);
   const rimLight = new THREE.DirectionalLight(
     bridgeAppearance ? 0xd5c2ff : 0xffd9c6,
-    bridgeAppearance ? 1.15 : 1.5,
+    bridgeAppearance ? 1.15 : 1.42,
   );
   rimLight.position.set(4.0, -0.6, -4.0);
   scene.add(rimLight);
+  /* The point fill is the one that was doing the damage: at 5.0 it was the
+     brightest source in the room and it sits on the camera side, so it filled in
+     exactly the shading that tells you a specimen is round. It stays — near
+     surfaces should not be carried by the environment alone — at a strength that
+     lifts the shadow side instead of erasing it. */
   const fillLight = new THREE.PointLight(
     bridgeAppearance ? 0xf1c6ca : 0xe4d9f6,
-    bridgeAppearance ? 3.15 : 5,
+    bridgeAppearance ? 3.15 : 2.4,
     18,
     2,
   );
@@ -172,9 +209,27 @@ export function createLibraryStage(host: HTMLElement, options: LibraryStageOptio
   const backdrop = createStudioBackdrop(camera, bridgeAppearance ? bridgeBackdropPalette : undefined);
   const shadow = createContactShadow({
     color: bridgeAppearance ? 0x6e4a55 : undefined,
-    strength: bridgeAppearance ? 0.21 : undefined,
+    /* Raised with the rest of the rebalance. A specimen framed in mid-air over a
+       0.16 shadow was floating; the grid below now says where the floor is, and
+       the shadow has to agree with it. */
+    strength: bridgeAppearance ? 0.21 : 0.2,
   });
   scene.add(shadow.mesh);
+
+  /*
+   * One floor for every specimen in the section.
+   *
+   * Created here rather than in the two loaders because it is the answer to the
+   * question "what is this thing standing on", which the stage owns — and
+   * because when only `CreatureStage` could build one, the bee had a room and
+   * the other eleven specimens had a white void. It is added to the scene
+   * immediately and stays invisible until a caller fits it, so a stage that
+   * never calls `fit` draws a correctly-scaled nothing instead of a 9-unit plane
+   * at the origin.
+   */
+  const grid = createLearningGrid();
+  grid.mesh.visible = false;
+  scene.add(grid.mesh);
 
   const renderSize = new THREE.Vector2(1, 1);
   const handlers: Array<() => void> = [];
@@ -220,6 +275,7 @@ export function createLibraryStage(host: HTMLElement, options: LibraryStageOptio
     keyLight,
     backdrop,
     shadow,
+    grid,
     reduceMotion,
     compact,
     renderSize,
@@ -243,6 +299,7 @@ export function createLibraryStage(host: HTMLElement, options: LibraryStageOptio
       handlers.length = 0;
       backdrop.dispose();
       shadow.dispose();
+      grid.dispose();
       scene.remove(hemisphere, keyLight, rimLight, fillLight);
       hemisphere.dispose();
       keyLight.dispose();

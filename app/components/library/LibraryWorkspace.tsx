@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LibraryViewer } from './LibraryViewer';
+import { LibraryIcon } from './LibraryIcons';
 import { RailVisual } from './RailVisual';
+import { ScrollThumb } from './ScrollThumb';
 import { useFormulaGate } from '../FormulaGate';
 import {
   DEFAULT_SUBJECT,
@@ -12,7 +14,6 @@ import {
   SUBJECT_GAPS,
   experiencesForSubject,
   readyCountForSubject,
-  relatedExperiences,
 } from '../../lib/library/manifest';
 import { subscribeToLibraryOpen } from '../../lib/library/openExperience';
 import type { ExperienceManifest, SubjectId } from '../../lib/library/types';
@@ -32,23 +33,31 @@ import type { ExperienceManifest, SubjectId } from '../../lib/library/types';
  *   - the centre gets the space. On a 1920 screen the viewer is roughly a
  *     thousand pixels wide, because the specimen is the product and the panels
  *     are the chrome, not the other way round.
- *   - it fits. The head band is one row — kicker, one-line heading, one clause,
- *     a live count — so that landing on `#thu-vien` on a 1366×768 laptop shows
- *     the whole workspace rather than a large headline and the top edge of an
- *     app. Everything that does not fit that budget is below the fold on
- *     purpose, which is also what keeps the section reading as scrollable.
+ *   - **it is exactly one screen.** Head band, subject switcher and workspace are
+ *     three rows of one screen-tall grid, so the arithmetic is done by the layout
+ *     engine against the real heading rather than against a token that guessed
+ *     its height. Nothing belongs below this fold; there is nothing below it.
  *   - switching subject or specimen never reloads. It is state, so the whole
  *     thing transitions instead of blinking.
  *   - a subject with nothing in it says so in the middle of the workspace, at
  *     full size, in plain words. That is a stronger signal of good faith than a
- *     hidden tab would be, and it is what stops the six real experiences from
- *     being read as a sample of thirty.
+ *     hidden tab would be, and it is what stops the ready experiences from being
+ *     read as a sample of thirty.
  *
  * The three panels are three separate cards with a gutter between them rather
  * than one bordered box with dividers. That gap is most of the difference
  * between "a section of a website" and "an application": a divider says the
  * panels are paragraphs of one document, a gutter says they are instruments that
  * happen to sit side by side.
+ *
+ * ---- what used to be under here ----
+ *
+ * A four-card strip: three "related" specimens and a note. It is gone, and its
+ * removal is the reason this section can now be a chapter of the page's snap
+ * track rather than a tall band you scroll through. Everything the strip listed
+ * was already in the rail eight hundred pixels above it, and the note said in a
+ * paragraph what the `Mở được ngay` tag on every row says in two words. A stop
+ * says its one thing once.
  */
 
 const KIND_LABEL: Record<ExperienceManifest['kind'], string> = {
@@ -108,6 +117,7 @@ export function LibraryWorkspace() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const railRef = useRef<HTMLUListElement>(null);
   const creditsRef = useRef<HTMLDetailsElement>(null);
 
   const subjectItems = useMemo(() => experiencesForSubject(subject), [subject]);
@@ -141,8 +151,6 @@ export function LibraryWorkspace() {
     [activeId, listed],
   );
 
-  const related = useMemo(() => (active ? relatedExperiences(active) : []), [active]);
-
   /*
    * Deep links from elsewhere on the page.
    *
@@ -166,13 +174,6 @@ export function LibraryWorkspace() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
-
-  /** Selecting from anywhere but the rail: the search has to go, or the item may not be listed. */
-  const select = useCallback((id: string) => {
-    setQuery('');
-    setActiveId(id);
-    setSheetOpen(false);
   }, []);
 
   /*
@@ -210,25 +211,35 @@ export function LibraryWorkspace() {
   const emptySubject = !active && !searchHits;
 
   return (
-    <section className="library" id="thu-vien" aria-labelledby="library-title">
-      {/* ------------------------------------------------------- head band --- */}
-      <div className="shell-wide library-head" data-reveal="soft">
-        <div className="library-head-copy">
-          <p className="section-kicker">Thư viện YooLab</p>
-          <h2 id="library-title">Học liệu 3D <em>mở được ngay</em></h2>
+    <section className="library" id="thu-vien" data-snap aria-labelledby="library-title">
+      {/*
+        One screen-tall grid: an `auto` head band, an `auto` chrome row and a
+        `minmax(0, 1fr)` workspace. `--library-head` used to declare the band's
+        height so the app could subtract it, and every time the band gained a
+        line the workspace lost the bottom of a panel at whichever width the
+        estimate went wrong. The layout engine measures the real heading now.
+        See DESIGN.md §2, which learned this the same way in YooStudio.
+      */}
+      <div className="library-stage">
+        {/* ----------------------------------------------------- head band --- */}
+        <div className="shell-wide library-head" data-reveal="soft">
+          <div className="library-head-copy">
+            <p className="section-kicker">Thư viện YooLab</p>
+            <h2 id="library-title">Học liệu 3D <em>mở được ngay</em></h2>
+          </div>
+          <p className="library-head-lede">
+            Chọn môn, mở mô hình, đưa thẳng vào bài giảng.
+          </p>
+          <p className="library-head-count">
+            <span><b>{READY_EXPERIENCES.length}</b> mở được ngay</span>
+            <span><b>{listed.length}</b> {searchHits ? 'kết quả tìm' : 'trong môn này'}</span>
+          </p>
         </div>
-        <p className="library-head-lede">
-          Chọn môn, mở mô hình, đưa thẳng vào bài giảng.
-        </p>
-        <p className="library-head-count">
-          <span><b>{READY_EXPERIENCES.length}</b> mở được ngay</span>
-          <span><b>{listed.length}</b> {searchHits ? 'kết quả tìm' : 'trong môn này'}</span>
-        </p>
-      </div>
 
-      <div className="shell-wide library-app" data-reveal="soft">
-        {/* ---------------------------------------------- subject switcher --- */}
-        <div className="library-chrome">
+        {/* ------------------------------------------------ subject switcher --- */}
+        {/* Borderless band, not a fourth card: the switcher is how you drive the
+            three panels, so it must not read as a peer of them. */}
+        <div className="shell-wide library-chrome" data-reveal="soft">
           <div className="library-subjects" role="tablist" aria-label="Môn học">
             {SUBJECTS.map((entry) => {
               const count = readyCountForSubject(entry.id);
@@ -243,6 +254,7 @@ export function LibraryWorkspace() {
                   style={{ '--subject-tint': entry.tint } as React.CSSProperties}
                   onClick={() => { setSubject(entry.id); setQuery(''); }}
                 >
+                  <LibraryIcon name={entry.glyph} />
                   <b>{entry.label}</b>
                   <i aria-hidden="true">{count === 0 ? '—' : count}</i>
                 </button>
@@ -250,12 +262,7 @@ export function LibraryWorkspace() {
             })}
           </div>
           <label className="library-search">
-            <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-              <g fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round">
-                <circle cx="7" cy="7" r="4.4" />
-                <path d="M10.3 10.3 14 14" />
-              </g>
-            </svg>
+            <LibraryIcon name="search" />
             <input
               ref={searchRef}
               type="search"
@@ -268,292 +275,291 @@ export function LibraryWorkspace() {
           </label>
         </div>
 
-        <div className={`library-body${emptySubject ? ' is-empty' : ''}`}>
-          {/* ----------------------------------------------- asset rail --- */}
-          <aside className="library-rail" aria-label="Học liệu của môn">
-            <div className="library-rail-head">
-              <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-                <g fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinejoin="round">
-                  <path d="M8 1.6 14.4 5 8 8.4 1.6 5z" />
-                  <path d="M1.6 8.6 8 12l6.4-3.4" opacity="0.55" />
-                </g>
-              </svg>
-              <span>{searchHits ? 'Kết quả tìm' : 'Học liệu'}</span>
-              <b>{listed.length}</b>
-            </div>
+        <div className="shell-wide library-app" data-reveal="soft">
+          <div className={`library-body${emptySubject ? ' is-empty' : ''}`}>
+            {/* --------------------------------------------- asset rail --- */}
+            <aside className="library-rail" aria-label="Học liệu của môn">
+              <div className="library-rail-head">
+                <LibraryIcon name="shelf" />
+                <span>{searchHits ? 'Kết quả tìm' : 'Học liệu'}</span>
+                <b>{listed.length}</b>
+              </div>
 
-            <ul className="library-rail-list">
-              {listed.map((item) => {
-                const isActive = active?.id === item.id;
-                return (
-                  <li key={item.id}>
-                    <button
-                      type="button"
-                      className={`library-asset${isActive ? ' is-active' : ''}${item.status === 'planned' ? ' is-planned' : ''}`}
-                      aria-current={isActive || undefined}
-                      style={{ '--rail-tint': tintFor(item.subject) } as React.CSSProperties}
-                      onClick={() => { setActiveId(item.id); setSheetOpen(false); }}
-                    >
-                      <span className="rail-visual"><RailVisual visual={item.rail} /></span>
-                      <span className="library-asset-copy">
-                        <span className="library-asset-kind">
-                          {KIND_LABEL[item.kind]}
-                          {searchHits && <em>{labelFor(item.subject)}</em>}
+              <ul className="library-rail-list" ref={railRef}>
+                {listed.map((item) => {
+                  const isActive = active?.id === item.id;
+                  return (
+                    <li key={item.id}>
+                      <button
+                        type="button"
+                        className={`library-asset${isActive ? ' is-active' : ''}${item.status === 'planned' ? ' is-planned' : ''}`}
+                        aria-current={isActive || undefined}
+                        style={{ '--rail-tint': tintFor(item.subject) } as React.CSSProperties}
+                        onClick={() => { setActiveId(item.id); setSheetOpen(false); }}
+                      >
+                        <span className="rail-visual"><RailVisual visual={item.rail} /></span>
+                        <span className="library-asset-copy">
+                          <span className="library-asset-kind">
+                            {KIND_LABEL[item.kind]}
+                            {searchHits && <em>{labelFor(item.subject)}</em>}
+                          </span>
+                          <b>{item.title}</b>
+                          <small>{item.summary}</small>
+                          {item.status === 'planned' && (
+                            <span className="library-asset-flag">Đang bổ sung</span>
+                          )}
                         </span>
-                        <b>{item.title}</b>
-                        <small>{item.summary}</small>
-                        {item.status === 'planned' && (
-                          <span className="library-asset-flag">Đang bổ sung</span>
-                        )}
-                      </span>
-                    </button>
+                      </button>
+                    </li>
+                  );
+                })}
+                {!listed.length && (
+                  <li className="library-rail-empty">
+                    {searchHits ? 'Không có học liệu nào khớp từ khóa.' : 'Môn học này chưa có học liệu.'}
                   </li>
-                );
-              })}
-              {!listed.length && (
-                <li className="library-rail-empty">
-                  {searchHits ? 'Không có học liệu nào khớp từ khóa.' : 'Môn học này chưa có học liệu.'}
-                </li>
-              )}
-            </ul>
+                )}
+              </ul>
 
-            {!searchHits && subjectEntry && (
-              <div className="library-rail-foot">
-                <b>{subjectEntry.note}</b>
-                <span>
-                  {readyCount > 0
-                    ? `${readyCount} học liệu mở được ngay trong trang.`
-                    : 'Chưa có học liệu mở được cho môn này.'}
-                </span>
-              </div>
-            )}
-          </aside>
-
-          {/* --------------------------------------------------- viewer --- */}
-          <div className="library-viewer">
-            <div className="library-viewer-bar">
-              <div className="library-viewer-title">
-                <b>{active ? active.title : subjectEntry?.label}</b>
-                {active
-                  ? active.subtitle && <span>{active.subtitle}</span>
-                  : <span>Chưa có học liệu</span>}
-              </div>
-              {active && (
-                <div className="library-viewer-tags">
-                  <span>{KIND_LABEL[active.kind]}</span>
-                  <span>{active.topic}</span>
-                  <span className={active.status === 'ready' ? 'is-ready' : 'is-planned'}>
-                    {active.status === 'ready' ? 'Mở được ngay' : 'Đang bổ sung'}
+              {!searchHits && subjectEntry && (
+                <div className="library-rail-foot">
+                  <b>{subjectEntry.note}</b>
+                  <span>
+                    {readyCount > 0
+                      ? `${readyCount} học liệu mở được ngay trong trang.`
+                      : 'Chưa có học liệu mở được cho môn này.'}
                   </span>
                 </div>
               )}
-            </div>
 
-            <div className="library-viewer-stage">
-              {active
-                ? <LibraryViewer key={active.id} item={active} onOpenWorkshop={openFormula} />
-                : (
-                  <div className="viewer-empty">
-                    <svg className="viewer-empty-art" viewBox="0 0 200 120" aria-hidden="true" fill="none">
-                      {/* Empty shelves: three rails, a few slots filled, the rest
-                          waiting. Drawn rather than lettered, like the rail marks. */}
-                      <g stroke="currentColor" strokeWidth="1.1" opacity="0.5">
-                        <path d="M18 34h164M18 66h164M18 98h164" />
-                      </g>
-                      <g fill="currentColor" opacity="0.16">
-                        <rect x="26" y="16" width="20" height="18" rx="3" />
-                        <rect x="52" y="22" width="14" height="12" rx="3" />
-                        <rect x="26" y="50" width="15" height="16" rx="3" />
-                      </g>
-                      <g stroke="currentColor" strokeWidth="1.1" strokeDasharray="3 4" opacity="0.42">
-                        <rect x="74" y="18" width="22" height="16" rx="3" />
-                        <rect x="104" y="18" width="18" height="16" rx="3" />
-                        <rect x="49" y="48" width="24" height="18" rx="3" />
-                        <rect x="81" y="52" width="16" height="14" rx="3" />
-                        <rect x="26" y="82" width="20" height="16" rx="3" />
-                        <rect x="54" y="80" width="18" height="18" rx="3" />
-                      </g>
-                    </svg>
-                    <h3>Đang bổ sung</h3>
-                    <p>{gap ?? 'Môn học này chưa có học liệu.'}</p>
-                    <button
-                      type="button"
-                      className="viewer-empty-jump"
-                      onClick={() => { setSubject(DEFAULT_SUBJECT); setQuery(''); }}
-                    >
-                      Mở môn có học liệu <span aria-hidden="true">→</span>
-                    </button>
+              <ScrollThumb scroller={railRef} />
+            </aside>
+
+            {/* ------------------------------------------------- viewer --- */}
+            <div className="library-viewer">
+              <div className="library-viewer-bar">
+                <div className="library-viewer-title">
+                  <b>{active ? active.title : subjectEntry?.label}</b>
+                  {active
+                    ? active.subtitle && <span>{active.subtitle}</span>
+                    : <span>Chưa có học liệu</span>}
+                </div>
+                {active && (
+                  <div className="library-viewer-tags">
+                    <span>{KIND_LABEL[active.kind]}</span>
+                    <span>{active.topic}</span>
+                    <span className={active.status === 'ready' ? 'is-ready' : 'is-planned'}>
+                      {active.status === 'ready' ? 'Mở được ngay' : 'Đang bổ sung'}
+                    </span>
                   </div>
                 )}
+              </div>
+
+              <div className="library-viewer-stage">
+                {active
+                  ? <LibraryViewer key={active.id} item={active} onOpenWorkshop={openFormula} />
+                  : (
+                    <div className="viewer-empty">
+                      <svg className="viewer-empty-art" viewBox="0 0 200 120" aria-hidden="true" fill="none">
+                        {/* Empty shelves: three rails, a few slots filled, the rest
+                            waiting. Drawn rather than lettered, like the rail marks. */}
+                        <g stroke="currentColor" strokeWidth="1.1" opacity="0.5">
+                          <path d="M18 34h164M18 66h164M18 98h164" />
+                        </g>
+                        <g fill="currentColor" opacity="0.16">
+                          <rect x="26" y="16" width="20" height="18" rx="3" />
+                          <rect x="52" y="22" width="14" height="12" rx="3" />
+                          <rect x="26" y="50" width="15" height="16" rx="3" />
+                        </g>
+                        <g stroke="currentColor" strokeWidth="1.1" strokeDasharray="3 4" opacity="0.42">
+                          <rect x="74" y="18" width="22" height="16" rx="3" />
+                          <rect x="104" y="18" width="18" height="16" rx="3" />
+                          <rect x="49" y="48" width="24" height="18" rx="3" />
+                          <rect x="81" y="52" width="16" height="14" rx="3" />
+                          <rect x="26" y="82" width="20" height="16" rx="3" />
+                          <rect x="54" y="80" width="18" height="18" rx="3" />
+                        </g>
+                      </svg>
+                      <h3>Đang bổ sung</h3>
+                      <p>{gap ?? 'Môn học này chưa có học liệu.'}</p>
+                      <button
+                        type="button"
+                        className="viewer-empty-jump"
+                        onClick={() => { setSubject(DEFAULT_SUBJECT); setQuery(''); }}
+                      >
+                        Mở môn có học liệu <span aria-hidden="true">→</span>
+                      </button>
+                    </div>
+                  )}
+              </div>
+
+              <button
+                type="button"
+                className="library-sheet-toggle"
+                onClick={() => setSheetOpen((value) => !value)}
+                aria-expanded={sheetOpen}
+              >
+                {sheetOpen ? 'Ẩn thông tin bài học' : 'Xem thông tin bài học'}
+              </button>
             </div>
 
-            <button
-              type="button"
-              className="library-sheet-toggle"
-              onClick={() => setSheetOpen((value) => !value)}
-              aria-expanded={sheetOpen}
+            {/* ------------------------------------- knowledge panel --- */}
+            <aside
+              className={`library-knowledge${sheetOpen ? ' is-open' : ''}`}
+              aria-label="Thông tin học liệu"
             >
-              {sheetOpen ? 'Ẩn thông tin bài học' : 'Xem thông tin bài học'}
-            </button>
-          </div>
+              <div className="library-knowledge-scroll" ref={panelRef}>
+                {active ? (
+                  <>
+                    <header className="knowledge-head" style={{ '--rail-tint': tintFor(active.subject) } as React.CSSProperties}>
+                      <p className="knowledge-topic"><i aria-hidden="true" />{active.topic}</p>
+                      <span className="knowledge-thumb rail-visual">
+                        <RailVisual visual={active.rail} />
+                      </span>
+                      <h3>{active.title}</h3>
+                      {/*
+                        One line, in the writing's own voice, before any number.
+                        The Latin binomial is not repeated here — the viewer bar
+                        two panels to the left is already printing it beside the
+                        specimen's name — so this slot carries the idea instead,
+                        and an entry with no authored line falls back to the
+                        binomial rather than to nothing.
+                      */}
+                      {active.poetic
+                        ? <p className="knowledge-poetic">{active.poetic}</p>
+                        : active.subtitle && <p className="knowledge-epithet">{active.subtitle}</p>}
+                      <p className="knowledge-body">{active.description}</p>
+                    </header>
 
-          {/* ----------------------------------------- knowledge panel --- */}
-          <aside
-            className={`library-knowledge${sheetOpen ? ' is-open' : ''}`}
-            aria-label="Thông tin học liệu"
-          >
-            <div className="library-knowledge-scroll" ref={panelRef}>
-              {active ? (
-                <>
-                  <header className="knowledge-head" style={{ '--rail-tint': tintFor(active.subject) } as React.CSSProperties}>
-                    <p className="knowledge-topic"><i aria-hidden="true" />{active.topic}</p>
-                    <span className="knowledge-thumb rail-visual">
-                      <RailVisual visual={active.rail} />
-                    </span>
-                    <h3>{active.title}</h3>
-                    {active.subtitle && <p className="knowledge-epithet">{active.subtitle}</p>}
-                    <p className="knowledge-body">{active.description}</p>
-                  </header>
-
-                  {active.parts && (
-                    <section>
-                      <h4>Cấu tạo</h4>
-                      <dl className="knowledge-parts">
-                        {active.parts.map((part) => (
-                          <div key={part.label}>
-                            <dt>{part.label}</dt>
-                            <dd>{part.body}</dd>
-                          </div>
-                        ))}
-                      </dl>
-                    </section>
-                  )}
-
-                  {active.goals && (
-                    <section>
-                      <h4>Mục tiêu học tập</h4>
-                      <ul className="knowledge-goals">
-                        {active.goals.map((goal) => <li key={goal}>{goal}</li>)}
-                      </ul>
-                    </section>
-                  )}
-
-                  {active.facts && (
-                    <section>
-                      <h4>Thông số</h4>
-                      <dl className="knowledge-facts">
-                        {active.facts.map((fact) => (
-                          <div key={fact.label}>
-                            <dt>{fact.label}</dt>
-                            <dd>{fact.value}</dd>
-                          </div>
-                        ))}
-                      </dl>
-                    </section>
-                  )}
-
-                  {/* The sentence a teacher repeats out loud, tinted so it is not
-                      read as one more paragraph of description. */}
-                  {active.notes && (
-                    <div className="knowledge-notes">
-                      {active.notes.map((note) => (
-                        <div className="knowledge-note" key={note.label}>
-                          <h4>{note.label}</h4>
-                          <p>{note.body}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  <div className="knowledge-actions">
-                    {active.status === 'ready' && (
-                      active.opensWorkshop
-                        ? (
-                          <button type="button" className="knowledge-primary" onClick={openFormula}>
-                            Mở trải nghiệm <span aria-hidden="true">↗</span>
-                          </button>
-                        )
-                        : (
-                          <a className="knowledge-primary" href="#cong-cu">
-                            Thêm vào bài giảng <span aria-hidden="true">→</span>
-                          </a>
-                        )
+                    {active.facts && (
+                      <section>
+                        <h4><LibraryIcon name="readout" />Thông số</h4>
+                        <dl className="knowledge-facts">
+                          {active.facts.map((fact) => (
+                            <div key={fact.label}>
+                              <span className="knowledge-fact-mark" aria-hidden="true">
+                                <LibraryIcon name={fact.icon ?? 'pulse'} />
+                              </span>
+                              <dt>{fact.label}</dt>
+                              <dd>{fact.value}</dd>
+                            </div>
+                          ))}
+                        </dl>
+                      </section>
                     )}
-                    <div className="knowledge-actions-pair">
-                      <a href="#bai-hoc-mau">Xem bài học mẫu</a>
-                      {active.credits && (
-                        <button type="button" onClick={revealCredits}>Nguồn &amp; giấy phép</button>
+
+                    {active.parts && (
+                      <section>
+                        <h4><LibraryIcon name="structure" />Cấu tạo</h4>
+                        <dl className="knowledge-parts">
+                          {active.parts.map((part) => (
+                            <div key={part.label}>
+                              <dt>{part.label}</dt>
+                              <dd>{part.body}</dd>
+                            </div>
+                          ))}
+                        </dl>
+                      </section>
+                    )}
+
+                    {active.goals && (
+                      <section>
+                        <h4><LibraryIcon name="goals" />Mục tiêu học tập</h4>
+                        <ul className="knowledge-goals">
+                          {active.goals.map((goal) => <li key={goal}>{goal}</li>)}
+                        </ul>
+                      </section>
+                    )}
+
+                    {/*
+                      The sentences a teacher repeats out loud. Two tones in a
+                      fixed order — the scientific point in lavender, the
+                      "did you know" in amber — because a column of identically
+                      tinted callouts is a column with no callouts in it.
+                    */}
+                    {active.notes && (
+                      <div className="knowledge-notes">
+                        {active.notes.map((note, index) => (
+                          <div
+                            className="knowledge-note"
+                            data-tone={index === 0 ? 'science' : 'curio'}
+                            key={note.label}
+                          >
+                            <h4>
+                              <LibraryIcon name={index === 0 ? 'science' : 'curio'} />
+                              {note.label}
+                            </h4>
+                            <p>{note.body}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {active.context && (
+                      <section>
+                        <h4><LibraryIcon name="context" />Liên hệ thực tế</h4>
+                        <ul className="knowledge-context">
+                          {active.context.map((entry) => <li key={entry}>{entry}</li>)}
+                        </ul>
+                      </section>
+                    )}
+
+                    <div className="knowledge-actions">
+                      {active.status === 'ready' && (
+                        active.opensWorkshop
+                          ? (
+                            <button type="button" className="knowledge-primary" onClick={openFormula}>
+                              Mở trải nghiệm <span aria-hidden="true">↗</span>
+                            </button>
+                          )
+                          : (
+                            <a className="knowledge-primary" href="#cong-cu">
+                              Thêm vào bài giảng <span aria-hidden="true">→</span>
+                            </a>
+                          )
                       )}
+                      <div className="knowledge-actions-pair">
+                        <a href="#bai-hoc-mau">Xem bài học mẫu</a>
+                        {active.credits && (
+                          <button type="button" onClick={revealCredits}>Nguồn &amp; giấy phép</button>
+                        )}
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Collapsed by default: the licence text is obligatory, not
-                      interesting, and open it used to eat a third of the panel. */}
-                  {active.credits && (
-                    <details className="knowledge-credits" ref={creditsRef}>
-                      <summary>Nguồn &amp; giấy phép</summary>
-                      {active.credits.map((credit) => (
-                        <div className="knowledge-credit" key={credit.source}>
-                          <b>{credit.author}</b>
-                          <em>{credit.license}</em>
-                          {/^https?:\/\//.test(credit.source)
-                            ? (
-                              <a href={credit.source} target="_blank" rel="noreferrer">
-                                {credit.source.replace(/^https?:\/\//, '')}
-                              </a>
-                            )
-                            : <span>{credit.source}</span>}
-                          {credit.notice && <small>{credit.notice}</small>}
-                        </div>
-                      ))}
-                    </details>
-                  )}
-                </>
-              ) : (
-                <header className="knowledge-head">
-                  <p className="knowledge-topic"><i aria-hidden="true" />{subjectEntry?.label}</p>
-                  <h3>Đang bổ sung</h3>
-                  <p className="knowledge-body">{gap}</p>
-                </header>
-              )}
-            </div>
-          </aside>
-        </div>
-      </div>
+                    {/* Collapsed by default: the licence text is obligatory, not
+                        interesting, and open it used to eat a third of the panel. */}
+                    {active.credits && (
+                      <details className="knowledge-credits" ref={creditsRef}>
+                        <summary><LibraryIcon name="source" />Nguồn &amp; giấy phép</summary>
+                        {active.credits.map((credit) => (
+                          <div className="knowledge-credit" key={credit.source}>
+                            <b>{credit.author}</b>
+                            <em>{credit.license}</em>
+                            {/^https?:\/\//.test(credit.source)
+                              ? (
+                                <a href={credit.source} target="_blank" rel="noreferrer">
+                                  {credit.source.replace(/^https?:\/\//, '')}
+                                </a>
+                              )
+                              : <span>{credit.source}</span>}
+                            {credit.notice && <small>{credit.notice}</small>}
+                          </div>
+                        ))}
+                      </details>
+                    )}
+                  </>
+                ) : (
+                  <header className="knowledge-head">
+                    <p className="knowledge-topic"><i aria-hidden="true" />{subjectEntry?.label}</p>
+                    <h3>Đang bổ sung</h3>
+                    <p className="knowledge-body">{gap}</p>
+                  </header>
+                )}
+              </div>
 
-      {/* ---------------------------------------------- below the fold --- */}
-      <div className="shell-wide library-strip" data-reveal data-stagger>
-        {related.map((item) => (
-          <article
-            className="library-strip-card"
-            key={item.id}
-            style={{ '--rail-tint': tintFor(item.subject) } as React.CSSProperties}
-          >
-            <p className="library-strip-kind">{KIND_LABEL[item.kind]}</p>
-            <h3>{item.title}</h3>
-            <div className="library-strip-visual rail-visual">
-              <RailVisual visual={item.rail} />
-            </div>
-            <button type="button" onClick={() => select(item.id)} aria-label={`Mở ${item.title}`}>
-              Mở <span aria-hidden="true">→</span>
-            </button>
-          </article>
-        ))}
-
-        <article className="library-strip-card library-strip-note">
-          <p className="library-strip-kind">Ghi chú</p>
-          <p>
-            {searchHits
-              ? `${searchHits.length} kết quả trong toàn thư viện.`
-              : gap
-                ? 'Môn học này được liệt kê để cấu trúc thư viện đầy đủ — nội dung sẽ mở khi có nguồn hợp lệ.'
-                : 'Mỗi học liệu ở đây đều mở và tương tác được ngay trong trang. Không có mục nào là ảnh minh hoạ.'}
-          </p>
-          <div className="library-strip-links">
-            <a href="#cong-cu">Mở YooStudio <span aria-hidden="true">→</span></a>
-            <a href="#thuc-hanh">Thực hành &amp; STEM <span aria-hidden="true">→</span></a>
+              <ScrollThumb scroller={panelRef} />
+            </aside>
           </div>
-        </article>
+        </div>
       </div>
     </section>
   );

@@ -271,6 +271,11 @@ function shellLayer(
   geometry: THREE.BufferGeometry,
   rimGeometry: THREE.BufferGeometry,
   surface: Surface = 'shell',
+  /* Quay cả nhóm, radian quanh trục Z. `CapsuleGeometry` của three nằm dọc trục
+     Y, còn trực khuẩn và sợi cơ nằm ngang — quay một nhóm là một dòng, còn quay
+     từng geometry là hai. Vòng dựng hình chỉ ghi `position` và `scale` của nhóm,
+     nên `rotation` đặt ở đây sống nguyên vẹn qua cả trạng thái tách lớp. */
+  rotateZ = 0,
 ) {
   const group = new THREE.Group();
   const skin = new THREE.Mesh(geometry, context.material(id, surface));
@@ -279,6 +284,7 @@ function shellLayer(
   group.add(new THREE.Mesh(rimGeometry, new THREE.MeshBasicMaterial({
     color: 0xe87868, wireframe: true, transparent: true, opacity: 0.1,
   })));
+  if (rotateZ) group.rotation.z = rotateZ;
   context.attach(id, group);
 }
 
@@ -699,6 +705,188 @@ const BUILDERS: Record<CellId, Builder> = {
     }
     context.attach('terminal', terminals);
   },
+
+  /* ------------------------------------------------------- tế bào vi khuẩn --- */
+  /*
+   * Một trực khuẩn nằm ngang, và mọi quyết định hình học ở đây là để nói ra *sự
+   * thiếu vắng*: không có khối cầu nào ở giữa để mắt bám vào, chỉ có một cuộn
+   * DNA nằm tự do và ribosome rải khắp tế bào chất. Đó chính là điều một tế bào
+   * nhân sơ khác với sáu tế bào ở trên, và nó phải đọc được từ bố cục chứ không
+   * chỉ từ bảng chữ.
+   *
+   * Ba chi tiết được dựng đúng tỉ lệ thật vì tỉ lệ mới là nội dung:
+   *
+   *   - hai lớp bao lồng nhau, thành ngoài dày rõ so với màng trong;
+   *   - vùng nhân là MỘT sợi vòng khép kín cuộn lại, không phải một khối cầu —
+   *     một vòng DNA dài 1,5 mm nhét trong một tế bào dài 2 µm;
+   *   - roi dài hơn cả tế bào, và nó xoắn cứng chứ không uốn như đuôi cá.
+   */
+  bacteria: (context) => {
+    const LENGTH = 3.1;   // nửa chiều dài phần thân trụ
+    const RADIUS = 1.12;  // bán kính thành ngoài
+
+    /*
+     * Lưới viền phải THƯA.
+     *
+     * Sáu tế bào kia dùng `organicSphere(r, 3, …)` cho lớp viền — một khối hai
+     * mươi mặt chia ba lần, tức vài chục đường. Bản đầu của trực khuẩn này dùng
+     * `CapsuleGeometry(r, l, 8, 26)` cho cả lớp trong và lớp viền, và 26 × 8
+     * đoạn ở chế độ `wireframe` phủ kín mẫu vật bằng một lưới tam giác hồng —
+     * lưới trở thành thứ đọc được nhất trong cảnh, đúng chỗ đáng lẽ chỉ có một
+     * đường ranh giới mờ. Lớp trong giữ độ chia cao để bề mặt vẫn tròn; lớp viền
+     * hạ xuống 5 × 12.
+     */
+    shellLayer(
+      context, 'wall',
+      context.keep(new THREE.CapsuleGeometry(RADIUS, LENGTH * 2, 8, 26)),
+      context.keep(new THREE.CapsuleGeometry(RADIUS + 0.02, LENGTH * 2, 3, 11)),
+      'wall',
+      Math.PI / 2,
+    );
+    shellLayer(
+      context, 'membrane',
+      context.keep(new THREE.CapsuleGeometry(RADIUS - 0.17, LENGTH * 2 - 0.06, 8, 24)),
+      context.keep(new THREE.CapsuleGeometry(RADIUS - 0.15, LENGTH * 2 - 0.06, 3, 10)),
+      'shell',
+      Math.PI / 2,
+    );
+
+    /*
+     * Vùng nhân: một sợi vòng khép kín, cuộn.
+     *
+     * Dựng bằng một đường cong đóng chạy trên hai vòng lệch pha, nên nó gấp
+     * khúc chi chít nhưng vẫn là *một* vòng liền — cắt ở đâu cũng chỉ ra hai
+     * đầu. Một khối cầu ở đây sẽ đọc thành "nhân", tức là đúng cái mà mục này
+     * tồn tại để phủ định.
+     */
+    const nucleoid = new THREE.Group();
+    const loop: THREE.Vector3[] = [];
+    const TURNS = 7;
+    for (let step = 0; step < 200; step += 1) {
+      const t = step / 200;
+      const around = t * Math.PI * 2;
+      const wind = t * Math.PI * 2 * TURNS;
+      loop.push(new THREE.Vector3(
+        Math.cos(around) * 1.62 + Math.cos(wind) * 0.2,
+        Math.sin(around) * 0.42 + Math.sin(wind) * 0.34,
+        Math.sin(around) * 0.5 + Math.sin(wind + 1.1) * 0.3,
+      ));
+    }
+    nucleoid.add(new THREE.Mesh(
+      context.keep(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(loop, true), 320, 0.062, 6, true)),
+      context.material('nucleoid', 'soft'),
+    ));
+    nucleoid.position.set(-0.15, 0.05, 0);
+    context.attach('nucleoid', nucleoid);
+
+    /*
+     * Ribosome: rải khắp tế bào chất, không tụ quanh một bào quan nào — vì không
+     * có bào quan nào để tụ quanh. Và đó chính là lý do phải dựng riêng ở đây
+     * thay vì gọi `beadField`.
+     *
+     * `beadField` rải hạt theo toạ độ cầu rồi bóp trục Y. Sáu tế bào kia là khối
+     * gần cầu nên cách đó phủ đều; trực khuẩn là một hình trụ dài 6,2 nên cùng
+     * công thức ấy dồn toàn bộ hạt thành một cái đĩa mỏng nằm ở mặt phẳng XZ,
+     * hiện ra trên hình đúng một đường hạt ở mép dưới. Ở đây hạt được rải trong
+     * *thể tích trụ*: đều theo trục X, và theo đĩa tròn quanh trục theo căn bậc
+     * hai của bán kính — cách duy nhất cho mật độ đều thay vì tụ ở lõi.
+     */
+    const ribosomes = new THREE.Group();
+    const bead = context.keep(new THREE.IcosahedronGeometry(0.055, 1));
+    const beadSkin = new THREE.MeshStandardMaterial({
+      color: new THREE.Color(context.organelle('ribosome').color),
+      roughness: 0.45,
+      metalness: 0,
+    });
+    const beadCount = context.compact ? 190 : 380;
+    const cloud = new THREE.InstancedMesh(bead, beadSkin, beadCount);
+    const dummy = new THREE.Object3D();
+    for (let index = 0; index < beadCount; index += 1) {
+      const along = ((index + 0.5) / beadCount) * 2 - 1;
+      // Góc vàng: phủ đều, tất định, không bao giờ gieo lại giữa hai lần dựng.
+      const angle = index * 2.399963;
+      const radius = Math.sqrt(scatter(index, 31)) * (RADIUS - 0.34);
+      dummy.position.set(
+        along * (LENGTH - 0.1),
+        Math.sin(angle) * radius,
+        Math.cos(angle) * radius,
+      );
+      dummy.scale.setScalar(0.7 + scatter(index, 37) * 0.6);
+      dummy.updateMatrix();
+      cloud.setMatrixAt(index, dummy.matrix);
+    }
+    cloud.instanceMatrix.needsUpdate = true;
+    ribosomes.add(cloud);
+    context.attach('ribosome', ribosomes);
+
+    /* Plasmid: ba vòng nhỏ rời hẳn khỏi vùng nhân. Rời là toàn bộ nội dung của
+       chúng — một plasmid truyền được sang tế bào khác chính vì nó không nối vào
+       hệ gen chính. */
+    const plasmids = new THREE.Group();
+    const ring = context.keep(new THREE.TorusGeometry(0.3, 0.055, 6, 26));
+    const plasmidSkin = context.material('plasmid', 'dense');
+    const spots: [number, number, number, number][] = [
+      [1.95, 0.42, 0.34, 0.8], [-2.1, -0.36, 0.3, -1.2], [1.15, -0.55, -0.42, 2.1],
+    ];
+    for (const [x, y, z, spin] of spots) {
+      const mesh = new THREE.Mesh(ring, plasmidSkin);
+      mesh.position.set(x, y, z);
+      mesh.rotation.set(spin, spin * 0.7, spin * 0.4);
+      plasmids.add(mesh);
+    }
+    context.attach('plasmid', plasmids);
+
+    /*
+     * Roi: một sợi xoắn cứng, cộng cái móc và cái đế ở chân.
+     *
+     * Hình xoắn phải giữ được bước sóng đều nhau — đó là thứ phân biệt một chân
+     * vịt quay với một cái đuôi uốn. Đế và móc được dựng riêng vì chúng là động
+     * cơ, và điểm cả bài học của bào quan này nằm ở chỗ động cơ ở chân chứ không
+     * phải ở dọc sợi.
+     */
+    /*
+     * Bước xoắn phải rộng hơn đường kính xoắn, nếu không nó không đọc ra là xoắn.
+     *
+     * Bản đầu quay 3,4 vòng trên 4,3 đơn vị — mỗi vòng 1,26 đơn vị trong khi
+     * đường kính lên tới 1,24 — nên trên hình các vòng chồng lên nhau và cả cái
+     * roi hiện ra thành ba hình tròn xếp cạnh nhau ở đầu tế bào. 2,1 vòng trên
+     * 4,6 đơn vị cho mỗi vòng 2,19: rộng gần gấp đôi đường kính, và lúc đó mắt
+     * thấy một sóng chứ không thấy mấy cái vòng.
+     */
+    const flagellum = new THREE.Group();
+    const helix: THREE.Vector3[] = [];
+    for (let step = 0; step <= 170; step += 1) {
+      const t = step / 170;
+      const wind = t * Math.PI * 2 * 2.1;
+      const grow = 0.3 + t * 0.32;
+      helix.push(new THREE.Vector3(
+        -LENGTH - RADIUS - 0.24 - t * 4.6,
+        Math.sin(wind) * grow,
+        Math.cos(wind) * grow,
+      ));
+    }
+    const flagellumSkin = context.material('flagellum', 'soft');
+    flagellum.add(new THREE.Mesh(
+      context.keep(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(helix), 220, 0.055, 6, false)),
+      flagellumSkin,
+    ));
+    // Móc nối và đế động cơ, ở đúng chỗ sợi xuyên qua thành.
+    const hook = new THREE.Mesh(
+      context.keep(new THREE.CapsuleGeometry(0.085, 0.26, 5, 10)),
+      flagellumSkin,
+    );
+    hook.position.set(-LENGTH - RADIUS + 0.06, 0, 0);
+    hook.rotation.z = Math.PI / 2;
+    flagellum.add(hook);
+    const motor = new THREE.Mesh(
+      context.keep(new THREE.CylinderGeometry(0.2, 0.2, 0.16, 14)),
+      flagellumSkin,
+    );
+    motor.position.set(-LENGTH - RADIUS + 0.28, 0, 0);
+    motor.rotation.z = Math.PI / 2;
+    flagellum.add(motor);
+    context.attach('flagellum', flagellum);
+  },
 };
 
 /** Chồng túi dẹt của bộ máy Golgi. Chỉ tế bào động vật dùng, nên để riêng. */
@@ -839,7 +1027,12 @@ export function CellStudio({ params }: { params?: Record<string, string> }) {
     ));
     applyFit();
     stage.onResize(applyFit);
-    stage.shadow.fit(box.clone().translate(centre.clone().negate()));
+    const fittedBox = box.clone().translate(centre.clone().negate());
+    stage.shadow.fit(fittedBox);
+    /* Sàn lưới dùng chung của cả Thư viện. Bảy loại tế bào cũng đứng trong cùng
+       một phòng dựng như con khủng long và con ong, nên không loại nào trông như
+       được chụp ở chỗ khác rồi dán vào. */
+    stage.grid.fit(fittedBox);
 
     /* -------------------------------------------------------------- chọn --- */
     const raycaster = new THREE.Raycaster();

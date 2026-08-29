@@ -19,13 +19,13 @@ import { STEM_EXPERIENCES } from './subjects/stem';
  */
 
 export const SUBJECTS: Subject[] = [
-  { id: 'sinh-hoc', label: 'Sinh học', note: 'Cơ thể · Tế bào · Vi sinh', tint: 'var(--color-sage)' },
-  { id: 'hoa-hoc', label: 'Hóa học', note: 'Nguyên tố · Cấu tạo chất', tint: 'var(--color-accent-strong)' },
-  { id: 'vat-ly', label: 'Vật lý', note: 'Chuyển động · Lực · Sóng', tint: 'var(--color-lavender)' },
-  { id: 'dia-ly', label: 'Địa lý & Trái Đất', note: 'Địa cầu · Cấu tạo hành tinh', tint: 'var(--color-cyan)' },
-  { id: 'stem', label: 'KHCN & STEM', note: 'Kỹ thuật · Thực hành', tint: 'var(--color-accent-deep)' },
-  { id: 'vu-tru', label: 'Khoa học vũ trụ', note: 'Hệ Mặt Trời · Phi hành', tint: 'var(--color-lavender)' },
-  { id: 'lich-su', label: 'Lịch sử & Văn hóa', note: 'Di sản · Cổ vật', tint: 'var(--color-blush)' },
+  { id: 'sinh-hoc', label: 'Sinh học', note: 'Cơ thể · Tế bào · Vi sinh', tint: 'var(--color-sage)', glyph: 'biology' },
+  { id: 'hoa-hoc', label: 'Hóa học', note: 'Nguyên tố · Cấu tạo chất', tint: 'var(--color-accent-strong)', glyph: 'chemistry' },
+  { id: 'vat-ly', label: 'Vật lý', note: 'Chuyển động · Lực · Sóng', tint: 'var(--color-lavender)', glyph: 'physics' },
+  { id: 'dia-ly', label: 'Địa lý & Trái Đất', note: 'Địa cầu · Cấu tạo hành tinh', tint: 'var(--color-cyan)', glyph: 'earth' },
+  { id: 'stem', label: 'KHCN & STEM', note: 'Kỹ thuật · Thực hành', tint: 'var(--color-accent-deep)', glyph: 'stem' },
+  { id: 'vu-tru', label: 'Khoa học vũ trụ', note: 'Hệ Mặt Trời · Phi hành', tint: 'var(--color-lavender)', glyph: 'space' },
+  { id: 'lich-su', label: 'Lịch sử & Văn hóa', note: 'Di sản · Cổ vật', tint: 'var(--color-blush)', glyph: 'history' },
 ];
 
 /** Subjects with no `ready` entry yet, and the honest reason. */
@@ -58,12 +58,14 @@ export function experienceById(id: string) {
   return EXPERIENCES.find((item) => item.id === id) ?? null;
 }
 
-/** Related items inside the same subject, for the strip under the workspace. */
-export function relatedExperiences(item: ExperienceManifest, limit = 3) {
-  return EXPERIENCES.filter(
-    (entry) => entry.subject === item.subject && entry.id !== item.id && entry.status === 'ready',
-  ).slice(0, limit);
-}
+/*
+ * `relatedExperiences` used to live here, for a four-card strip under the
+ * workspace. Both are gone. The strip repeated three rows that were already in
+ * the rail eight hundred pixels above it, and its real cost was structural: it
+ * put content below the fold in a section whose whole argument is that the
+ * library is one screen you can operate. Removing it is what let the section
+ * become a single viewport-tall panel and join the page's chapter snap.
+ */
 
 /** Biology leads: it has the most verified assets, so it is what opens. */
 export const DEFAULT_SUBJECT: SubjectId = 'sinh-hoc';

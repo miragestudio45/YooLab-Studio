@@ -2,18 +2,20 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import {
-  CAR_BASE,
-  createCarLoaders,
-  createCarMaterials,
-  disposeScene,
-  loadCarTextures,
-  normalizeModel,
-  prepareCarVisual,
-  type CarPieceState,
-  type MaterialShader,
-} from '../lib/formula/carRuntime';
+import { CAR_BASE, disposeScene } from '../lib/formula/carRuntime';
+import { createCarWorkshop, type CarWorkshop } from '../lib/formula/carScene';
 import { createProceduralEnvironment, studioEnvironmentPalette } from '../lib/three/environment';
+
+/**
+ * The full-screen Formula workshop.
+ *
+ * The car, the sprue frame and the desk tools are no longer built here — they
+ * live in `lib/formula/carScene.ts`, because the practice hub renders the same
+ * workshop inside the Library's ivory room and two copies of four hundred lines
+ * of texture-channel conventions is how one model becomes two models. What is
+ * left in this file is what actually belongs to the *overlay*: its dark studio,
+ * its neon rig, its drive floor, and the three modes.
+ */
 
 export type FormulaMode = 'KIT' | 'STUDIO' | 'DRIVE';
 
@@ -58,6 +60,7 @@ function FormulaCanvas({
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
+    let disposed = false;
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x12101f);
@@ -90,10 +93,6 @@ function FormulaCanvas({
 
     const world = new THREE.Group();
     scene.add(world);
-    const carRoot = new THREE.Group();
-    world.add(carRoot);
-    const kitRoot = new THREE.Group();
-    world.add(kitRoot);
     const driveRoot = new THREE.Group();
     world.add(driveRoot);
 
@@ -119,145 +118,20 @@ function FormulaCanvas({
     gridMaterials.forEach((material) => { material.transparent = true; material.opacity = 0.42; });
     driveRoot.add(grid);
 
-    const loaders = createCarLoaders(renderer);
-    const kitShaders: MaterialShader[] = [];
-    const carPieces: CarPieceState[] = [];
-    let carVisual: THREE.Object3D | undefined;
+    let workshop: CarWorkshop | null = null;
     let kitProgress = 1;
     let lastMode: FormulaMode | '' = '';
 
-    const makeDeskAtlasMaterial = (
-      atlas: THREE.Texture,
-      channel: 'r' | 'g' | 'b' | 'a',
-      color: number,
-      uvExpression = 'vMapUv',
-    ) => {
-      const material = new THREE.MeshStandardMaterial({ map: atlas, color, roughness: 0.58, metalness: 0.28 });
-      material.onBeforeCompile = (shader) => {
-        shader.fragmentShader = shader.fragmentShader.replace(
-          '#include <map_fragment>',
-          `vec4 sampledDiffuseColor = texture2D(map, ${uvExpression});\nfloat deskDetail = sampledDiffuseColor.${channel};\ndiffuseColor.rgb *= mix(0.68, 1.18, deskDetail);`,
-        );
-      };
-      material.customProgramCacheKey = () => `desk-${channel}-${uvExpression}`;
-      return material;
-    };
-
-    const prepareCar = async () => {
-      const [gltf, textures] = await Promise.all([
-        loaders.loadProtected('formulaCar.glb'),
-        loadCarTextures(loaders),
-      ]);
-      const { materials, shaders } = createCarMaterials(textures, { initialKitProgress: kitProgress });
-      kitShaders.push(...shaders);
-      carVisual = gltf.scene;
-      carPieces.push(...prepareCarVisual(carVisual, materials, 4.25));
-      carRoot.add(carVisual);
-      carRoot.position.y = -0.4;
-    };
-
-    const prepareKit = async () => {
-      const desk = new THREE.Mesh(
-        new THREE.BoxGeometry(9.4, 0.28, 6.4),
-        new THREE.MeshStandardMaterial({ color: 0x817789, roughness: 0.68, metalness: 0.05 }),
-      );
-      desk.position.y = -1.48;
-      desk.receiveShadow = true;
-      kitRoot.add(desk);
-
-      const textureLoader = new THREE.TextureLoader();
-      const [
-        sprueGltf, matGltf, paintGltf, eraserGltf, pencilGltf, rulerGltf,
-        scissorGltf, cutterGltf, driverGltf,
-        spruePacked, cmBase, cmPacked, paintBody, sharedMask, eraserBase,
-        atlasFalse, atlasTrue,
-      ] = await Promise.all([
-        loaders.loadProtected('formulaSprue.glb'), loaders.loadProtected('cuttingMatt.glb'), loaders.loadProtected('paintJar.glb'),
-        loaders.loadProtected('eraser.glb'), loaders.loadProtected('pencil.glb'), loaders.loadProtected('ruler.glb'),
-        loaders.loadProtected('scissor.glb'), loaders.loadProtected('boxCutter.glb'), loaders.loadProtected('screwdriver.glb'),
-        loaders.loadTexture('sprue_packed.webp', false, false), loaders.loadTexture('cm_baseTexture.webp', false, false),
-        loaders.loadTexture('cm_packedEffects.webp', false, false), loaders.loadTexture('paintJar_body.webp', true, false),
-        textureLoader.loadAsync('/asset/fish/sharedMaskAtlas.webp'), textureLoader.loadAsync('/asset/fish/eraser_baseColor.webp'),
-        textureLoader.loadAsync('/asset/fish/deskSupplies_atlas.webp'), textureLoader.loadAsync('/asset/fish/deskSupplies_atlas.webp'),
-      ]);
-      sharedMask.colorSpace = THREE.NoColorSpace; sharedMask.flipY = false; sharedMask.needsUpdate = true;
-      eraserBase.colorSpace = THREE.SRGBColorSpace; eraserBase.flipY = false; eraserBase.needsUpdate = true;
-      // The desk atlas needs two instances: ruler and scissor sample it
-      // unflipped, box cutter and screwdriver flipped.
-      atlasFalse.colorSpace = THREE.NoColorSpace; atlasFalse.flipY = false; atlasFalse.needsUpdate = true;
-      atlasTrue.colorSpace = THREE.NoColorSpace; atlasTrue.flipY = true; atlasTrue.needsUpdate = true;
-      [sharedMask, eraserBase, atlasFalse, atlasTrue].forEach((texture) => loaders.ownedTextures.add(texture));
-
-      const spruePlastic = new THREE.MeshStandardMaterial({ map: spruePacked, color: 0xb3a8d6, roughness: 0.64, metalness: 0.02 });
-      spruePlastic.onBeforeCompile = (shader) => {
-        shader.fragmentShader = shader.fragmentShader.replace(
-          '#include <map_fragment>',
-          'vec4 sprueData = texture2D(map, vMapUv); diffuseColor.rgb *= mix(0.64, 1.0, sprueData.g);',
-        );
-      };
-      const sprueLabel = new THREE.MeshBasicMaterial({ map: spruePacked, color: 0xf4e9ff, transparent: true, depthWrite: false });
-      sprueLabel.onBeforeCompile = (shader) => {
-        shader.fragmentShader = shader.fragmentShader.replace(
-          '#include <map_fragment>',
-          'vec4 sprueData = texture2D(map, vMapUv); diffuseColor.a *= sprueData.r;',
-        );
-      };
-      sprueGltf.scene.traverse((object) => {
-        if (!(object instanceof THREE.Mesh)) return;
-        object.material = (object.material as THREE.Material).name.includes('label') ? sprueLabel : spruePlastic;
-      });
-      normalizeModel(sprueGltf.scene, 2.25);
-      const sprueWrapper = new THREE.Group();
-      sprueWrapper.add(sprueGltf.scene);
-      sprueWrapper.position.set(-2.65, -1.24, 0.45);
-      sprueWrapper.rotation.x = -Math.PI / 2;
-      kitRoot.add(sprueWrapper);
-
-      const matMaterial = new THREE.ShaderMaterial({
-        uniforms: { uBase: { value: cmBase }, uEffects: { value: cmPacked } },
-        vertexShader: `varying vec2 vUv; varying vec3 vLocal; void main(){vUv=uv;vLocal=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,
-        fragmentShader: `uniform sampler2D uBase; uniform sampler2D uEffects; varying vec2 vUv; varying vec3 vLocal; void main(){vec2 packUv=vec2(vLocal.x*.5+.5,vLocal.y/1.5+.5);vec4 fx=texture2D(uEffects,packUv);float design=texture2D(uBase,vUv).r;vec3 base=mix(vec3(.16,.14,.21),vec3(.28,.23,.40),design);base+=fx.g*.045-fx.r*.02;gl_FragColor=vec4(base,1.0);}`,
-      });
-      matGltf.scene.traverse((object) => { if (object instanceof THREE.Mesh) object.material = matMaterial; });
-      normalizeModel(matGltf.scene, 5.45);
-      const matWrapper = new THREE.Group();
-      matWrapper.add(matGltf.scene);
-      matWrapper.position.set(0, -1.3, 0);
-      kitRoot.add(matWrapper);
-
-      paintGltf.scene.traverse((object) => {
-        if (!(object instanceof THREE.Mesh)) return;
-        if (object.geometry.attributes.uv && !object.geometry.attributes.uv1) object.geometry.setAttribute('uv1', object.geometry.attributes.uv);
-        object.material = new THREE.MeshStandardMaterial({ map: paintBody, aoMap: sharedMask, aoMapIntensity: 0.7, roughness: 0.45, metalness: 0.08 });
-      });
-      eraserGltf.scene.traverse((object) => { if (object instanceof THREE.Mesh) object.material = new THREE.MeshStandardMaterial({ map: eraserBase, roughness: 0.74 }); });
-      pencilGltf.scene.traverse((object) => { if (object instanceof THREE.Mesh) object.material = new THREE.MeshStandardMaterial({ color: 0xf2b850, roughness: 0.68 }); });
-      rulerGltf.scene.traverse((object) => { if (object instanceof THREE.Mesh) object.material = makeDeskAtlasMaterial(atlasFalse, 'b', 0xb6cdf8, 'vec2(vMapUv.x, vMapUv.y * 0.125)'); });
-      scissorGltf.scene.traverse((object) => { if (object instanceof THREE.Mesh) object.material = makeDeskAtlasMaterial(atlasFalse, 'r', 0xd33c75); });
-      cutterGltf.scene.traverse((object) => { if (object instanceof THREE.Mesh) object.material = makeDeskAtlasMaterial(atlasTrue, 'g', 0x6c68d8); });
-      driverGltf.scene.traverse((object) => { if (object instanceof THREE.Mesh) object.material = makeDeskAtlasMaterial(atlasTrue, 'a', 0x3eb6ce); });
-
-      const props = [
-        [paintGltf.scene, 0.64, 3.15, -1.18, -1.15, 0],
-        [eraserGltf.scene, 0.52, 2.4, -1.25, 1.58, 0.2],
-        [pencilGltf.scene, 1.45, -1.1, -1.27, 2.15, -0.18],
-        [rulerGltf.scene, 1.55, 0.5, -1.26, -2.2, 0.12],
-        [scissorGltf.scene, 1.0, -3.2, -1.2, -1.15, -0.2],
-        [cutterGltf.scene, 0.9, 3.35, -1.2, 1.2, 0.24],
-        [driverGltf.scene, 1.0, -2.85, -1.18, 1.95, -0.28],
-      ] as const;
-      for (const [object, size, x, y, z, rotation] of props) {
-        normalizeModel(object, size);
-        const wrapper = new THREE.Group();
-        wrapper.add(object);
-        wrapper.position.set(x, y, z);
-        wrapper.rotation.y = rotation;
-        kitRoot.add(wrapper);
-      }
-    };
-
-    Promise.all([prepareCar(), prepareKit()])
-      .then(() => onReady())
+    createCarWorkshop(renderer, world, { initialKitProgress: kitProgress })
+      .then((built) => {
+        if (disposed) {
+          built.dispose();
+          return;
+        }
+        workshop = built;
+        built.carRoot.position.y = -0.4;
+        onReady();
+      })
       .catch((error) => {
         console.error('Formula experience failed to load', error);
         host.dataset.error = 'true';
@@ -327,12 +201,6 @@ function FormulaCanvas({
     const drivePosition = new THREE.Vector3();
     const targetCamera = new THREE.Vector3();
     const carTarget = new THREE.Vector3();
-    const rollQuaternion = new THREE.Quaternion();
-    const steeringQuaternion = new THREE.Quaternion();
-    // The wheel nodes are authored with a 90° Y rotation, so their axle is
-    // local X. Rolling around local Z made the tyres yaw/wobble instead of spin.
-    const rollAxis = new THREE.Vector3(1, 0, 0);
-    const steerAxis = new THREE.Vector3(0, 1, 0);
     let hudElapsed = 0;
     const timer = new THREE.Timer();
     renderer.setAnimationLoop(() => {
@@ -346,8 +214,8 @@ function FormulaCanvas({
       }
       const kitTarget = activeMode === 'KIT' ? 1 : 0;
       kitProgress += (kitTarget - kitProgress) * Math.min(1, delta * 3.2);
-      for (const shader of kitShaders) shader.uniforms.uKitProgress.value = kitProgress;
-      kitRoot.visible = activeMode === 'KIT';
+      const built = workshop;
+      if (built) built.kitRoot.visible = activeMode === 'KIT';
       studioFloor.visible = activeMode !== 'DRIVE';
       studioRing.visible = activeMode === 'STUDIO';
       driveRoot.visible = activeMode === 'DRIVE';
@@ -361,10 +229,12 @@ function FormulaCanvas({
         heading += steering * delta * (0.7 + Math.abs(speed) * 0.105) * Math.sign(speed || 1);
         drivePosition.x += Math.sin(heading) * speed * delta;
         drivePosition.z += Math.cos(heading) * speed * delta;
-        carTarget.set(drivePosition.x, -0.42, drivePosition.z);
-        carRoot.position.lerp(carTarget, 0.2);
-        // The authored Formula points along local +X; heading zero drives toward +Z.
-        carRoot.rotation.y = heading - Math.PI / 2;
+        if (built) {
+          carTarget.set(drivePosition.x, -0.42, drivePosition.z);
+          built.carRoot.position.lerp(carTarget, 0.2);
+          // The authored Formula points along local +X; heading zero drives toward +Z.
+          built.carRoot.rotation.y = heading - Math.PI / 2;
+        }
         wheelRoll -= speed * delta * 1.8;
         targetCamera.set(
           drivePosition.x - Math.sin(heading) * 7.2,
@@ -377,10 +247,12 @@ function FormulaCanvas({
         grid.position.z = Math.round(drivePosition.z / 10) * 10;
       } else {
         speed *= Math.pow(0.9, delta * 60);
-        carTarget.set(0, activeMode === 'KIT' ? -0.3 : -0.36, 0);
-        carRoot.position.lerp(carTarget, 1 - Math.pow(0.012, delta));
         if (activeMode === 'STUDIO' && !dragging && !reduceMotion) studioYaw += delta * 0.16;
-        carRoot.rotation.y = activeMode === 'STUDIO' ? studioYaw : 0;
+        if (built) {
+          carTarget.set(0, activeMode === 'KIT' ? -0.3 : -0.36, 0);
+          built.carRoot.position.lerp(carTarget, 1 - Math.pow(0.012, delta));
+          built.carRoot.rotation.y = activeMode === 'STUDIO' ? studioYaw : 0;
+        }
         const radius = activeMode === 'KIT' ? 8.8 : 7.2;
         targetCamera.set(
           Math.sin(orbitYaw) * radius,
@@ -391,20 +263,11 @@ function FormulaCanvas({
         camera.lookAt(0, activeMode === 'KIT' ? -0.6 : -0.22, 0);
       }
 
-      if (carVisual) {
+      if (built) {
         const steering = activeMode === 'DRIVE'
           ? (keys.has('KeyA') || keys.has('ArrowLeft') ? 0.16 : keys.has('KeyD') || keys.has('ArrowRight') ? -0.16 : 0)
           : 0;
-        rollQuaternion.setFromAxisAngle(rollAxis, wheelRoll);
-        steeringQuaternion.setFromAxisAngle(steerAxis, steering);
-        for (const piece of carPieces) {
-          piece.object.position.lerpVectors(piece.assembledPosition, piece.kitPosition, kitProgress);
-          piece.object.quaternion.slerpQuaternions(piece.assembledQuaternion, piece.kitQuaternion, kitProgress);
-          if (piece.isWheel && kitProgress < 0.01) {
-            piece.object.quaternion.multiply(rollQuaternion);
-            if (piece.isFrontWheel) piece.object.quaternion.premultiply(steeringQuaternion);
-          }
-        }
+        built.update(kitProgress, wheelRoll, steering);
       }
       hudElapsed += delta;
       if (hudElapsed > 0.12) {
@@ -414,11 +277,12 @@ function FormulaCanvas({
       cyan.intensity = activeMode === 'STUDIO' ? 32 : activeMode === 'DRIVE' ? 18 : 13;
       magenta.intensity = activeMode === 'STUDIO' ? 22 : 11;
       key.intensity = activeMode === 'KIT' ? 7 : 5.4;
-      if (activeMode === 'KIT') kitRoot.rotation.y = reduceMotion ? 0 : Math.sin(elapsed * 0.12) * 0.015;
+      if (built && activeMode === 'KIT') built.kitRoot.rotation.y = reduceMotion ? 0 : Math.sin(elapsed * 0.12) * 0.015;
       renderer.render(scene, camera);
     });
 
     return () => {
+      disposed = true;
       renderer.setAnimationLoop(null);
       observer.disconnect();
       host.removeEventListener('keydown', onKeyDown);
@@ -428,9 +292,9 @@ function FormulaCanvas({
       renderer.domElement.removeEventListener('pointermove', onPointerMove);
       renderer.domElement.removeEventListener('pointerup', onPointerUp);
       renderer.domElement.removeEventListener('pointercancel', onPointerUp);
+      workshop?.dispose();
       disposeScene(world);
       environment.dispose();
-      loaders.dispose();
       renderer.dispose();
       renderer.domElement.remove();
     };

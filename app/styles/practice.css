@@ -1,0 +1,1961 @@
+/* =============================================================== practice === */
+/*
+ * Thực hành & STEM — the poster wall and its three doors.
+ *
+ * One composition, and it is the argument the section makes before a word is
+ * read: a large still of the selected experience, a brief welded to its right
+ * edge, and a rail of three photographs beside both.
+ *
+ * The stage held a live renderer until the section grew to three labs, and the
+ * swap is the single most consequential change in this file. A chooser cannot
+ * also be the thing being chosen — see the header of `PracticeSection.tsx` —
+ * and what the section gained by giving the labs their own popup is that every
+ * rule below is now about *composition* rather than about keeping a WebGL
+ * canvas from fighting the page it sits in.
+ *
+ * Everything vertical here is a `clamp` whose middle term is `vh`, for the
+ * reason the education section already learned: a flat padding value is correct
+ * on a 1080 display and wrong on a 1366×768 laptop, where the section's own
+ * heading plus a constant would push the stage's bottom edge off the screen.
+ */
+.practice {
+  --practice-head: clamp(96px, 14vh, 150px);
+  --stage-min: clamp(360px, calc(100svh - var(--practice-head) - 280px), 620px);
+  /*
+   * The blush the brief column, the rail's resting state and the benefits
+   * strip all share. Three separate near-pink literals is how one panel ends up
+   * two units warmer than the one beside it, which nobody can name and everyone
+   * can see.
+   */
+  --practice-blush: #fdf4f1;
+  --practice-blush-deep: #fbede8;
+  padding: calc(var(--header-h) + var(--section-gap)) 0 clamp(44px, 6.5vh, 88px);
+  scroll-margin-top: 0;
+  /* The lavender note in the section chain: ivory → a breath of lavender-ivory
+     → ivory. Four units of value; the point is that the eye never meets an
+     edge, not that anyone can name the colour. */
+  background: linear-gradient(180deg, var(--color-bg) 0%, #f7f2f4 48%, var(--color-bg) 100%);
+}
+
+.practice-head { min-height: var(--practice-head); }
+
+/*
+ * Stage plus rail. The stage takes roughly three quarters, which is the ratio at
+ * which a poster stops reading as an illustration beside a menu and starts
+ * reading as the thing the section is about.
+ */
+.practice-hub {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(266px, 22.5%, 322px);
+  gap: clamp(14px, 1.5vw, 24px);
+  align-items: stretch;
+  margin-top: clamp(16px, 2.4vh, 34px);
+}
+
+/* The application: the experience and what it is, inside one frame. */
+.practice-main {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 2.9fr) minmax(248px, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+
+/* ------------------------------------------------------------------ stage --- */
+
+/*
+ * The poster, and the largest click target in the section.
+ *
+ * A `button` rather than a figure with a handler, so it is reachable by
+ * keyboard and announces the experience it opens. Its own background is the
+ * ivory the three renders were lit against, which means a poster that has not
+ * decoded yet reads as an empty studio rather than as a hole.
+ */
+.practice-stage {
+  position: relative;
+  /* Explicit, because the pager below shares this cell and auto-placement
+     would otherwise push whichever of the two comes second into column 2. */
+  grid-area: 1 / 1;
+  display: block;
+  min-width: 0;
+  min-height: var(--stage-min);
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  background: var(--color-surface-2);
+  cursor: pointer;
+}
+.practice-stage:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -3px; }
+
+.practice-poster {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /*
+   * The renders are lit for a subject on a turntable, so their interest sits
+   * just below centre. Left to the default the stage crops the studio ceiling
+   * in and the platform out.
+   */
+  object-position: center 58%;
+  opacity: 0;
+  transition: opacity 420ms var(--ease-reveal);
+  user-select: none;
+}
+.practice-poster.is-active { opacity: 1; }
+
+/*
+ * Everything drawn over the poster is `pointer-events: none`, because the
+ * poster *is* the button. A pill that eats the pointer-down would leave a dead
+ * patch in the middle of the section's main affordance — invisible in a
+ * screenshot and infuriating in use.
+ */
+.practice-live,
+.practice-open,
+.practice-tools {
+  position: absolute;
+  pointer-events: none;
+}
+
+.practice-live {
+  top: clamp(12px, 1.6vh, 18px);
+  left: clamp(12px, 1vw, 20px);
+  display: flex;
+  padding: 7px 13px;
+  align-items: center;
+  gap: 7px;
+  border-radius: 999px;
+  color: #2f5f33;
+  background: rgba(255, 253, 249, 0.88);
+  box-shadow: inset 0 0 0 1px var(--color-border-hair);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  font-size: 9.5px;
+  font-weight: 680;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.practice-live i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-sage);
+  animation: lab-pulse 2s ease-in-out infinite;
+}
+
+/*
+ * The hover affordance.
+ *
+ * A still image of a machine gives no sign that it is a door. On a pointer
+ * device this is the sign, and it is deliberately not present until the pointer
+ * arrives: a permanent "Mở trải nghiệm" plate over the poster would fight the
+ * coral button eighteen pixels to its right, which says the same thing and is
+ * the one meant to be pressed.
+ */
+.practice-open {
+  top: 50%;
+  left: 50%;
+  display: flex;
+  padding: 11px 20px;
+  align-items: center;
+  gap: 9px;
+  transform: translate(-50%, -50%) scale(0.94);
+  border-radius: 999px;
+  color: #fff;
+  background: rgba(35, 30, 38, 0.72);
+  box-shadow: 0 14px 34px rgba(30, 24, 32, 0.24);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  font-size: 12px;
+  font-weight: 620;
+  letter-spacing: -0.01em;
+  opacity: 0;
+  transition: opacity 240ms var(--ease-reveal), transform 240ms var(--ease-reveal);
+}
+.practice-open svg { width: 15px; height: 15px; }
+.practice-stage:hover .practice-open,
+.practice-stage:focus-visible .practice-open {
+  transform: translate(-50%, -50%) scale(1);
+  opacity: 1;
+}
+
+/*
+ * The tool pill: what the experience behind the poster lets you do.
+ *
+ * The one thing a still cannot say about itself. Three items, each a mark and
+ * one word, on a single frosted plate rather than three — three floating chips
+ * read as three controls, and none of these is one.
+ */
+.practice-tools {
+  bottom: clamp(12px, 1.6vh, 18px);
+  left: clamp(12px, 1vw, 20px);
+  display: flex;
+  max-width: calc(100% - 40px);
+  padding: 9px 6px;
+  align-items: center;
+  border-radius: var(--radius-md);
+  background: rgba(255, 253, 249, 0.82);
+  box-shadow: inset 0 0 0 1px var(--color-border-hair);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.practice-tools > span {
+  display: flex;
+  padding: 0 13px;
+  align-items: center;
+  gap: 7px;
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 560;
+  white-space: nowrap;
+}
+.practice-tools > span + span { box-shadow: inset 1px 0 0 var(--color-border-hair); }
+.practice-tools svg { width: 15px; height: 15px; flex: 0 0 auto; color: var(--color-muted-2); }
+
+/*
+ * The pager.
+ *
+ * A sibling of the stage rather than a child, because a button inside a button
+ * is invalid HTML and the browser resolves it by dropping one of them. It is
+ * placed into the stage's own grid cell instead of positioned over the card, so
+ * "centred on the poster" needs no percentage that would go wrong the moment
+ * the brief column hits its `minmax` floor.
+ *
+ * Its job is narrower than the rail's: it pages the poster without opening
+ * anything.
+ */
+.practice-dots {
+  position: relative;
+  z-index: 2;
+  grid-area: 1 / 1;
+  display: flex;
+  margin-bottom: clamp(12px, 1.6vh, 18px);
+  align-self: end;
+  justify-self: center;
+  /* Wide enough for the active pill to overflow its own 7 px box by 6.5 px each
+     side without touching its neighbour. */
+  gap: 10px;
+  pointer-events: none;
+}
+/*
+ * The dot is a fixed 7 px box; what grows is a pill drawn *out of flow* inside
+ * it.
+ *
+ * Animating the button's own width was the obvious way to write this and it
+ * makes every frame of the transition a layout pass — the three dots sit in a
+ * flex row, so one of them growing moves the other two, which moves the row,
+ * which is centred in its grid cell. Two pseudo-elements cross-fading instead
+ * keeps the row a constant 41 px and touches only `opacity` and `transform`.
+ *
+ * The pill is authored at its *final* 20 px and scaled down at rest rather than
+ * the reverse, so the stadium radius is undistorted in the state that is
+ * actually looked at; the squash exists only mid-transition, under a fade.
+ */
+.practice-dot {
+  position: relative;
+  width: 7px;
+  height: 7px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  pointer-events: auto;
+  cursor: pointer;
+}
+.practice-dot::before,
+.practice-dot::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  height: 7px;
+  box-shadow: 0 0 0 3px rgba(255, 253, 249, 0.5);
+}
+/* Resting: a circle filling the box. */
+.practice-dot::before {
+  left: 0;
+  width: 7px;
+  border-radius: 50%;
+  background: rgba(117, 91, 70, 0.26);
+  transition: opacity 220ms ease, background-color 220ms ease;
+}
+/* Active: a coral pill, centred on the same 7 px box and overflowing it into
+   the row's gap — which is why that gap is 10 px rather than 7. */
+.practice-dot::after {
+  left: 50%;
+  width: 20px;
+  margin-left: -10px;
+  border-radius: 999px;
+  background: var(--color-accent-strong);
+  opacity: 0;
+  transform: scaleX(0.35);
+  transition: opacity 220ms ease, transform 260ms var(--ease-reveal);
+}
+.practice-dot:hover::before { background: rgba(117, 91, 70, 0.44); }
+.practice-dot.is-active::before { opacity: 0; }
+.practice-dot.is-active::after { opacity: 1; transform: none; }
+.practice-dot:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 3px; }
+
+/* ------------------------------------------------------------------ brief --- */
+
+/*
+ * The blush panel.
+ *
+ * It is the one surface in the section that is not ivory, and the tint is doing
+ * structural work rather than decoration: the stage and the brief share a card
+ * with no divider between them, so without it the poster's own ivory studio
+ * would run straight into the page and the card would lose its right half.
+ */
+.practice-brief {
+  grid-area: 1 / 2;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  padding: clamp(20px, 2.8vh, 32px) clamp(20px, 1.9vw, 30px);
+  background: linear-gradient(180deg, var(--practice-blush) 0%, var(--practice-blush-deep) 100%);
+}
+
+.practice-brief-index {
+  margin: 0 0 10px;
+  color: var(--color-accent-deep);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.practice-brief h3 {
+  margin: 0 0 12px;
+  text-wrap: balance;
+  font-family: var(--font-display);
+  font-size: clamp(20px, 1.55vw, 27px);
+  font-weight: 690;
+  letter-spacing: -0.036em;
+  line-height: 1.13;
+}
+
+.practice-brief-summary {
+  margin: 0;
+  color: var(--color-ink-2);
+  font-size: 13px;
+  line-height: 1.66;
+}
+
+/*
+ * Three capabilities, each a mark and two lines.
+ *
+ * The mark is what makes this a capability list rather than three more
+ * sentences: the eye finds "can I drive it" by the shape of the wheel beside it
+ * instead of by reading three labels in sequence. Same reasoning, same drawing
+ * hand and same 20-unit grid as the Library's readout table.
+ */
+.practice-capabilities {
+  margin: clamp(14px, 2.2vh, 24px) 0 auto;
+  padding: clamp(14px, 2.2vh, 22px) 0 0;
+  border-top: 1px solid rgba(180, 88, 70, 0.14);
+  list-style: none;
+}
+.practice-capabilities li {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  align-items: center;
+  gap: 13px;
+  padding: clamp(6px, 1vh, 10px) 0;
+}
+.practice-capabilities i {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  color: var(--color-accent-deep);
+  background: rgba(232, 120, 104, 0.13);
+  place-items: center;
+}
+.practice-capabilities svg { width: 18px; height: 18px; }
+.practice-capabilities b {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 660;
+  letter-spacing: -0.012em;
+}
+.practice-capabilities span {
+  display: block;
+  margin-top: 2px;
+  color: var(--color-muted);
+  font-size: 11.5px;
+  line-height: 1.48;
+}
+
+/*
+ * The one primary button in the section, and full width.
+ *
+ * It is not competing with anything: the poster to its left opens the same
+ * experience, and this is the label that says so in words. A pill floated left
+ * inside a blush panel would read as one option among several in a column that
+ * has no others.
+ */
+.practice-cta {
+  display: flex;
+  min-height: 52px;
+  width: 100%;
+  margin-top: clamp(14px, 2.4vh, 26px);
+  padding: 0 22px;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border: 0;
+  border-radius: var(--radius-md);
+  color: #fff;
+  background: var(--color-accent-strong);
+  box-shadow: 0 12px 30px rgba(180, 88, 70, 0.26);
+  font-size: 13.5px;
+  font-weight: 640;
+  cursor: pointer;
+  transition: transform 200ms ease, background-color 200ms ease;
+}
+.practice-cta span { font-size: 17px; line-height: 1; }
+.practice-cta:hover { background: var(--color-accent-deep); transform: translateY(-1px); }
+.practice-cta:active { transform: translateY(0); }
+
+/* ------------------------------------------------------------------- rail --- */
+
+.practice-rail {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: clamp(8px, 1vh, 12px);
+}
+
+.practice-rail-item {
+  display: grid;
+  flex: 1 1 0;
+  min-height: 116px;
+  padding: clamp(11px, 1.4vh, 15px);
+  grid-template-columns: clamp(104px, 46%, 158px) minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(10px, 0.9vw, 16px);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: var(--practice-blush);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 220ms ease, background-color 220ms ease, box-shadow 220ms ease;
+}
+.practice-rail-item:hover { background: var(--color-surface-raised); }
+/*
+ * Active gets the coral border and the white surface. Nothing else changes —
+ * no scale, no shadow ramp, no second accent. One selected item in a list of
+ * three needs exactly one signal, and a rail where the inactive rows also
+ * shimmer is a rail with no selected row.
+ */
+.practice-rail-item.is-active {
+  border-color: var(--color-accent-line);
+  background: var(--color-surface-raised);
+  box-shadow: 0 10px 26px rgba(180, 88, 70, 0.09);
+}
+.practice-rail-item:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+
+/*
+ * The tile is a photograph now.
+ *
+ * It was a drawn mark for two builds, for an honest reason: two of the three
+ * labs were assembled from primitives at runtime, so there was no object to
+ * photograph and a render would have been a picture of a guess. That is no
+ * longer true — the robot loads a real industrial arm and all three stills are
+ * renders of the actual subjects, lit in the same studio — so the rail shows
+ * them. Three photographs of three machines separate at 40 px; three line
+ * drawings of them do not.
+ */
+.practice-rail-item i {
+  display: block;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+  box-shadow: inset 0 0 0 1px var(--color-border-hair);
+}
+.practice-rail-item i img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  aspect-ratio: 3 / 2;
+  object-fit: cover;
+  object-position: center 56%;
+  user-select: none;
+}
+
+.practice-rail-item span { display: block; min-width: 0; }
+.practice-rail-item b {
+  display: block;
+  margin-bottom: 5px;
+  color: rgba(201, 95, 82, 0.6);
+  font-size: 11px;
+  font-weight: 680;
+  letter-spacing: 0.05em;
+}
+.practice-rail-item.is-active b { color: var(--color-accent-deep); }
+.practice-rail-item em {
+  display: block;
+  color: var(--color-ink);
+  font-size: 12.5px;
+  font-style: normal;
+  font-weight: 620;
+  letter-spacing: -0.018em;
+  line-height: 1.34;
+}
+
+.practice-rail-note {
+  display: flex;
+  margin: 0;
+  padding: 11px 14px;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid var(--color-border-hair);
+  border-radius: var(--radius-md);
+  color: var(--color-muted);
+  background: var(--color-surface);
+  font-size: 11.5px;
+}
+.practice-rail-note svg {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+  color: var(--color-accent-strong);
+  fill: currentColor;
+  stroke-width: 1.2;
+}
+
+/* --------------------------------------------------------------- benefits --- */
+/*
+ * Four claims about the section that has just been offered.
+ *
+ * On its own blush plate rather than under a hairline, which is the one change
+ * here that is purely compositional: the section now ends on a white card and a
+ * blush rail, and a strip of bare text under both left the composition
+ * finishing on nothing. The plate closes it. The claims are still secondary —
+ * no card shadow, no border, 32 px marks rather than 56 px ones — because a
+ * claim given the same weight as the thing it describes stops being a caption
+ * and starts competing.
+ */
+.practice-benefits {
+  display: grid;
+  margin: clamp(14px, 2.2vh, 24px) 0 0;
+  padding: clamp(16px, 2.2vh, 24px) clamp(8px, 1vw, 16px);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-radius: var(--radius-lg);
+  background: var(--practice-blush);
+  list-style: none;
+}
+.practice-benefits li {
+  display: grid;
+  min-width: 0;
+  padding: 2px clamp(12px, 1.6vw, 28px);
+  grid-template-columns: 38px minmax(0, 1fr);
+  align-items: center;
+  gap: 13px;
+}
+.practice-benefits li + li { box-shadow: inset 1px 0 0 rgba(180, 88, 70, 0.14); }
+.practice-benefits i {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-sm);
+  color: var(--color-accent-deep);
+  background: rgba(232, 120, 104, 0.13);
+  place-items: center;
+}
+.practice-benefits svg { width: 20px; height: 20px; }
+.practice-benefits b {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 650;
+  letter-spacing: -0.012em;
+}
+.practice-benefits span {
+  display: block;
+  margin-top: 2px;
+  color: var(--color-muted);
+  font-size: 11.5px;
+  line-height: 1.46;
+}
+
+/* ================================================================== modal === */
+/*
+ * The popup every experience opens into. See `PracticeModal.tsx` for why the
+ * labs live here rather than in the section.
+ *
+ * The card is ~94 vw × 92 vh, which is large enough that the expand button is
+ * an option rather than a necessity, and the scrim is dark enough that the page
+ * behind stops competing without going black — a full blackout makes an ivory
+ * lab look like a lightbox rather than like the same product one layer up.
+ */
+.practice-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  padding: clamp(10px, 2vh, 30px) clamp(10px, 2vw, 34px);
+  place-items: center;
+}
+
+.practice-modal-scrim {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(28, 22, 30, 0.52);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  cursor: pointer;
+  animation: practice-modal-scrim 260ms var(--ease-reveal);
+}
+
+@keyframes practice-modal-scrim {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.practice-modal-card {
+  position: relative;
+  display: grid;
+  width: min(1480px, 100%);
+  height: min(940px, 100%);
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: 0 40px 110px rgba(30, 22, 28, 0.34);
+  animation: practice-modal-card 320ms var(--ease-reveal);
+}
+
+@keyframes practice-modal-card {
+  from { opacity: 0; transform: translateY(14px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+
+/*
+ * Real fullscreen. The card fills the screen, so its radius and its border have
+ * nothing to sit against and both come off; the animation is dropped because
+ * the browser has already animated the transition itself.
+ */
+.practice-modal-card:fullscreen {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  animation: none;
+}
+
+.practice-modal-head {
+  display: grid;
+  padding: clamp(13px, 1.8vh, 20px) clamp(16px, 1.6vw, 26px);
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px 20px;
+  border-bottom: 1px solid var(--color-border-hair);
+  background: var(--color-surface);
+}
+
+.practice-modal-eyebrow {
+  display: flex;
+  grid-column: 1;
+  margin: 0 0 5px;
+  align-items: center;
+  gap: 9px;
+  color: var(--color-muted-2);
+  font-size: 10px;
+  font-weight: 680;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.practice-modal-eyebrow b {
+  color: var(--color-accent-deep);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.practice-modal-head h2 {
+  grid-column: 1;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(17px, 1.5vw, 24px);
+  font-weight: 690;
+  letter-spacing: -0.035em;
+  line-height: 1.1;
+}
+
+.practice-modal-tools {
+  display: flex;
+  grid-row: 1 / span 2;
+  grid-column: 2;
+  align-items: center;
+  gap: 8px;
+}
+
+.practice-modal-button {
+  display: flex;
+  min-height: 38px;
+  padding: 0 15px;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-ink-2);
+  background: var(--color-surface);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 180ms ease, background-color 180ms ease, color 180ms ease;
+}
+.practice-modal-button svg { width: 15px; height: 15px; flex: 0 0 auto; }
+.practice-modal-button:hover {
+  border-color: var(--color-border-strong);
+  background: var(--color-surface-2);
+}
+.practice-modal-button[aria-pressed='true'] {
+  border-color: var(--color-accent-line);
+  color: var(--color-accent-deep);
+  background: var(--color-accent-wash);
+}
+.practice-modal-button--close:hover {
+  border-color: var(--color-accent-line);
+  color: var(--color-accent-deep);
+  background: var(--color-accent-wash);
+}
+
+/*
+ * The lab's own container. `position: relative` because every lab positions its
+ * chrome absolutely against it, and `min-height: 0` because a grid row of
+ * `1fr` holding a canvas will otherwise refuse to shrink below the canvas's
+ * intrinsic size and push the card's bottom edge off the screen.
+ */
+.practice-modal-body {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--color-surface-2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .practice-modal-scrim,
+  .practice-modal-card { animation: none; }
+  .practice-poster { transition: none; }
+  .practice-live i { animation: none; }
+}
+
+
+/* ==================================================================== lab === */
+/*
+ * The chrome over a running lab. One implementation, three labs — see
+ * `LabChrome.tsx` for why the composition is fixed.
+ *
+ * Every element here is `pointer-events: none` unless it is a control, because
+ * the whole frame is a drag surface: an invisible box over the stage that eats
+ * a pointer-down is the most annoying bug a 3D viewer can have, and it is
+ * invisible in a screenshot.
+ */
+.lab {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  color: var(--color-ink);
+  touch-action: none;
+}
+.lab:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -3px; }
+.lab[data-grabbing='true'] { cursor: grabbing; }
+.lab-view { position: absolute; inset: 0; }
+.lab canvas { display: block; }
+
+.lab-status {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  margin: 0;
+  padding: 10px 18px;
+  align-items: center;
+  gap: 10px;
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  color: var(--color-muted);
+  background: rgba(255, 253, 249, 0.9);
+  box-shadow: var(--shadow-card);
+  font-size: 12px;
+}
+.lab-status i {
+  width: 13px;
+  height: 13px;
+  border: 2px solid var(--color-accent-soft);
+  border-top-color: var(--color-accent-strong);
+  border-radius: 50%;
+  animation: lab-spin 760ms linear infinite;
+}
+.lab-status.is-error { color: var(--color-accent-deep); }
+.lab-status.is-error i { border-color: var(--color-accent-line); animation: none; }
+
+@keyframes lab-spin { to { transform: rotate(360deg); } }
+
+/* ------------------------------------------------------------------ badge --- */
+
+.lab-badge {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  display: flex;
+  margin: 0;
+  padding: 6px 12px;
+  align-items: center;
+  gap: 7px;
+  border-radius: 999px;
+  color: var(--color-muted);
+  background: rgba(255, 253, 249, 0.86);
+  box-shadow: inset 0 0 0 1px var(--color-border-hair);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  font-size: 9.5px;
+  font-weight: 680;
+  letter-spacing: 0.09em;
+  pointer-events: none;
+  text-transform: uppercase;
+}
+.lab-badge i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-muted-2);
+}
+.lab-badge.is-live { color: #2f5f33; }
+.lab-badge.is-live i {
+  background: var(--color-sage);
+  animation: lab-pulse 2s ease-in-out infinite;
+}
+
+@keyframes lab-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+/* ------------------------------------------------------------------ steps --- */
+
+.lab-steps {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: flex;
+  max-width: calc(100% - 190px);
+  margin: 0;
+  padding: 5px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 3px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 253, 249, 0.86);
+  box-shadow: inset 0 0 0 1px var(--color-border-hair);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  list-style: none;
+  pointer-events: none;
+}
+.lab-steps li { display: flex; }
+/* The chip is a `p` in the two labs whose steps are a state machine and a
+   `button` in the one whose steps are three views of the same model. Both get
+   the same box; only the button takes the pointer back from the strip. */
+.lab-step {
+  display: flex;
+  margin: 0;
+  padding: 5px 9px;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  border-radius: var(--radius-xs);
+  color: var(--color-muted-2);
+  background: transparent;
+  font-size: 10.5px;
+  font-weight: 600;
+  transition: color 240ms ease, background-color 240ms ease;
+}
+button.lab-step { pointer-events: auto; }
+button.lab-step:hover { color: var(--color-ink-2); background: rgba(117, 91, 70, 0.06); }
+button.lab-step.is-current:hover { color: var(--color-accent-deep); background: var(--color-accent-wash); }
+.lab-step b {
+  display: grid;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: rgba(117, 91, 70, 0.09);
+  place-items: center;
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+.lab-step b svg { width: 11px; height: 11px; }
+.lab-step.is-done { color: #2f5f33; }
+.lab-step.is-done b { color: #fff; background: var(--color-sage); }
+.lab-step.is-current {
+  color: var(--color-accent-deep);
+  background: var(--color-accent-wash);
+}
+.lab-step.is-current b { color: #fff; background: var(--color-accent-strong); }
+
+/* ------------------------------------------------------- brief and hint --- */
+
+.lab-brief {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  max-width: min(44ch, calc(100% - 330px));
+  pointer-events: none;
+}
+.lab-objective {
+  margin: 0;
+  padding: 9px 14px;
+  border-radius: var(--radius-md);
+  color: var(--color-ink);
+  background: rgba(255, 253, 249, 0.9);
+  box-shadow: inset 0 0 0 1px var(--color-border-hair), var(--shadow-card);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  font-size: 12.5px;
+  font-weight: 560;
+  line-height: 1.5;
+}
+/*
+ * The tint is the whole signal — there is no accent rule down its edge.
+ *
+ * A 2 px lavender bar on the left was doing nothing the colour was not already
+ * doing: the objective above it is near-white and this is lavender, which is
+ * the same two-tone convention the Library's knowledge panel uses for its notes.
+ * A stripe on top of that is a second marker for one distinction. What the block
+ * did need was more opacity: at 0.42 over a blurred 3D scene it went thin
+ * wherever the car's black bodywork was behind it.
+ */
+.lab-hint {
+  margin: 7px 0 0;
+  padding: 9px 14px;
+  border-radius: var(--radius-xs);
+  color: var(--color-ink-2);
+  background: rgba(221, 210, 242, 0.74);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  font-size: 11.5px;
+  line-height: 1.55;
+}
+
+/* ---------------------------------------------------------------- actions --- */
+
+.lab-actions {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.lab-button {
+  display: inline-flex;
+  min-height: 38px;
+  padding: 0 14px;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--color-ink-2);
+  background: rgba(255, 253, 249, 0.92);
+  box-shadow: inset 0 0 0 1px var(--color-border-hair), var(--shadow-card);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  font-size: 11.5px;
+  font-weight: 620;
+  transition: color 200ms ease, background-color 200ms ease;
+}
+.lab-button svg { width: 15px; height: 15px; }
+.lab-button:hover { color: var(--color-ink); background: var(--color-surface-raised); }
+.lab-button.is-active { color: var(--color-lavender); }
+.lab-button.is-primary {
+  color: #fff;
+  background: var(--color-accent-strong);
+  box-shadow: 0 10px 24px rgba(180, 88, 70, 0.26);
+}
+.lab-button.is-primary:hover { background: var(--color-accent-deep); }
+.lab-button:disabled { opacity: 0.55; cursor: default; }
+
+/* ---------------------------------------------------------------- readout --- */
+
+/*
+ * Above the actions, on the right.
+ *
+ * It has been in two wrong places already, and both were the same mistake:
+ * every other edge of this frame is spoken for. Bottom centre collided with the
+ * objective line, which is a sentence that wants forty characters where the
+ * readout is a pill that wants two hundred pixels. Top centre collided with the
+ * step strip, which grows a chip for every beat a lab has. The gap between the
+ * step strip and the action row is the one band nothing else claims.
+ */
+.lab-readout {
+  position: absolute;
+  right: 16px;
+  bottom: 62px;
+  display: flex;
+  padding: 7px 14px;
+  align-items: baseline;
+  gap: 5px;
+  border-radius: 999px;
+  color: var(--color-muted);
+  background: rgba(255, 253, 249, 0.9);
+  box-shadow: inset 0 0 0 1px var(--color-border-hair);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  font-size: 10.5px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.lab-readout b { color: var(--color-ink); font-size: 14px; font-weight: 680; letter-spacing: -0.02em; }
+.lab-readout b.is-ok { color: #2f5f33; font-size: 11.5px; }
+.lab-readout i { width: 1px; height: 12px; margin: 0 5px; background: var(--color-border); }
+
+/* ------------------------------------------------------------------ flash --- */
+
+.lab-flash {
+  position: absolute;
+  top: 62px;
+  left: 50%;
+  display: flex;
+  margin: 0;
+  padding: 9px 16px;
+  align-items: center;
+  gap: 8px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 620;
+  pointer-events: none;
+  animation: lab-flash 2.8s var(--ease-reveal) forwards;
+}
+.lab-flash svg { width: 16px; height: 16px; }
+.lab-flash--success { color: #2f5f33; background: rgba(214, 232, 210, 0.94); }
+.lab-flash--warn { color: var(--color-accent-deep); background: rgba(249, 217, 205, 0.94); }
+
+@keyframes lab-flash {
+  0% { opacity: 0; transform: translate(-50%, -8px); }
+  10%, 78% { opacity: 1; transform: translate(-50%, 0); }
+  100% { opacity: 0; transform: translate(-50%, -6px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lab-flash { animation: lab-flash-static 2.8s steps(1) forwards; }
+  .lab-badge.is-live i { animation: none; }
+  @keyframes lab-flash-static {
+    0%, 88% { opacity: 1; transform: translateX(-50%); }
+    100% { opacity: 0; transform: translateX(-50%); }
+  }
+}
+
+/* --------------------------------------------------------------- key legend --- */
+/*
+ * The keyboard, drawn.
+ *
+ * The brief for this section asks for the controls to be shown on screen, and
+ * this is why: a lab whose only statement of its controls is a sentence in the
+ * objective line has told the student once, in prose, at the moment they were
+ * reading something else. Three rows of keycaps are readable at a glance and
+ * stay readable while both hands are busy.
+ */
+.lab-keys {
+  position: absolute;
+  top: 62px;
+  left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  pointer-events: none;
+}
+.lab-keys p {
+  display: flex;
+  margin: 0;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-muted);
+  font-size: 10px;
+}
+.lab-keys kbd {
+  display: grid;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 4px;
+  border-radius: 5px;
+  color: var(--color-ink-2);
+  background: rgba(255, 253, 249, 0.92);
+  box-shadow: inset 0 0 0 1px var(--color-border-hair), 0 1px 0 rgba(117, 91, 70, 0.12);
+  place-items: center;
+  font-family: inherit;
+  font-size: 9.5px;
+  font-weight: 660;
+}
+.lab-keys span { margin-left: 4px; }
+
+/* ------------------------------------------------------------------- pads --- */
+/*
+ * Hidden on pointer-fine devices, and the only control surface on a phone.
+ * `onPointerDown`/`onPointerUp` rather than click, because holding is the
+ * gesture — see `LabPad`.
+ */
+.lab-pad {
+  position: absolute;
+  bottom: 74px;
+  left: 16px;
+  display: none;
+  grid-template-areas:
+    '. up .'
+    'left . right'
+    '. down .';
+  gap: 5px;
+}
+.lab-pad--lift {
+  right: 16px;
+  left: auto;
+  grid-template-areas: 'up' 'down';
+}
+.lab-pad button {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  border: 0;
+  border-radius: 50%;
+  color: var(--color-ink-2);
+  background: rgba(255, 253, 249, 0.92);
+  box-shadow: inset 0 0 0 1px var(--color-border-hair), var(--shadow-card);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  place-items: center;
+  font-size: 17px;
+  line-height: 1;
+  touch-action: none;
+}
+.lab-pad button:active { color: #fff; background: var(--color-accent-strong); }
+
+/*
+ * Two triggers, not one.
+ *
+ * `pointer: coarse` is the correct test and it is not a sufficient one: a
+ * narrow window on a laptop has no room for a legend *or* for the corner it
+ * would sit in, and a device-emulated capture does not always report a coarse
+ * pointer at all — which is how a mobile screenshot ended up with the keycap
+ * legend printed straight across the step strip. Either condition now switches
+ * the lab to pads. The keyboard still works wherever there is one; it just
+ * stops being advertised where it cannot be shown.
+ */
+@media (pointer: coarse), (max-width: 700px) {
+  .lab-pad { display: grid; }
+  .lab-keys { display: none; }
+}
+
+/* ================================================================== hmi === */
+/*
+ * The docked control panel — the robot cell's pendant, and the drone's.
+ *
+ * It replaces a disclosure that held six joint sliders in a 244 px box floated
+ * over the stage. That control was truthful and nobody opened it, for a reason
+ * worth writing down: an overlay panel has to stay small enough not to hide the
+ * scene, so every control in it competes with every other one for the same few
+ * hundred pixels, and the first thing to lose is the label that says what the
+ * control *is*. Given its own column the same six sliders carry their axis
+ * name, their real limit and their live position, and none of them covers the
+ * machine they drive.
+ *
+ * It is only possible because the labs moved into a modal. Inside a section
+ * there was no column to give.
+ */
+.lab--panelled {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(300px, 27%, 392px);
+  align-items: stretch;
+}
+
+/*
+ * The stage half. `position: relative` because every piece of lab chrome is
+ * absolutely positioned, and before the split those offsets were measured
+ * against `.lab` itself — leaving them there would have parked the step strip
+ * and the action row underneath the panel.
+ */
+.lab-stage {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.hmi {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  border-left: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+/* ------------------------------------------------------------------ modes --- */
+
+/*
+ * Two modes, and the segmented control is deliberately the largest thing in the
+ * panel. Which mode you are in changes what every control below means, so it
+ * has to be answerable without reading anything.
+ */
+.hmi-modes {
+  display: grid;
+  padding: clamp(10px, 1.4vh, 14px);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  border-bottom: 1px solid var(--color-border-hair);
+  background: var(--practice-blush);
+}
+.hmi-modes button {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--color-muted);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 640;
+  cursor: pointer;
+  transition: color 180ms ease, background-color 180ms ease, border-color 180ms ease;
+}
+.hmi-modes button svg { width: 16px; height: 16px; }
+.hmi-modes button:hover { color: var(--color-ink-2); }
+.hmi-modes button.is-active {
+  border-color: var(--color-accent-line);
+  color: var(--color-accent-deep);
+  background: var(--color-surface-raised);
+  box-shadow: 0 4px 14px rgba(180, 88, 70, 0.1);
+}
+
+.hmi-body {
+  display: flex;
+  min-height: 0;
+  padding: clamp(12px, 1.6vh, 18px);
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: clamp(12px, 1.6vh, 18px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.hmi-group { min-width: 0; }
+.hmi-group h4 {
+  margin: 0 0 9px;
+  color: var(--color-muted-2);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+/* Pushed to the bottom of the column: it is the one block that is read rather
+   than operated, so it belongs after everything that is. */
+.hmi-group--status { margin-top: auto; }
+
+.hmi-subtabs {
+  display: grid;
+  padding: 3px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+}
+.hmi-subtabs button {
+  min-height: 30px;
+  border: 0;
+  border-radius: var(--radius-xs);
+  color: var(--color-muted);
+  background: transparent;
+  font-size: 11.5px;
+  font-weight: 620;
+  cursor: pointer;
+  transition: color 160ms ease, background-color 160ms ease;
+}
+.hmi-subtabs button.is-active {
+  color: var(--color-accent-deep);
+  background: var(--color-surface-raised);
+  box-shadow: 0 1px 3px rgba(87, 62, 43, 0.1);
+}
+
+/* ------------------------------------------------------------------ joints --- */
+
+.hmi-group--joints { display: flex; flex-direction: column; gap: 2px; }
+
+.hmi-joint {
+  display: block;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--color-border-hair);
+}
+.hmi-joint:last-child { border-bottom: 0; }
+
+.hmi-joint-head {
+  display: flex;
+  margin-bottom: 6px;
+  align-items: baseline;
+  gap: 7px;
+}
+.hmi-joint-head b {
+  color: var(--color-accent-deep);
+  font-size: 10.5px;
+  font-weight: 720;
+  letter-spacing: 0.03em;
+}
+.hmi-joint-head em {
+  flex: 1 1 auto;
+  color: var(--color-ink-2);
+  font-size: 11.5px;
+  font-style: normal;
+  font-weight: 580;
+}
+.hmi-joint-head output {
+  color: var(--color-ink);
+  font-size: 12px;
+  font-weight: 680;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.hmi-joint-scale {
+  display: flex;
+  margin-top: 5px;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--color-muted-2);
+  font-size: 9.5px;
+  font-variant-numeric: tabular-nums;
+}
+.hmi-joint-scale i { font-style: normal; }
+/*
+ * Commanded versus actual, side by side.
+ *
+ * The slider is a *request*; the arm slews toward it at a bounded rate, the way
+ * a real controller does. Printing only the request would make the panel lie
+ * during every move, and the gap between the two numbers is the most honest
+ * thing in the lab — it is the machine taking time.
+ */
+.hmi-joint-live { color: var(--color-accent-deep); }
+
+/* One slider style for every range input in the panel. */
+.hmi input[type='range'] {
+  display: block;
+  width: 100%;
+  height: 4px;
+  margin: 0;
+  border-radius: 2px;
+  background: var(--color-border);
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+.hmi input[type='range']::-webkit-slider-thumb {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--color-surface-raised);
+  border-radius: 50%;
+  background: var(--color-accent-strong);
+  box-shadow: 0 1px 4px rgba(180, 88, 70, 0.35);
+  appearance: none;
+  -webkit-appearance: none;
+}
+.hmi input[type='range']::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--color-surface-raised);
+  border-radius: 50%;
+  background: var(--color-accent-strong);
+  box-shadow: 0 1px 4px rgba(180, 88, 70, 0.35);
+}
+.hmi input[type='range']:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 4px; }
+
+/* --------------------------------------------------------------------- jog --- */
+
+/*
+ * Six axis keys in a 3 × 2 grid, ordered so the pairs sit under each other:
+ * Z+ / Y+ / X− on the top row, Z− / X+ / Y− on the bottom. Held, not clicked —
+ * a tap that yields one frame of motion is not jogging.
+ */
+.hmi-jog {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+.hmi-jog button {
+  display: flex;
+  min-height: 54px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-ink-2);
+  background: var(--color-surface);
+  cursor: pointer;
+  touch-action: none;
+  transition: color 140ms ease, background-color 140ms ease, border-color 140ms ease;
+}
+.hmi-jog button b { font-size: 13px; font-weight: 700; letter-spacing: -0.01em; }
+.hmi-jog button span { color: var(--color-muted-2); font-size: 9.5px; }
+.hmi-jog button:hover { border-color: var(--color-accent-line); background: var(--color-accent-wash); }
+.hmi-jog button:active {
+  border-color: transparent;
+  color: #fff;
+  background: var(--color-accent-strong);
+}
+.hmi-jog button:active span { color: rgba(255, 255, 255, 0.78); }
+
+/* ----------------------------------------------------------------- buttons --- */
+
+.hmi-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+
+.hmi-button,
+.hmi-toggle {
+  display: flex;
+  min-height: 40px;
+  padding: 0 12px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-ink-2);
+  background: var(--color-surface);
+  font-size: 11.5px;
+  font-weight: 620;
+  cursor: pointer;
+  transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease;
+}
+.hmi-button svg,
+.hmi-toggle svg { width: 15px; height: 15px; flex: 0 0 auto; }
+.hmi-button:hover,
+.hmi-toggle:hover { border-color: var(--color-border-strong); background: var(--color-surface-2); }
+.hmi-button--wide { width: 100%; }
+
+/* The vacuum. On is a state the operator can leave the panel in, so it reads as
+   latched rather than as a press. */
+.hmi-toggle.is-on {
+  border-color: transparent;
+  color: #fff;
+  background: var(--color-accent-strong);
+  box-shadow: 0 6px 18px rgba(180, 88, 70, 0.24);
+}
+.hmi-toggle.is-on:hover { background: var(--color-accent-deep); }
+
+.hmi-run {
+  display: flex;
+  min-height: 52px;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 0;
+  border-radius: var(--radius-md);
+  color: #fff;
+  background: var(--color-accent-strong);
+  box-shadow: 0 10px 26px rgba(180, 88, 70, 0.24);
+  font-size: 13px;
+  font-weight: 660;
+  cursor: pointer;
+  transition: background-color 180ms ease;
+}
+.hmi-run svg { width: 17px; height: 17px; fill: currentColor; stroke: none; }
+.hmi-run:hover { background: var(--color-accent-deep); }
+.hmi-run.is-running { background: var(--color-ink-2); box-shadow: none; }
+.hmi-run.is-running:hover { background: var(--color-ink); }
+.hmi-run:disabled { opacity: 0.5; cursor: default; }
+
+/* ------------------------------------------------------------------- phase --- */
+
+.hmi-phase {
+  display: flex;
+  margin: 9px 0 0;
+  padding: 9px 12px;
+  align-items: center;
+  gap: 9px;
+  border-radius: var(--radius-sm);
+  color: var(--color-ink-2);
+  background: var(--color-surface-2);
+  font-size: 11.5px;
+  font-weight: 560;
+}
+.hmi-phase i {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--color-muted-2);
+}
+.hmi-phase i[data-run='true'] {
+  background: var(--color-sage);
+  animation: lab-pulse 1.4s ease-in-out infinite;
+}
+
+/*
+ * Twelve cells, one per case.
+ *
+ * A bar would say "half done" in less space. This says *which* half, and once a
+ * student has watched the pattern fill left to right and then start a second
+ * row, the "one motion plus an index" claim in the panel above stops being a
+ * sentence and becomes something they watched happen.
+ */
+.hmi-progress {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 4px;
+}
+.hmi-progress span {
+  height: 16px;
+  border: 1px solid var(--color-border-hair);
+  border-radius: 3px;
+  background: var(--color-surface-2);
+  transition: background-color 240ms ease, border-color 240ms ease;
+}
+.hmi-progress span.is-filled {
+  border-color: transparent;
+  background: var(--color-accent-strong);
+}
+
+/* ---------------------------------------------------------------- readouts --- */
+
+.hmi-readout {
+  display: grid;
+  margin: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--color-border-hair);
+}
+.hmi-readout > div { padding: 8px 11px; background: var(--color-surface); }
+.hmi-readout dt {
+  color: var(--color-muted-2);
+  font-size: 9.5px;
+  font-weight: 640;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.hmi-readout dd {
+  margin: 3px 0 0;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 680;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+.hmi-readout--tight dd { font-size: 12px; }
+.hmi-readout--tight > div:last-child { grid-column: 1 / -1; }
+.hmi-readout--tight > div:last-child dd { font-size: 11.5px; font-weight: 600; }
+
+.hmi-note {
+  margin: 9px 0 0;
+  color: var(--color-muted);
+  font-size: 10.5px;
+  line-height: 1.55;
+}
+
+.hmi-warn {
+  margin: 8px 0 0;
+  padding: 8px 11px;
+  border-radius: var(--radius-sm);
+  color: var(--color-accent-deep);
+  background: var(--color-accent-wash);
+  font-size: 10.5px;
+  font-weight: 560;
+  line-height: 1.5;
+}
+
+/* --------------------------------------------------------------- waypoints --- */
+
+.hmi-waypoints {
+  margin: 9px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.hmi-waypoints li {
+  display: grid;
+  padding: 7px 0;
+  grid-template-columns: 30px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--color-border-hair);
+}
+.hmi-waypoints li:last-child { border-bottom: 0; }
+.hmi-waypoints b {
+  color: var(--color-accent-deep);
+  font-size: 11px;
+  font-weight: 700;
+}
+.hmi-waypoints span {
+  overflow: hidden;
+  color: var(--color-muted-2);
+  font-size: 9.5px;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hmi-waypoints button {
+  min-height: 26px;
+  padding: 0 9px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xs);
+  color: var(--color-muted);
+  background: var(--color-surface);
+  font-size: 10.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.hmi-waypoints button:hover { border-color: var(--color-accent-line); color: var(--color-accent-deep); }
+
+/* ------------------------------------------------------------------ chips --- */
+
+/* A row of exclusive view choices. Chips rather than a segmented control
+   because there are four of them and one word each. */
+.hmi-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.hmi-chips button {
+  min-height: 30px;
+  padding: 0 11px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  color: var(--color-muted);
+  background: var(--color-surface);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease;
+}
+.hmi-chips button:hover { border-color: var(--color-border-strong); color: var(--color-ink-2); }
+.hmi-chips button.is-active {
+  border-color: transparent;
+  color: #fff;
+  background: var(--color-accent-strong);
+}
+
+.hmi-check {
+  display: flex;
+  margin-top: 9px;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-muted);
+  font-size: 10.5px;
+  cursor: pointer;
+}
+.hmi-check input { width: 14px; height: 14px; accent-color: var(--color-accent-strong); }
+
+/* --------------------------------------------------------------- attitude --- */
+
+.hmi-attitude {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+}
+.hmi-attitude svg { display: block; width: 104px; height: 104px; }
+.hmi-attitude dl { display: grid; margin: 0; gap: 7px; }
+.hmi-attitude dt {
+  color: var(--color-muted-2);
+  font-size: 9.5px;
+  font-weight: 640;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.hmi-attitude dd {
+  margin: 1px 0 0;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 680;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------------------- bars --- */
+
+.hmi-bars { display: grid; margin-top: 10px; gap: 8px; }
+.hmi-bars > span {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) 54px;
+  align-items: center;
+  gap: 9px;
+}
+.hmi-bars b {
+  color: var(--color-muted);
+  font-size: 10px;
+  font-weight: 640;
+}
+.hmi-bars i {
+  display: block;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--color-surface-2);
+  box-shadow: inset 0 0 0 1px var(--color-border-hair);
+}
+/*
+ * The fill is a full-width block scaled on X, not a block whose width is
+ * animated. The battery updates eight times a second, so a width transition
+ * here is a layout pass eight times a second for two meters that are three
+ * pixels tall.
+ *
+ * `--fill` is a 0–1 ratio set inline by the lab. No radius of its own: the track
+ * above clips with `overflow: hidden`, so the ends are already rounded and a
+ * radius on the fill would only be there to be squashed by the scale.
+ */
+.hmi-bars em {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--color-accent-strong);
+  transform: scaleX(var(--fill, 0));
+  transform-origin: left center;
+  transition: transform 220ms linear;
+}
+.hmi-bars output {
+  color: var(--color-ink-2);
+  font-size: 11px;
+  font-weight: 660;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* ----------------------------------------------------------------- sticks --- */
+
+/*
+ * Two gimbals, drawn as squares with a dot in them.
+ *
+ * In manual mode this is a mirror of what the pilot is holding, which is worth
+ * having on its own: a beginner mashing four keys cannot tell that two of them
+ * are cancelling. In automatic mode it is the whole point of the mode — it is
+ * the only readout in the lab that answers "what should I be doing right now".
+ */
+.hmi-sticks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.hmi-sticks > span { display: grid; justify-items: center; gap: 6px; }
+.hmi-sticks i {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: var(--radius-sm);
+  background:
+    linear-gradient(var(--color-border-hair), var(--color-border-hair)) center / 100% 1px no-repeat,
+    linear-gradient(var(--color-border-hair), var(--color-border-hair)) center / 1px 100% no-repeat,
+    var(--color-surface-2);
+  box-shadow: inset 0 0 0 1px var(--color-border-hair);
+}
+.hmi-sticks em {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--color-accent-strong);
+  box-shadow: 0 1px 4px rgba(180, 88, 70, 0.35);
+  transform: translate(-50%, -50%);
+  transition: left 120ms linear, top 120ms linear;
+}
+.hmi-sticks b {
+  color: var(--color-muted-2);
+  font-size: 9.5px;
+  font-weight: 620;
+}
+
+.hmi-progress--gates { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.hmi-progress--gates span { height: 20px; }
+
+/* Sits directly under the status block, which already carries the
+   `margin-top: auto` that pushes both to the bottom of the column. */
+.hmi-note--limits { padding-top: 4px; }
+
+/* ------------------------------------------------------------------- speed --- */
+
+.hmi-speed {
+  display: block;
+  padding-top: clamp(10px, 1.4vh, 14px);
+  border-top: 1px solid var(--color-border-hair);
+}
+.hmi-speed > span {
+  display: flex;
+  margin-bottom: 8px;
+  align-items: baseline;
+  justify-content: space-between;
+  color: var(--color-muted);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+.hmi-speed output {
+  color: var(--color-ink);
+  font-size: 12px;
+  font-weight: 680;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============================================================ responsive === */
+
+/*
+ * The rail turns into a row of tabs before anything else changes.
+ *
+ * At 1180 the rail is under 266 px and its two-line titles start wrapping to
+ * three beside a thumb that has nowhere left to shrink. A horizontal strip
+ * above the stage costs about 100 px of height and gives the stage back the
+ * full width, which is the trade that keeps the poster readable on a laptop.
+ * The thumb goes on top of its label there rather than beside it — three cells
+ * across a 1100 px strip are 360 px each, which is wide enough for a
+ * photograph and not for a photograph plus two lines.
+ */
+@media (max-width: 1180px) {
+  .practice-hub { grid-template-columns: minmax(0, 1fr); }
+  .practice-rail {
+    display: grid;
+    order: -1;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .practice-rail-item {
+    min-height: 0;
+    grid-template-columns: 88px minmax(0, 1fr);
+  }
+  .practice-rail-item i img { aspect-ratio: 4 / 3; }
+  .practice-rail-note { grid-column: 1 / -1; justify-content: center; }
+  .practice-benefits li { padding: 2px clamp(10px, 1.2vw, 20px); }
+}
+
+@media (max-width: 1000px) {
+  .practice-main { grid-template-columns: minmax(0, 1fr); }
+  /*
+   * Stage over brief. The pager's cell moves with it, so nothing has to be
+   * repositioned: it is still `1 / 1`, which is now the whole first row.
+   */
+  .practice-stage { grid-area: 1 / 1; min-height: clamp(340px, 46svh, 480px); }
+  .practice-brief { grid-area: 2 / 1; }
+  .practice-benefits {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    row-gap: clamp(14px, 2.4vh, 22px);
+  }
+  /* Dividers only make sense between columns of one row. Two rows of two need
+     the vertical rule on the second column and nothing between the rows. */
+  .practice-benefits li + li { box-shadow: none; }
+  .practice-benefits li:nth-child(2n) { box-shadow: inset 1px 0 0 rgba(180, 88, 70, 0.14); }
+  /*
+   * The bottom edge stops being shared.
+   *
+   * On a wide stage the objective sits left and the actions sit right with
+   * three hundred pixels between them. Below a thousand there is no such gap:
+   * at 768 the sentence ran straight under the "Đóng kẹp" button. So the
+   * objective takes the full width on its own row and everything else stacks
+   * around it — actions under it on the right, readout under it on the left.
+   */
+  .lab-steps { max-width: calc(100% - 170px); }
+  .lab-brief { right: 14px; left: 14px; bottom: 58px; max-width: none; }
+  .lab-actions { right: 14px; bottom: 12px; }
+  .lab-readout { right: auto; bottom: 14px; left: 14px; }
+}
+
+@media (max-width: 700px) {
+  .practice-rail { grid-template-columns: minmax(0, 1fr); }
+  .practice-rail-item { grid-template-columns: 96px minmax(0, 1fr); }
+  .practice-benefits { grid-template-columns: minmax(0, 1fr); }
+  .practice-benefits li,
+  .practice-benefits li:nth-child(2n) { box-shadow: none; }
+  .practice-brief { padding: 20px; }
+  /* The pointer affordance has no meaning on a touch screen: there is no hover
+     to reveal it and the whole poster is already a tap target. */
+  .practice-open { display: none; }
+  .practice-tools > span:last-child { display: none; }
+
+  /* The modal keeps its scrim inset on a phone but loses the rounded card
+     margin — 10 px of ivory around a 3D lab on a 390 px screen is 5% of the
+     stage spent on a border. */
+  .practice-modal { padding: 0; }
+  .practice-modal-card { height: 100%; border: 0; border-radius: 0; }
+  .practice-modal-head { padding: 11px 13px; }
+  .practice-modal-button span { display: none; }
+  .practice-modal-button { min-width: 38px; padding: 0 11px; }
+
+  /*
+   * The phone layout for a live lab.
+   *
+   * Everything that floated in a corner of a 900 px stage stacks instead: the
+   * steps become a scrollable strip under the badge, the objective sits at the
+   * bottom above the pads, and the readout moves out of the pads' way. The
+   * controls stay at 46 px because a control that is hard to hit is a control
+   * that teaches nothing.
+   */
+  /*
+   * Shorter on a phone, and the reason is the poster's aspect rather than the
+   * screen's height. The stills are 4:3; a 333 × 440 stage is *taller* than
+   * the source, so `cover` scales to the height and the top third of the
+   * frame fills with empty studio ceiling. At 38svh the box is close enough
+   * to 4:3 that the crop lands on the subject.
+   */
+  .practice-stage { min-height: clamp(240px, 38svh, 330px); }
+  .lab-steps {
+    top: 58px;
+    right: 12px;
+    left: 12px;
+    max-width: none;
+    justify-content: flex-start;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+  }
+  .lab-step span { white-space: nowrap; }
+  .lab-badge { top: 12px; left: 12px; }
+  .lab-brief { right: 12px; bottom: 12px; left: 12px; max-width: none; }
+  .lab-objective { font-size: 12px; }
+  .lab-actions { top: 12px; right: 12px; bottom: auto; }
+  .lab-button span { display: none; }
+  .lab-button { min-width: 38px; padding: 0 11px; }
+  .lab-button.is-primary span { display: inline; }
+  .lab-readout { top: 100px; right: auto; bottom: auto; left: 12px; }
+  .lab-pad { bottom: 96px; left: 12px; }
+  .lab-pad--lift { right: 12px; left: auto; }
+  .hmi-jog button { min-height: 46px; }
+  .hmi-readout { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ------------------------------------------------------- panelled labs --- */
+/*
+ * The pendant stops being a column and becomes a drawer.
+ *
+ * At 1080 the split leaves the stage under 700 px for a cell that is eight
+ * metres across, and a 300 px panel beside a 700 px viewport is a third of the
+ * screen spent on controls. Stacking gives the machine the full width and puts
+ * the panel under it, where it scrolls with the page inside the modal instead
+ * of scrolling inside itself.
+ */
+@media (max-width: 1080px) {
+  .lab--panelled {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(240px, 1fr) auto;
+    overflow-y: auto;
+  }
+  .lab-stage { min-height: clamp(240px, 46svh, 460px); }
+  .hmi {
+    border-top: 1px solid var(--color-border);
+    border-left: 0;
+  }
+  .hmi-body { overflow-y: visible; }
+  /* Two columns of controls, so a stacked panel does not become a 900 px
+     scroll of full-width rows. */
+  .hmi-body > .hmi-group,
+  .hmi-body > .hmi-subtabs,
+  .hmi-body > .hmi-speed { grid-column: span 1; }
+  .hmi-body {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-content: start;
+  }
+  .hmi-group--joints,
+  .hmi-group--status { grid-column: 1 / -1; }
+  .hmi-group--joints {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: clamp(14px, 2vw, 28px);
+  }
+  .hmi-group--status { margin-top: 0; }
+}
+
+@media (max-width: 640px) {
+  .hmi-body { grid-template-columns: minmax(0, 1fr); }
+  .hmi-group--joints { grid-template-columns: minmax(0, 1fr); }
+}

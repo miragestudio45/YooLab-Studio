@@ -8,6 +8,7 @@ import {
   GRAM_WALL_THUMBNAIL,
   JELLYFISH_THUMBNAIL,
   TOOLKIT_THUMBNAIL,
+  TREX_THUMBNAIL,
 } from '../../lib/three/thumbnailRequests';
 import type { ThumbnailRequest } from '../../lib/three/thumbnails';
 import type { RailVisual as RailVisualSpec, ThumbnailKey } from '../../lib/library/types';
@@ -33,6 +34,7 @@ const BAKED: Record<Exclude<ThumbnailKey, 'formula'>, ThumbnailRequest> = {
   bee: BEE_THUMBNAIL,
   fish: CLOWNFISH_THUMBNAIL,
   jellyfish: JELLYFISH_THUMBNAIL,
+  trex: TREX_THUMBNAIL,
   'gram-wall': GRAM_WALL_THUMBNAIL,
   toolkit: TOOLKIT_THUMBNAIL,
 };

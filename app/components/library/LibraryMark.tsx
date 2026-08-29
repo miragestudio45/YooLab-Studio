@@ -97,6 +97,35 @@ const MARKS: Record<MarkId, ReactNode> = {
       />
     </>
   ),
+  /*
+   * The one cell mark with no nucleus in it.
+   *
+   * Every other cell in the rail has a ring near its centre, so this row is
+   * recognisable by what is *absent*: a rod with a free coiled loop of DNA, a few
+   * loose plasmid rings, and a helix trailing off one end. The coil is drawn as
+   * an open serpentine rather than as a blob for the same reason the 3D model is
+   * — a blob in the middle of a prokaryote reads as a nucleus, which is the one
+   * thing this specimen exists to contradict.
+   */
+  'cell-bacteria': (
+    <>
+      {/* thành ngoài và màng trong, lồng nhau */}
+      <rect x="3.6" y="12.6" width="24.4" height="14.8" rx="7.4" />
+      <rect x="5.8" y="14.8" width="20" height="10.4" rx="5.2" opacity="0.42" />
+      {/* vùng nhân: một sợi vòng cuộn, không phải một khối cầu */}
+      <path d="M9.8 20.6c1.4-2.4 2.8-2.4 4.2 0s2.8 2.4 4.2 0 2.8-2.4 4.2 0" />
+      {/* ribosome rải khắp tế bào chất */}
+      <g fill="currentColor" fillOpacity="0.5" stroke="none">
+        <circle cx="10.6" cy="16.4" r="0.85" />
+        <circle cx="16" cy="24" r="0.85" />
+        <circle cx="21.6" cy="16.6" r="0.85" />
+      </g>
+      {/* một plasmid rời */}
+      <circle cx="23.8" cy="23.4" r="1.7" opacity="0.6" />
+      {/* roi: sợi xoắn, dài hơn thân, chỉ ở một đầu */}
+      <path d="M28 20c1.4-2.5 2.8-2.5 4.2 0s2.8 2.5 4.2 0" opacity="0.78" />
+    </>
+  ),
   neuron: (
     <>
       <circle cx="12.6" cy="20" r="4.8" fill="currentColor" fillOpacity="0.15" stroke="none" />
@@ -108,6 +137,175 @@ const MARKS: Record<MarkId, ReactNode> = {
       <path d="M17.4 20h11" />
       <path d="M21 18.4v3.2M25 18.4v3.2" opacity="0.45" />
       <path d="M28.4 20 33.6 15.6M28.4 20h5.8M28.4 20 33.6 24.4" />
+    </>
+  ),
+
+  /* ------------------------------------------------------ human organs --- */
+  /*
+   * Twelve organs on the same 40-unit grid as the cells above them.
+   *
+   * The set has one rule of its own: **each mark is drawn at the feature that
+   * names the organ, not at its outline.** Six of these twelve are, in
+   * silhouette, a rounded blob — liver, spleen, pancreas, gallbladder, thymus
+   * lobe, kidney — and a rail of six rounded blobs is a rail with no information
+   * in it. So the spleen carries its hilar notch, the pancreas is drawn along the
+   * duct that runs its whole length, the kidney is cut open to show the pyramids,
+   * and the gallbladder keeps the cystic duct hooking off its neck. Those are the
+   * features a textbook diagram labels them by, which means a student who has
+   * seen the textbook recognises the row before reading it.
+   */
+  'organ-heart': (
+    <>
+      {/* Two chambers of unequal wall, because that asymmetry is the heart's own
+          lesson: the left side pumps to the whole body and is built for it. */}
+      <path d="M20 33.4c-5.6-4-11.4-8.2-11.4-14.6 0-4.2 3-7.4 6.8-7.4 2.2 0 3.7 1 4.6 2.3.9-1.3 2.4-2.3 4.6-2.3 3.8 0 6.8 3.2 6.8 7.4 0 6.4-5.8 10.6-11.4 14.6Z" />
+      <path d="M20 13.7v19.7" opacity="0.42" />
+      <path d="M17.2 9.4v3.4M22.6 8.6v4.2" />
+      <g fill="currentColor" fillOpacity="0.15" stroke="none">
+        <path d="M20 31.9c4.8-3.5 9.9-7.2 9.9-13.1 0-3.4-2.4-5.9-5.3-5.9-1.8 0-3 .9-3.6 1.9-.4.6-.7 1.3-1 2Z" />
+      </g>
+    </>
+  ),
+  'organ-brain': (
+    <>
+      {/* Cerebrum, one central sulcus, and the cerebellum as a separate lobed body
+          under the back of it. A brain drawn as one gyrified oval is a walnut. */}
+      <path d="M8.2 18.4c0-5.4 5.3-9.6 11.8-9.6s11.8 4.2 11.8 9.6c0 3.6-1.6 5.6-3.4 7.2" />
+      <path d="M8.2 18.4c0 3.4 1.4 5.6 3.2 7.2 1.4 1.3 2 2.6 2 4.4" />
+      <path d="M20 8.8v12.4" opacity="0.5" />
+      <path d="M13.6 12.6c1.8 1.4 1.6 3.4 0 4.6M26.6 12.6c-1.8 1.4-1.6 3.4 0 4.6" opacity="0.55" />
+      <g fill="currentColor" fillOpacity="0.14" stroke="none">
+        <path d="M24.4 25.8c2.6 0 4.6 1.6 4.6 3.6s-2 3.6-4.6 3.6-4.6-1.6-4.6-3.6 2-3.6 4.6-3.6Z" />
+      </g>
+      <path d="M24.4 25.8c2.6 0 4.6 1.6 4.6 3.6s-2 3.6-4.6 3.6-4.6-1.6-4.6-3.6 2-3.6 4.6-3.6Z" />
+      <path d="M21.4 27.6h6M20.6 30.4h7.4" opacity="0.5" />
+    </>
+  ),
+  'organ-lungs': (
+    <>
+      {/* Trachea and the carina it splits at, drawn first: the airway is why the
+          two lobes are the shape they are. */}
+      <path d="M20 7.4v9.2" />
+      <path d="M20 16.6 15 21M20 16.6 25 21" />
+      <path d="M17.2 8.6h5.6M17.4 11.8h5.2" opacity="0.5" />
+      <path d="M14.4 21.4c-3.4 1.6-5.4 5.4-5.4 9 0 2.4 1.6 3.6 3.4 3.6 2.8 0 5.2-2.6 5.2-6.4v-6.8Z" />
+      <path d="M25.6 21.4c3.4 1.6 5.4 5.4 5.4 9 0 2.4-1.6 3.6-3.4 3.6-2.8 0-5.2-2.6-5.2-6.4v-6.8Z" />
+      <g fill="currentColor" fillOpacity="0.13" stroke="none">
+        <path d="M25.6 21.4c3.4 1.6 5.4 5.4 5.4 9 0 2.4-1.6 3.6-3.4 3.6-2.8 0-5.2-2.6-5.2-6.4v-6.8Z" />
+      </g>
+    </>
+  ),
+  'organ-liver': (
+    <>
+      {/* Two lobes of very unequal size, split by the falciform ligament. */}
+      <path d="M5.4 15.2c0-1.8 1.6-2.8 3.6-2.6 6.4.6 15.6.6 22-.4 2.4-.4 3.8.8 3.6 2.8-.6 5.8-3.4 12.4-9.4 12.4-3.2 0-4.6-1.8-6.4-3.4-1.6-1.4-3.2-2.2-5.6-2.2-4.4 0-7.8-2.6-7.8-6.6Z" />
+      <path d="M22.2 12.4l-1.4 11" opacity="0.5" />
+      <path d="M17.6 27.2c1.4 1.2 2.2 2.6 2.4 4.4" opacity="0.45" />
+      <g fill="currentColor" fillOpacity="0.14" stroke="none">
+        <path d="M20.8 12.6c4.6-.1 9.6-.3 13.2-.8 2.4-.4 3.8.8 3.6 2.8-.6 5.8-3.4 12.4-9.4 12.4-3.2 0-4.6-1.8-6.4-3.4-.7-.6-1.4-1.1-2.2-1.5Z" />
+      </g>
+    </>
+  ),
+  'organ-gallbladder': (
+    <>
+      {/* A pear with a duct hooking off the neck. Without the duct it is a pear. */}
+      <path d="M13.6 27.2c0-4.4 2.6-6.6 4.2-8.6 1-1.2 1.4-2.4 1.4-3.8" />
+      <path d="M13.6 27.2c0 3.2 2.8 5.4 6.4 5.4s6.4-2.2 6.4-5.4c0-4.4-2.6-6.6-4.2-8.6-1-1.2-1.4-2.4-1.4-3.8" />
+      <path d="M19.2 14.8c0-1.6 1.6-2.6 3.4-2.2 3 .6 4.6 3 5 6" />
+      <path d="M27.6 18.6l1.4-1.6m-1.4 1.6 1.9.4" opacity="0.6" />
+      <g fill="currentColor" fillOpacity="0.15" stroke="none">
+        <path d="M13.6 27.2c0 3.2 2.8 5.4 6.4 5.4s6.4-2.2 6.4-5.4c0-2.4-.8-4.1-1.8-5.5H15.4c-1 1.4-1.8 3.1-1.8 5.5Z" />
+      </g>
+    </>
+  ),
+  'organ-kidney': (
+    <>
+      {/* Cut open on purpose. The bean outline is shared with the spleen; the
+          medullary pyramids around the pelvis are what is not. */}
+      <path d="M25.4 7.8c4.4 0 8 5.4 8 12.2s-3.6 12.2-8 12.2c-3 0-5-2.2-6-5.2-.7-2-1.9-2.9-3.6-2.9h-1.4" />
+      <path d="M25.4 7.8c-3 0-5 2.2-6 5.2-.7 2-1.9 2.9-3.6 2.9h-1.4" />
+      <path d="M14.4 15.9c-2.4 0-4 1.8-4 4.1s1.6 4.1 4 4.1" />
+      <g fill="currentColor" fillOpacity="0.14" stroke="none">
+        <path d="M25.4 9.6c3.3 0 6.2 4.6 6.2 10.4s-2.9 10.4-6.2 10.4c-2.1 0-3.5-1.6-4.3-3.9-.4-1.2-1-2.1-1.8-2.7 1.4-.9 2.3-2.4 2.3-4.2s-.9-3.3-2.3-4.2c.8-.6 1.4-1.5 1.8-2.7.8-2.3 2.2-3.1 4.3-3.1Z" />
+      </g>
+      <path d="M26 13.4l3.4 1.4M26.8 20h4M26 26.6l3.4-1.4" opacity="0.55" />
+    </>
+  ),
+  'organ-eye': (
+    <>
+      {/* A section, not a front view. A front view of an eye is a target; the
+          section is where the cornea's bulge and the optic nerve live. */}
+      <circle cx="19" cy="20" r="10.6" />
+      <path d="M8.6 20c0-2.6 2-4.6 4.4-4.6s4.4 2 4.4 4.6-2 4.6-4.4 4.6S8.6 22.6 8.6 20Z" />
+      <circle cx="13" cy="20" r="2.1" fill="currentColor" fillOpacity="0.2" stroke="none" />
+      <circle cx="13" cy="20" r="2.1" />
+      <path d="M29 16.4c1.8 0 3.2 1.6 3.2 3.6s-1.4 3.6-3.2 3.6" />
+      <path d="M32.2 20h3.4" opacity="0.6" />
+      <path d="M17.4 15.4c1.4 1.2 2.2 2.8 2.2 4.6s-.8 3.4-2.2 4.6" opacity="0.45" />
+    </>
+  ),
+  'organ-pancreas': (
+    <>
+      {/* Drawn along the duct, because the duct runs the organ's whole length and
+          is why a stone in the head of it stops the tail working. */}
+      <path d="M6.6 22.4c0-3.4 2.4-5.6 5.4-5.6 2.4 0 4 1 5.6 2 2.4 1.5 5 2.4 8 2.6 3.6.3 6.6 1.4 8.8 3" />
+      <path d="M6.6 22.4c0 3.2 2.2 5 5 5 2.2 0 3.6-.9 5-1.8 2.4-1.5 5-2.3 8-2.1 3.4.2 6.4-.3 8.8-1.1" />
+      <path d="M10.8 22.2c1.8.5 3 1.6 4.6 2.6 2.6 1.6 5.4 2.4 8.6 2.4h6.2" opacity="0.55" />
+      <g fill="currentColor" fillOpacity="0.15" stroke="none">
+        <path d="M6.6 22.4c0-3.4 2.4-5.6 5.4-5.6 2.4 0 4 1 5.6 2 .9.6 1.9 1.1 2.9 1.5v6.5c-1-.4-2-.9-2.9-1.4-1.4-.9-2.8-1.8-5-1.8-2.8 0-5-1.8-5-5Z" />
+      </g>
+    </>
+  ),
+  'organ-ileum': (
+    <>
+      {/* The last stretch of small intestine: tight coils held in a loop, and the
+          villous lining that is why this is the absorbing segment. */}
+      <path d="M11 10.6c5.4 0 5.4 4.2 0 4.2s-5.4 4.2 0 4.2 5.4 4.2 0 4.2 5.4 4.2 0 4.2" />
+      <path d="M11 10.6h17.2c1.2 0 2.2 1 2.2 2.2s-1 2.2-2.2 2.2H11" />
+      <path d="M11 19h17.2c1.2 0 2.2 1 2.2 2.2s-1 2.2-2.2 2.2H11" />
+      <path d="M11 27.4h17.2c1.2 0 2.2 1 2.2 2.2s-1 2.2-2.2 2.2H11c-2.4 0-3.6-1.8-3.6-3.4" />
+      <g fill="currentColor" fillOpacity="0.13" stroke="none">
+        <path d="M13 10.6h15.2c1.2 0 2.2 1 2.2 2.2s-1 2.2-2.2 2.2H13Z" />
+      </g>
+    </>
+  ),
+  'organ-colon': (
+    <>
+      {/* The frame the small intestine sits inside: ascending, transverse,
+          descending, and the sigmoid turn at the end. */}
+      <path d="M11 31.2V16.4c0-2.6 2-4.6 4.6-4.6h9c2.6 0 4.6 2 4.6 4.6v12.4" />
+      <path d="M29.2 28.8c0 2.4-2.6 3.4-4.4 2.4-1.6-.9-3.2 0-3.2 1.8" />
+      <path d="M11 31.2c0 1.4-1.2 2.2-2.4 1.8" opacity="0.55" />
+      <path d="M11 20.4h-2.2M11 25.6h-2.2M14 11.8v-2.4M20 11.8V9.4M26 11.8V9.4M29.2 20.4h2.4M29.2 25.6h2.4" opacity="0.45" />
+      <g fill="currentColor" fillOpacity="0.13" stroke="none">
+        <path d="M15.6 11.8h8.8c2.6 0 4.6 2 4.6 4.6v3.2H11v-3.2c0-2.6 2-4.6 4.6-4.6Z" />
+      </g>
+    </>
+  ),
+  'organ-spleen': (
+    <>
+      {/* The hilar notch on the concave face is the whole mark. Without it a
+          spleen and a kidney are the same drawing. */}
+      <path d="M27.6 8.6c3.4 2 5.2 6.4 5.2 11.4 0 6.6-4 12-9.6 12-4.8 0-8.4-3.4-9.8-8" />
+      <path d="M27.6 8.6c-4.6-2.4-10.4-.4-13 4.6-1.2 2.4-1.4 4.6-1.2 6.8" />
+      <path d="M13.4 20c.2 1.4.4 2.8 1 4" />
+      <path d="M12.6 15.6 8.2 14M13.4 20H8.6M13.8 24.4l-4.2 2.2" opacity="0.6" />
+      <g fill="currentColor" fillOpacity="0.14" stroke="none">
+        <path d="M27.6 8.6c3.4 2 5.2 6.4 5.2 11.4 0 6.6-4 12-9.6 12-2.6 0-4.9-1-6.6-2.7 5-.6 8.8-5.6 8.8-11.7 0-3.8-1.5-7.2-3.8-9.3 2-.6 4.1-.6 6-.2v.5Z" />
+      </g>
+    </>
+  ),
+  'organ-thymus': (
+    <>
+      {/* One lobe, not two: this mesh is the left lobe only, and the mark says so
+          rather than drawing the butterfly shape of the whole gland. */}
+      <path d="M20.6 8.4c-4.2 0-7.6 3-7.6 7 0 2.6 1 4.2 1.8 6 .8 1.8 1 3.6.4 5.6-.6 2.2.6 4.4 3 4.6 2.6.2 4.4-1.6 4.6-4 .2-2.6-.6-4.4-.4-6.6.2-2.2 1.4-3.6 1.4-6 0-3.6-2.4-6.6-3.2-6.6Z" />
+      <path d="M20.4 12.8c-.4 2 .4 3.6.4 5.6s-.8 3.4-.6 5.4" opacity="0.5" />
+      <path d="M13.4 13.6 9.2 11.4M13 18.6 8.6 18.8" opacity="0.55" />
+      <path d="M27 14.6c1.6.6 2.8 2 3.2 3.8" opacity="0.5" />
+      <g fill="currentColor" fillOpacity="0.15" stroke="none">
+        <path d="M20.6 8.4c.8 0 3.2 3 3.2 6.6 0 2.4-1.2 3.8-1.4 6-.2 2.2.6 4 .4 6.6-.1 1.4-.7 2.6-1.7 3.3-.6-.9-.9-2-.8-3.3.2-2.6-.6-4.4-.4-6.6.2-2.2 1.4-3.6 1.4-6 0-2.6-1.2-4.9-2.2-6.1.4-.3.9-.5 1.5-.5Z" />
+      </g>
     </>
   ),
 

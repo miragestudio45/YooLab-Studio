@@ -1,7 +1,9 @@
 'use client';
 
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import * as THREE from 'three';
+import { LibraryIcon } from './LibraryIcons';
+import { StageChrome, StageClipRow, StageRail, StageRailGroup, StageToolButton } from './StageChrome';
 import {
   createBeeCreature,
   createCreatureLoader,
@@ -12,8 +14,10 @@ import {
   type CreatureHandle,
 } from '../../lib/three/creatures';
 import { createLibraryStage } from '../../lib/three/libraryEnvironment';
+import type { LearningGrid } from '../../lib/three/studioBackdrop';
 import { createOrbitRig, createSubjectFit, type OrbitRig, type SubjectFit } from '../../lib/three/framing';
 import type { BeeMaterialSet } from '../../lib/three/beeOptics';
+import type { MotionGlyph } from '../../lib/library/glyphs';
 import type { CreatureId, ModelFraming } from '../../lib/library/types';
 
 /**
@@ -52,9 +56,14 @@ type CreatureStageProps = {
   isolatedPart?: BeePartKey | null;
   /** The richer bridge room is opt-in; Library viewers keep their calibrated look. */
   appearance?: 'library' | 'bridge';
-  /** A real world-space learning grid beneath the specimen. */
-  floorGrid?: boolean;
-  /** Lets the bridge toolbar toggle the real scene grid without rebuilding. */
+  /**
+   * Lets the bridge toolbar toggle the measured floor without rebuilding.
+   *
+   * The floor itself is no longer opt-in. It used to be `floorGrid`, off by
+   * default, built here — which is exactly why the Library's bee stood in a room
+   * and its T-rex, fish and jellyfish did not. It belongs to the stage now (see
+   * `createLearningGrid`), and this prop only says whether to show it.
+   */
   gridVisible?: boolean;
   /** Screen-space UI that needs the stage's projected anchor CSS variables. */
   children?: ReactNode;
@@ -66,43 +75,14 @@ export type CreatureStageMode = 'rotate' | 'structure' | 'motion' | 'annotation'
 export type BeePartKey = 'head' | 'thorax' | 'wing' | 'abdomen';
 type BeeAnchorKey = 'head' | 'thorax' | 'wing' | 'abdomen';
 
-/* ------------------------------------------------------------------ icons --- */
-
 /**
- * The control-rail glyph set, shared with `ModelStage`.
- *
- * It lives here rather than in a file of its own because the stage chrome is one
- * contract with two implementations, and both stages are in the same chunk: the
- * Library viewer imports them eagerly side by side, so there is nothing to gain
- * from splitting twenty lines of paths out.
+ * The rail's glyphs used to be eight hand-written paths in this file. They now
+ * come from `LibraryIcons`, which is the whole Library's mark set on one grid at
+ * one weight — the eight here were drawn on a 16-unit box at 1.3 stroke while
+ * every other mark in the section was on 20 at 1.5, and side by side in the same
+ * rail that difference is visible as a slight softness on the four camera
+ * controls and nowhere else.
  */
-export type StageIconName = 'rotate' | 'zoomIn' | 'zoomOut' | 'reset' | 'rest' | 'hover' | 'fly' | 'spin';
-
-const ICON_PATHS: Record<StageIconName, string> = {
-  rotate: 'M13.2 8a5.2 5.2 0 1 1-1.7-3.85M13.4 1.9v3h-3',
-  zoomIn: 'M7 2.7a4.3 4.3 0 1 1 0 8.6 4.3 4.3 0 0 1 0-8.6M10.2 10.2 13.6 13.6M5.1 7h3.8M7 5.1v3.8',
-  zoomOut: 'M7 2.7a4.3 4.3 0 1 1 0 8.6 4.3 4.3 0 0 1 0-8.6M10.2 10.2 13.6 13.6M5.1 7h3.8',
-  reset: 'M2.6 5.8V2.6h3.2M13.4 5.8V2.6h-3.2M2.6 10.2v3.2h3.2M13.4 10.2v3.2h-3.2M8 7v2M7 8h2',
-  rest: 'M4.2 12.4h7.6M8 4.2v5.4M5.6 6.6 8 4.2l2.4 2.4',
-  hover: 'M8 5.8a2.2 2.2 0 1 1 0 4.4 2.2 2.2 0 0 1 0-4.4M8 1.9v2.2M6.7 3.1 8 1.8l1.3 1.3M8 14.1v-2.2M6.7 12.9 8 14.2l1.3-1.3',
-  fly: 'M3.1 12.9 12.9 3.1M8.4 3.1h4.5v4.5',
-  spin: 'M2.9 8a5.1 5.1 0 0 1 8.6-3.7M13.1 8a5.1 5.1 0 0 1-8.6 3.7M11.6 1.6v2.9h-2.9M4.4 14.4v-2.9h2.9',
-};
-
-export function StageIcon({ name }: { name: StageIconName }) {
-  return (
-    <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-      <path
-        d={ICON_PATHS[name]}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.3"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
 
 /** World size of the longest axis after normalisation — the hero's values, so
  *  the point-light falloff and the optical scale read identically. */
@@ -128,75 +108,9 @@ const CREATURE_NOTE: Record<CreatureId, string> = {
  */
 const FLIGHT_LABELS = ['Đứng yên', 'Tại chỗ', 'Bay đi'] as const;
 const FLIGHT_TITLES = ['Đứng yên', 'Bay tại chỗ', 'Bay đi và ra khỏi khung'] as const;
-const FLIGHT_ICONS = ['rest', 'hover', 'fly'] as const;
+const FLIGHT_ICONS = ['rest', 'hover', 'fly'] as const satisfies readonly MotionGlyph[];
 /** The specimen opens hovering: wings beating, body still, nothing leaving frame. */
 const DEFAULT_FLIGHT = 1;
-
-const gridVertex = /* glsl */ `
-  varying vec2 vGridPosition;
-  void main() {
-    vGridPosition = position.xy;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-  }
-`;
-
-const gridFragment = /* glsl */ `
-  precision highp float;
-  varying vec2 vGridPosition;
-  uniform vec3 uMinor;
-  uniform vec3 uMajor;
-
-  float gridLine(vec2 point, float spacing) {
-    vec2 coordinate = point / spacing;
-    vec2 width = max(fwidth(coordinate), vec2(0.0001));
-    vec2 distanceToLine = abs(fract(coordinate - 0.5) - 0.5) / width;
-    return 1.0 - min(min(distanceToLine.x, distanceToLine.y), 1.0);
-  }
-
-  void main() {
-    float minor = gridLine(vGridPosition, 0.34);
-    float major = gridLine(vGridPosition, 1.70);
-    float fade = 1.0 - smoothstep(2.7, 4.55, length(vGridPosition));
-    float alpha = max(minor * 0.16, major * 0.34) * fade;
-    vec3 color = mix(uMinor, uMajor, major);
-    gl_FragColor = vec4(color, alpha);
-  }
-`;
-
-function createLearningGrid() {
-  const geometry = new THREE.PlaneGeometry(9.2, 9.2);
-  const material = new THREE.ShaderMaterial({
-    name: 'yoolab_learning_grid',
-    vertexShader: gridVertex,
-    fragmentShader: gridFragment,
-    uniforms: {
-      uMinor: { value: new THREE.Color(0xbfa9d8) },
-      uMajor: { value: new THREE.Color(0xe18f83) },
-    },
-    transparent: true,
-    depthWrite: false,
-    toneMapped: true,
-  });
-  const mesh = new THREE.Mesh(geometry, material);
-  mesh.name = 'yoolab_learning_grid';
-  mesh.rotation.x = -Math.PI / 2;
-  mesh.renderOrder = -940;
-  mesh.frustumCulled = false;
-
-  return {
-    mesh,
-    fit: (box: THREE.Box3) => {
-      const center = box.getCenter(new THREE.Vector3());
-      const size = box.getSize(new THREE.Vector3());
-      mesh.position.set(center.x, box.min.y - Math.max(0.06, size.y * 0.12), center.z);
-    },
-    dispose: () => {
-      mesh.removeFromParent();
-      geometry.dispose();
-      material.dispose();
-    },
-  };
-}
 
 export function CreatureStage({
   creature,
@@ -207,7 +121,6 @@ export function CreatureStage({
   motionState = DEFAULT_FLIGHT,
   isolatedPart = null,
   appearance = 'library',
-  floorGrid = false,
   gridVisible = true,
   children,
   label,
@@ -217,7 +130,7 @@ export function CreatureStage({
   const orbitRef = useRef<OrbitRig | null>(null);
   const flightRef = useRef<((next: number) => void) | null>(null);
   const opticsRef = useRef<BeeMaterialSet | null>(null);
-  const learningGridRef = useRef<ReturnType<typeof createLearningGrid> | null>(null);
+  const learningGridRef = useRef<LearningGrid | null>(null);
   const isolatedPartRef = useRef<BeePartKey | null>(isolatedPart);
   const gridVisibleRef = useRef(gridVisible);
   const canSpinRef = useRef(true);
@@ -225,6 +138,9 @@ export function CreatureStage({
   const [spinning, setSpinning] = useState(false);
   const [flight, setFlight] = useState(DEFAULT_FLIGHT);
   const [flightCount, setFlightCount] = useState(0);
+  /** The guide card is spent once the visitor has actually driven the model. */
+  const [touched, setTouched] = useState(false);
+  const markTouched = useCallback(() => setTouched(true), []);
   // Latest framing without restarting the scene: a new object identity for an
   // unchanged framing must not tear down the WebGL context. Seeded at mount and
   // then kept in an effect, because writing a ref during render is not allowed.
@@ -242,7 +158,7 @@ export function CreatureStage({
   }, [isolatedPart]);
   useEffect(() => {
     gridVisibleRef.current = gridVisible;
-    if (learningGridRef.current) learningGridRef.current.mesh.visible = gridVisible;
+    learningGridRef.current?.setVisible(gridVisible);
   }, [gridVisible]);
 
   useEffect(() => {
@@ -275,7 +191,6 @@ export function CreatureStage({
     let sceneCapture: THREE.WebGLRenderTarget | null = null;
     let beeMaps: THREE.Texture[] = [];
     let flightState = DEFAULT_FLIGHT;
-    let learningGrid: ReturnType<typeof createLearningGrid> | null = null;
     let beeAnchors: Array<{ key: BeeAnchorKey; candidates: THREE.Object3D[] }> = [];
     const anchorWorld = new THREE.Vector3();
     const projected = new THREE.Vector3();
@@ -402,13 +317,9 @@ export function CreatureStage({
         const fittedBox = fit.box.clone().translate(fit.current.target.clone().negate());
         stage.shadow.fit(fittedBox);
 
-        if (floorGrid) {
-          learningGrid = createLearningGrid();
-          learningGrid.fit(fittedBox);
-          learningGrid.mesh.visible = gridVisibleRef.current;
-          learningGridRef.current = learningGrid;
-          stage.scene.add(learningGrid.mesh);
-        }
+        stage.grid.fit(fittedBox);
+        stage.grid.setVisible(gridVisibleRef.current);
+        learningGridRef.current = stage.grid;
 
         if (creature === 'bee') {
           const bones: THREE.Object3D[] = [];
@@ -422,12 +333,17 @@ export function CreatureStage({
             const name = bone.name.toLowerCase();
             return stems.some((stem) => name.includes(stem));
           });
-          beeAnchors = [
+          // The literal is annotated rather than inferred: without it the `key`s
+          // widen to `string` and the array stops being assignable to
+          // `beeAnchors`, so a typo in one of the four keys would only surface as
+          // a callout that never appears.
+          const authored: Array<{ key: BeeAnchorKey; candidates: THREE.Object3D[] }> = [
             { key: 'head', candidates: candidates('antenna_jnt01', 'head_jnt') },
             { key: 'thorax', candidates: candidates('thorax_jnt') },
             { key: 'wing', candidates: candidates('wingroot_jnt') },
             { key: 'abdomen', candidates: candidates('abdomen_jnt04', 'abdomen_jnt03') },
-          ].filter((anchor) => anchor.candidates.length > 0);
+          ];
+          beeAnchors = authored.filter((anchor) => anchor.candidates.length > 0);
           syncAnchors();
         }
         setState('ready');
@@ -508,7 +424,6 @@ export function CreatureStage({
       learningGridRef.current = null;
       orbit.dispose();
       handle?.dispose();
-      learningGrid?.dispose();
       sceneCapture?.dispose();
       for (const map of beeMaps) map.dispose();
       loader.dispose();
@@ -519,7 +434,7 @@ export function CreatureStage({
         host.style.removeProperty(`--anchor-${key}-visible`);
       }
     };
-  }, [appearance, creature, floorGrid, initialSpin]);
+  }, [appearance, creature, initialSpin]);
 
   useEffect(() => {
     if (state !== 'ready' || !mode) return;
@@ -540,7 +455,13 @@ export function CreatureStage({
   const ready = state === 'ready';
 
   return (
-    <div className="stage" data-state={state} ref={hostRef}>
+    <div
+      className="stage"
+      data-state={state}
+      ref={hostRef}
+      onPointerDown={markTouched}
+      onWheel={markTouched}
+    >
       {/*
         The canvas gets its own labelled box. An element with role="img" hides its
         whole subtree from assistive technology, so the control rail cannot live
@@ -565,73 +486,43 @@ export function CreatureStage({
 
       {ready && (
         <>
-          <div className="stage-tools">
-            <button
-              type="button"
-              className="stage-tool"
-              onClick={() => orbitRef.current?.nudgeYaw(Math.PI / 4)}
-            >
-              <StageIcon name="rotate" />
-              <span>Xoay</span>
-            </button>
-            <button
-              type="button"
-              className="stage-tool"
-              onClick={() => orbitRef.current?.zoomBy(0.82)}
-            >
-              <StageIcon name="zoomIn" />
-              <span>Phóng to</span>
-            </button>
-            <button
-              type="button"
-              className="stage-tool"
-              onClick={() => orbitRef.current?.zoomBy(1.22)}
-            >
-              <StageIcon name="zoomOut" />
-              <span>Thu nhỏ</span>
-            </button>
-            <button
-              type="button"
-              className="stage-tool"
-              onClick={() => orbitRef.current?.reset()}
-            >
-              <StageIcon name="reset" />
-              <span>Đặt lại</span>
-            </button>
+          <StageRail>
+            <StageRailGroup>
+              <StageToolButton glyph="rotate" label="Xoay" onClick={() => orbitRef.current?.nudgeYaw(Math.PI / 4)} />
+              <StageToolButton glyph="zoomIn" label="Gần" title="Phóng to" onClick={() => orbitRef.current?.zoomBy(0.82)} />
+              <StageToolButton glyph="zoomOut" label="Xa" title="Thu nhỏ" onClick={() => orbitRef.current?.zoomBy(1.22)} />
+              <StageToolButton glyph="reset" label="Về khung" title="Đặt lại khung nhìn" onClick={() => orbitRef.current?.reset()} />
+            </StageRailGroup>
+          </StageRail>
 
-            {/* Flight states, only when the asset really carries all three clips. */}
-            {flightCount >= FLIGHT_LABELS.length && FLIGHT_LABELS.map((flightLabel, index) => (
-              <button
-                key={flightLabel}
-                type="button"
-                className={`stage-tool${flight === index ? ' is-active' : ''}`}
-                aria-pressed={flight === index}
-                aria-label={FLIGHT_TITLES[index]}
-                title={FLIGHT_TITLES[index]}
-                onClick={() => flightRef.current?.(index)}
-              >
-                <StageIcon name={FLIGHT_ICONS[index]} />
-                <span>{flightLabel}</span>
-              </button>
-            ))}
-          </div>
+          {/* Flight states, only when the asset really carries all three clips. */}
+          {flightCount >= FLIGHT_LABELS.length && (
+            <StageClipRow title="Trạng thái">
+              {FLIGHT_LABELS.map((flightLabel, index) => (
+                <StageToolButton
+                  key={flightLabel}
+                  glyph={FLIGHT_ICONS[index]}
+                  label={flightLabel}
+                  title={FLIGHT_TITLES[index]}
+                  active={flight === index}
+                  onClick={() => { markTouched(); flightRef.current?.(index); }}
+                />
+              ))}
+            </StageClipRow>
+          )}
 
-          <div className="stage-caption">
-            <b>{label}</b>
-            <span>{CREATURE_NOTE[creature]}</span>
-          </div>
-
-          <button
-            type="button"
-            className={`stage-spin${spinning ? ' is-active' : ''}`}
-            aria-pressed={spinning}
-            onClick={() => orbitRef.current?.setSpinning(!spinning)}
-          >
-            <StageIcon name="spin" />
-            <span>Tự xoay</span>
-          </button>
-
-          <p className="stage-hint">Kéo để xoay · Cuộn để phóng</p>
+          <StageChrome
+            name={label}
+            note={CREATURE_NOTE[creature]}
+            spinning={spinning}
+            onSpin={() => { markTouched(); orbitRef.current?.setSpinning(!spinning); }}
+            guide={touched ? null : (
+              <>
+                <li><LibraryIcon name="drag" /> Kéo để xoay</li>
+                <li><LibraryIcon name="scroll" /> Cuộn để phóng</li>
+              </>
+            )}
+          />
         </>
       )}
     </div>

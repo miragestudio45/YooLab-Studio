@@ -60,6 +60,66 @@ const OPEN = (subject, row) => `
   asset.click();` : ''}
 `;
 
+/**
+ * Selects one of the three practice labs by the start of its rail title, then
+ * waits for its stage to exist.
+ *
+ * The two adapted labs are code-split, so selecting one is a chunk fetch, a
+ * 320 ms crossfade and a mount — a fixed sleep raced all three and intermittently
+ * handed the shot a Suspense fallback with no `.lab` in it at all.
+ */
+const PRACTICE = (title, selector) => `
+  {
+  const rail = [...document.querySelectorAll('.practice-rail-item')]
+    .find((node) => node.textContent.includes(${JSON.stringify(title)}));
+  if (!rail) throw new Error('practice lab not found: ' + ${JSON.stringify(title)});
+  rail.click();
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    if (document.querySelector(${JSON.stringify(selector)})) break;
+    await new Promise((r) => setTimeout(r, 120));
+  }
+  if (!document.querySelector(${JSON.stringify(selector)})) {
+    throw new Error('practice lab never mounted: ' + ${JSON.stringify(selector)});
+  }
+  /*
+   * Then press the lab's own "Làm lại".
+   *
+   * The harness navigates once and runs every shot against that one document,
+   * so a lab is whatever the shot before it left behind — armed, mid-course,
+   * finished, or a different lab entirely. Four shots that each passed alone
+   * failed as a suite for exactly that reason, and the failures looked like
+   * missing buttons rather than like stale state. Resetting through the visible
+   * control is also the honest way to do it: if "Làm lại" ever stops actually
+   * resetting a lab, every shot after it starts failing.
+   */
+  const restart = [...document.querySelectorAll('.lab-actions .lab-button')]
+    .find((node) => node.textContent.includes('Làm lại'));
+  if (restart) restart.click();
+  await new Promise((r) => setTimeout(r, 1100));
+  }
+`;
+
+/**
+ * Waits for a lab action button to exist, then returns it.
+ *
+ * Every practice shot used to assume its lab was interactive by the time the
+ * script ran, which held right up until the whole suite was run in one browser
+ * session: eleven GLBs, three WebGL contexts and a dev server compiling on
+ * demand make "ready" a range rather than a moment, and four shots that each
+ * passed alone failed together. Polling costs nothing when the button is
+ * already there.
+ */
+const ACTION = (text) => `
+  const findAction = (label) => [...document.querySelectorAll('.lab-actions .lab-button')]
+    .find((node) => node.textContent.includes(label));
+  let action = null;
+  for (let attempt = 0; attempt < 120 && !action; attempt += 1) {
+    action = findAction(${JSON.stringify(text)});
+    if (!action) await new Promise((r) => setTimeout(r, 200));
+  }
+  if (!action) throw new Error('practice: no action ' + ${JSON.stringify(text)});
+`;
+
 const SHOTS = [
   { name: 'hero', at: '#trang-chu', settle: 2600 },
   /*
@@ -165,15 +225,113 @@ const SHOTS = [
    */
   { name: 'studio-space-2', at: '#cong-cu', settle: 2600, run: `[...document.querySelectorAll('.studio-spaces > button')][1].click();` },
   { name: 'studio-space-3', at: '#cong-cu', settle: 3200, run: `[...document.querySelectorAll('.studio-spaces > button')][2].click();` },
+  /*
+   * The T-rex is the Library's default selection, so this shot takes no `run` —
+   * it photographs what a visitor actually lands on. 4.6 s of settle because the
+   * shot has more to wait for than any other in this file: a 1.6 MB meshopt GLB,
+   * four WebP textures pulled through the spec/gloss fallback, the `bite` clip
+   * fading in, and six anatomy pins whose positions are only correct once the
+   * skeleton has been evaluated at least one frame.
+   */
+  { name: 'library-trex', at: '#thu-vien', settle: 4600 },
+  {
+    /* One pin open. The rest of the pin machinery — projection, occlusion,
+       tracking through the animation — is only judgeable with a card on screen. */
+    name: 'library-trex-pin',
+    at: '#thu-vien',
+    run: `
+      await new Promise((r) => setTimeout(r, 3200));
+      const dots = [...document.querySelectorAll('.stage-pin-dot')];
+      if (!dots.length) throw new Error('no anatomy pins rendered');
+      const jaw = dots.find((node) => (node.getAttribute('aria-label') || '').startsWith('Hàm'));
+      (jaw ?? dots[0]).click();
+    `,
+    settle: 2200,
+  },
+  {
+    /*
+     * The knowledge panel, scrolled past its own fold and magnified.
+     *
+     * The three faults this catches are all invisible in a full-page shot: the
+     * measurement table's glyph column drifting out of line, a value long enough
+     * to wrap and break the readout's alignment, and the two notes rendering in
+     * the same tint — which is the one thing that would turn the whole block back
+     * into a paragraph in a box.
+     */
+    name: 'library-panel',
+    at: '#thu-vien',
+    settle: 3200,
+    run: `
+      const panel = document.querySelector('.library-knowledge-scroll');
+      panel.scrollTop = Math.round((panel.scrollHeight - panel.clientHeight) * 0.62);
+      await new Promise((r) => setTimeout(r, 340));
+    `,
+    clipOf: { sel: '.library-knowledge', scale: 2.2 },
+  },
   { name: 'library-bee', at: '#thu-vien', run: OPEN('Sinh học', 'Ong mật'), settle: 3400 },
   { name: 'library-fish', at: '#thu-vien', run: OPEN('Sinh học', 'Cá cảnh biển'), settle: 3200 },
   { name: 'library-jelly', at: '#thu-vien', run: OPEN('Sinh học', 'Sứa biển'), settle: 3200 },
+  /*
+   * The twelve Human Reference Atlas organs.
+   *
+   * Shot individually rather than sampled, because the fault this catches is
+   * per-mesh and invisible in any one of them: the HRA set is authored at real
+   * anatomical scale in a shared body-space, so the meshes arrive at wildly
+   * different sizes AND wildly different distances from the origin — an eye is
+   * 24 mm and sits off-axis in a skull, a colon is a half-metre frame. A global
+   * camera cannot serve both, so each entry carries its own `fill`/`yaw`/`pitch`
+   * and each one has to be looked at. The five named in the QA brief lead.
+   */
+  { name: 'library-organ-heart', at: '#thu-vien', run: OPEN('Sinh học', 'Tim'), settle: 2800 },
+  { name: 'library-organ-brain', at: '#thu-vien', run: OPEN('Sinh học', 'Não'), settle: 2800 },
+  { name: 'library-organ-lungs', at: '#thu-vien', run: OPEN('Sinh học', 'Phổi'), settle: 2800 },
+  { name: 'library-organ-kidney', at: '#thu-vien', run: OPEN('Sinh học', 'Thận'), settle: 2800 },
+  { name: 'library-organ-eye', at: '#thu-vien', run: OPEN('Sinh học', 'Mắt'), settle: 2800 },
+  { name: 'library-organ-liver', at: '#thu-vien', run: OPEN('Sinh học', 'Gan'), settle: 2600 },
+  { name: 'library-organ-gallbladder', at: '#thu-vien', run: OPEN('Sinh học', 'Túi mật'), settle: 2600 },
+  { name: 'library-organ-pancreas', at: '#thu-vien', run: OPEN('Sinh học', 'Tuyến tụy'), settle: 2600 },
+  { name: 'library-organ-ileum', at: '#thu-vien', run: OPEN('Sinh học', 'Hồi tràng'), settle: 2600 },
+  { name: 'library-organ-colon', at: '#thu-vien', run: OPEN('Sinh học', 'Ruột già'), settle: 2600 },
+  { name: 'library-organ-spleen', at: '#thu-vien', run: OPEN('Sinh học', 'Lách'), settle: 2600 },
+  { name: 'library-organ-thymus', at: '#thu-vien', run: OPEN('Sinh học', 'Thùy tuyến ức trái'), settle: 2600 },
+  /* The organ knowledge panel past its own fold, at the same magnification the
+     `library-panel` shot uses — so the twelve new entries' readouts are judged
+     by the same rule the existing ones were. */
+  {
+    name: 'library-organ-panel',
+    at: '#thu-vien',
+    run: `${OPEN('Sinh học', 'Tim')}
+      await new Promise((r) => setTimeout(r, 900));
+      const panel = document.querySelector('.library-knowledge-scroll');
+      panel.scrollTop = Math.round((panel.scrollHeight - panel.clientHeight) * 0.55);
+      await new Promise((r) => setTimeout(r, 340));`,
+    settle: 1600,
+    clipOf: { sel: '.library-knowledge', scale: 2.2 },
+  },
+  /* The rail scrolled to its middle, where the twelve organ marks sit, with the
+     drawn indicator caught mid-move. This is the only shot that photographs the
+     scroll thumb at full strength — it settles back after 720 ms. */
+  {
+    name: 'library-rail-thumb',
+    at: '#thu-vien',
+    run: `${OPEN('Sinh học')}
+      const rail = document.querySelector('.library-rail-list');
+      rail.scrollTop = Math.round((rail.scrollHeight - rail.clientHeight) * 0.45);
+      rail.dispatchEvent(new Event('scroll'));
+      await new Promise((r) => setTimeout(r, 200));`,
+    settle: 0,
+    clipOf: { sel: '.library-rail', scale: 2 },
+  },
   { name: 'library-cell-animal', at: '#thu-vien', run: OPEN('Sinh học', 'Tế bào động vật'), settle: 2600 },
   { name: 'library-cell-plant', at: '#thu-vien', run: OPEN('Sinh học', 'Tế bào thực vật'), settle: 2600 },
   { name: 'library-cell-blood', at: '#thu-vien', run: OPEN('Sinh học', 'Bạch cầu'), settle: 2600 },
   { name: 'library-cell-epithelial', at: '#thu-vien', run: OPEN('Sinh học', 'Tế bào biểu mô'), settle: 2600 },
   { name: 'library-cell-muscle', at: '#thu-vien', run: OPEN('Sinh học', 'Tế bào cơ'), settle: 2600 },
   { name: 'library-neuron', at: '#thu-vien', run: OPEN('Sinh học', 'Tế bào thần kinh'), settle: 2600 },
+  /* The prokaryote. Worth its own shot because it is the one cell whose whole
+     point is what the scene does NOT contain — a blob in the middle would mean
+     the nucleoid tube collapsed. */
+  { name: 'library-cell-bacteria', at: '#thu-vien', run: OPEN('Sinh học', 'Tế bào vi khuẩn'), settle: 2800 },
   { name: 'library-gram', at: '#thu-vien', run: OPEN('Sinh học', 'Vách tế bào Gram dương'), settle: 3000 },
   { name: 'library-periodic', at: '#thu-vien', run: OPEN('Hóa học', 'Bảng tuần hoàn'), settle: 1800 },
   { name: 'library-water', at: '#thu-vien', run: OPEN('Hóa học', 'Nước'), settle: 2400 },
@@ -202,8 +360,432 @@ const SHOTS = [
       tool.click();`,
     settle: 2600,
   },
+  /*
+   * All eight tools, not a sample.
+   *
+   * The bench renders one mesh at a time behind a chip row, so a single shot of
+   * it proves one tool and hides seven. Six of the eight are long and thin and
+   * each carries its own `fill`/`roll`, which is exactly the kind of per-item
+   * setting that goes wrong quietly — the ruler and the pencil were spanning the
+   * viewer corner to corner for months behind a shot list that only ever opened
+   * the ruler.
+   */
+  {
+    name: 'library-tool-ruler',
+    at: '#thu-vien',
+    run: `${OPEN('KHCN', 'Bộ dụng cụ mô hình')}
+      await new Promise((r) => setTimeout(r, 700));
+      const tool = [...document.querySelectorAll('.toolkit-chip')]
+        .find((node) => node.textContent.trim().startsWith('Thước kẻ'));
+      if (!tool) throw new Error('tool not found: ' + 'Thước kẻ');
+      tool.click();`,
+    settle: 2400,
+  },
+  {
+    name: 'library-tool-pencil',
+    at: '#thu-vien',
+    run: `${OPEN('KHCN', 'Bộ dụng cụ mô hình')}
+      await new Promise((r) => setTimeout(r, 700));
+      const tool = [...document.querySelectorAll('.toolkit-chip')]
+        .find((node) => node.textContent.trim().startsWith('Bút chì'));
+      if (!tool) throw new Error('tool not found: ' + 'Bút chì');
+      tool.click();`,
+    settle: 2400,
+  },
+  {
+    name: 'library-tool-eraser',
+    at: '#thu-vien',
+    run: `${OPEN('KHCN', 'Bộ dụng cụ mô hình')}
+      await new Promise((r) => setTimeout(r, 700));
+      const tool = [...document.querySelectorAll('.toolkit-chip')]
+        .find((node) => node.textContent.trim().startsWith('Gôm'));
+      if (!tool) throw new Error('tool not found: ' + 'Gôm');
+      tool.click();`,
+    settle: 2400,
+  },
+  {
+    name: 'library-tool-scissor',
+    at: '#thu-vien',
+    run: `${OPEN('KHCN', 'Bộ dụng cụ mô hình')}
+      await new Promise((r) => setTimeout(r, 700));
+      const tool = [...document.querySelectorAll('.toolkit-chip')]
+        .find((node) => node.textContent.trim().startsWith('Kéo'));
+      if (!tool) throw new Error('tool not found: ' + 'Kéo');
+      tool.click();`,
+    settle: 2400,
+  },
+  {
+    name: 'library-tool-boxcutter',
+    at: '#thu-vien',
+    run: `${OPEN('KHCN', 'Bộ dụng cụ mô hình')}
+      await new Promise((r) => setTimeout(r, 700));
+      const tool = [...document.querySelectorAll('.toolkit-chip')]
+        .find((node) => node.textContent.trim().startsWith('Dao rọc giấy'));
+      if (!tool) throw new Error('tool not found: ' + 'Dao rọc giấy');
+      tool.click();`,
+    settle: 2400,
+  },
+  {
+    name: 'library-tool-mat',
+    at: '#thu-vien',
+    run: `${OPEN('KHCN', 'Bộ dụng cụ mô hình')}
+      await new Promise((r) => setTimeout(r, 700));
+      const tool = [...document.querySelectorAll('.toolkit-chip')]
+        .find((node) => node.textContent.trim().startsWith('Thảm cắt'));
+      if (!tool) throw new Error('tool not found: ' + 'Thảm cắt');
+      tool.click();`,
+    settle: 2400,
+  },
+  {
+    name: 'library-tool-screwdriver',
+    at: '#thu-vien',
+    run: `${OPEN('KHCN', 'Bộ dụng cụ mô hình')}
+      await new Promise((r) => setTimeout(r, 700));
+      const tool = [...document.querySelectorAll('.toolkit-chip')]
+        .find((node) => node.textContent.trim().startsWith('Tua vít'));
+      if (!tool) throw new Error('tool not found: ' + 'Tua vít');
+      tool.click();`,
+    settle: 2400,
+  },
+  {
+    name: 'library-tool-paintjar',
+    at: '#thu-vien',
+    run: `${OPEN('KHCN', 'Bộ dụng cụ mô hình')}
+      await new Promise((r) => setTimeout(r, 700));
+      const tool = [...document.querySelectorAll('.toolkit-chip')]
+        .find((node) => node.textContent.trim().startsWith('Hũ sơn'));
+      if (!tool) throw new Error('tool not found: ' + 'Hũ sơn');
+      tool.click();`,
+    settle: 2400,
+  },
   { name: 'library-empty', at: '#thu-vien', run: OPEN('Khoa học vũ trụ'), settle: 900 },
-  { name: 'practice', at: '#thuc-hanh', settle: 1400 },
+  /*
+   * The practice hub, three labs deep.
+   *
+   * One shot of this section proves almost nothing: only the selected lab is
+   * mounted, so a capture of the default tells you the Formula workshop loaded
+   * and nothing at all about the two that were adapted for this build. Each of
+   * the three is photographed with its own stage running, and the drone and the
+   * robot are each driven far enough into their guided flow that the step strip,
+   * the objective line and the on-stage controls are all on screen — which is
+   * the whole claim this section makes.
+   */
+  {
+    name: 'practice',
+    at: '#thuc-hanh',
+    run: PRACTICE('Xưởng mô hình', '.lab--formula'),
+    settle: 4200,
+  },
+  {
+    /*
+     * Three labs in one page load, in the order the rail lists them.
+     *
+     * The section's central performance rule is that only one heavy renderer is
+     * ever alive — selecting a lab disposes the previous one's WebGL context,
+     * geometries, materials and animation loop before the next asks for a
+     * context. Browsers cap live contexts, and the failure mode when that cap is
+     * hit is not an error, it is the *first* canvas silently going blank. So the
+     * cycle is walked in one session and the last stage photographed: if a
+     * teardown regresses, this is the shot that comes back empty.
+     */
+    name: 'practice-cycle',
+    at: '#thuc-hanh',
+    run: `${PRACTICE('Trải nghiệm', '.lab--drone')}
+      ${PRACTICE('Vận hành', '.lab--robot')}
+      ${PRACTICE('Xưởng mô hình', '.lab--formula')}
+      await new Promise((r) => setTimeout(r, 2600));
+      ${PRACTICE('Vận hành', '.lab--robot')}
+    `,
+    settle: 2600,
+  },
+  {
+    /* The bench. The one frame that proves the kit ⇄ assembled blend still runs
+       in the ivory room, and the one most likely to break when the workshop is
+       moved between two lighting rigs. */
+    name: 'practice-formula-kit',
+    at: '#thuc-hanh',
+    run: `${PRACTICE('Xưởng mô hình', '.lab--formula')}
+      /* Waits on the action row, then clicks the step chip: both only exist
+         once the workshop has finished loading. */
+      ${ACTION('Lái thử')}
+      [...document.querySelectorAll('.lab-step')]
+        .find((node) => node.textContent.includes('Lắp ráp')).click();
+    `,
+    settle: 2800,
+  },
+  {
+    name: 'practice-formula-drive',
+    at: '#thuc-hanh',
+    run: `${PRACTICE('Xưởng mô hình', '.lab--formula')}
+      ${ACTION('Lái thử')}
+      action.click();
+      await new Promise((r) => setTimeout(r, 900));
+      const stage = document.querySelector('.lab');
+      stage.focus();
+      await new Promise((r) => setTimeout(r, 500));
+      stage.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW', bubbles: true }));
+      await new Promise((r) => setTimeout(r, 1600));
+      stage.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW', bubbles: true }));
+    `,
+    settle: 1400,
+  },
+  {
+    /* Armed and climbing: the props are spinning, the takeoff gate is lit, and
+       the step strip has moved off 01. */
+    name: 'practice-drone',
+    at: '#thuc-hanh',
+    run: `${PRACTICE('Trải nghiệm', '.lab--drone')}
+      ${ACTION('Khởi động')}
+      action.click();
+      const stage = document.querySelector('.lab--drone');
+      stage.focus();
+      await new Promise((r) => setTimeout(r, 400));
+      // Hold the climb key for two seconds of simulated flight.
+      stage.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyR', bubbles: true }));
+      await new Promise((r) => setTimeout(r, 2200));
+      stage.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyR', bubbles: true }));
+      await new Promise((r) => setTimeout(r, 600));
+      stage.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW', bubbles: true }));
+      await new Promise((r) => setTimeout(r, 1500));
+      stage.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW', bubbles: true }));
+    `,
+    settle: 1600,
+  },
+  {
+    /*
+     * The drone's whole lesson, flown end to end.
+     *
+     * This is the shot that proves the guided flow *finishes*. A lab whose
+     * first two steps work and whose fourth never fires strands every student
+     * who gets that far, and no still frame of a hovering drone can tell you
+     * which of those you have.
+     */
+    name: 'practice-drone-landed',
+    at: '#thuc-hanh',
+    run: `${PRACTICE('Trải nghiệm', '.lab--drone')}
+      const stage = document.querySelector('.lab--drone');
+      stage.focus();
+      ${ACTION('Khởi động')}
+
+      /* 1.2 s of settling after every release: letting go glides the aircraft
+         to a stop over about a second, and a leg that starts while the last one
+         is still arriving compounds its error into the next gate. */
+      const hold = (codes, ms) => new Promise((done) => {
+        for (const code of codes) stage.dispatchEvent(new KeyboardEvent('keydown', { code, bubbles: true }));
+        setTimeout(() => {
+          for (const code of codes) stage.dispatchEvent(new KeyboardEvent('keyup', { code, bubbles: true }));
+          setTimeout(done, 1200);
+        }, ms);
+      });
+      const tap = (code, ms) => new Promise((done) => {
+        stage.dispatchEvent(new KeyboardEvent('keydown', { code, bubbles: true }));
+        setTimeout(() => {
+          stage.dispatchEvent(new KeyboardEvent('keyup', { code, bubbles: true }));
+          setTimeout(done, 320);
+        }, ms);
+      });
+
+      /* Parsed by hand rather than by regex: this whole script is embedded in a
+         template literal, so a backslash class never survives to the page. */
+      const readout = () => document.querySelector('.lab-readout')?.textContent ?? '';
+      const rings = () => {
+        const mark = readout().indexOf('/3');
+        return mark > 0 ? Number(readout()[mark - 1]) || 0 : 0;
+      };
+      const altitude = () => Number.parseFloat(readout()) || 0;
+      /*
+       * The ring counter only exists while the route step is current: clearing
+       * the third gate advances the lab to "hạ cánh" and the counter leaves the
+       * readout altogether. Reading a missing counter as zero is what sent an
+       * earlier version of this script twenty metres past the course, still
+       * pressing keys at a step that had already finished.
+       */
+      const routeOver = () => !readout().includes('vòng');
+      const cleared = () => (routeOver() ? 3 : rings());
+      /*
+       * A staircase, not a computed leg.
+       *
+       * Two earlier versions converted metres to milliseconds from the flight
+       * model's constants, and both drifted: real travel per press depends on
+       * how long the attitude loop takes to reach the commanded tilt, which is
+       * not a number the envelope states. Alternating short presses along the
+       * leg's two axes walks toward a gate the way a person does and converges
+       * regardless — and because it stops the instant the counter moves, it is
+       * a direct test of the capture radius rather than of arithmetic.
+       */
+      const approach = async (codes, target, presses) => {
+        for (let attempt = 0; attempt < presses && cleared() < target; attempt += 1) {
+          await hold([codes[attempt % codes.length]], 700);
+        }
+        return cleared() >= target;
+      };
+
+      action.click();
+      await new Promise((r) => setTimeout(r, 320));
+      await hold(['KeyR'], 1250);                  // up to the takeoff gate, ~3 m
+      if (!await approach(['KeyW'], 1, 10)) throw new Error('drone: never reached ring 01');
+      await hold(['KeyR'], 700);                   // ring 02 at (7.4, 3.9, −14.2)
+      if (!await approach(['KeyD', 'KeyW'], 2, 16)) throw new Error('drone: never reached ring 02');
+      await hold(['KeyF'], 700);                   // ring 03 at (14.6, 2.7, −7.4)
+      if (!await approach(['KeyD', 'KeyS'], 3, 16)) throw new Error('drone: never reached ring 03');
+
+      // The pad is at (13.6, 0, 1.4); ring 03 leaves the aircraft near
+      // (15.6, ·, −7.5), so one press left and five back covers it.
+      await hold(['KeyA'], 700);
+      for (let attempt = 0; attempt < 5; attempt += 1) await hold(['KeyS'], 700);
+
+      const landed = () => (document.querySelector('.lab-objective')?.textContent ?? '')
+        .includes('Hoàn thành');
+      /* Down in taps rather than one long press: a held descent stick arrives at
+         2.6 m/s, which is survivable and graceless. Taps never let the sink rate
+         build — the technique the lab's own hint describes. */
+      const descend = async () => {
+        await tap('KeyF', 700);
+        for (let attempt = 0; attempt < 16 && altitude() > 0.1 && !landed(); attempt += 1) {
+          await tap('KeyF', 260);
+        }
+      };
+      await descend();
+      /*
+       * Missing the pad is a recoverable mistake in this lab rather than a
+       * failure — the aircraft simply reports "chưa đúng bãi đáp" and waits — so
+       * the script takes the recovery a student would: climb back up, shuffle,
+       * set down again. The pattern spirals rather than repeating one nudge,
+       * because the error after three ring approaches can be a metre and a half
+       * in either direction on either axis. Reaching the pad on the first try is
+       * not what this shot is testing; reaching it at all is.
+       */
+      const SEARCH = ['KeyS', 'KeyA', 'KeyW', 'KeyW', 'KeyD', 'KeyD', 'KeyS', 'KeyS'];
+      for (let attempt = 0; attempt < SEARCH.length && !landed(); attempt += 1) {
+        await hold(['KeyR'], 900);
+        await hold([SEARCH[attempt]], 620);
+        await descend();
+      }
+      if (!landed()) throw new Error('drone: never landed on the pad');
+    `,
+    settle: 2400,
+  },
+  {
+    /*
+     * The robot's whole lesson, run closed-loop.
+     *
+     * Unlike the drone this one steers on feedback rather than on timings: the
+     * cell already shows the pilot when the tool is over its target — the ring
+     * goes green and the readout says "Đúng vị trí" — so the script watches for
+     * exactly the signal a student watches for. That makes it a test of the
+     * affordance as well as of the mechanism: if the snap indicator stops being
+     * truthful, this shot stops passing.
+     */
+    name: 'practice-robot-done',
+    at: '#thuc-hanh',
+    run: `${PRACTICE('Vận hành', '.lab--robot')}
+      const stage = document.querySelector('.lab--robot');
+      stage.focus();
+      ${ACTION('Bắt đầu điều khiển')}
+      const click = (text) => {
+        const button = [...document.querySelectorAll('.lab-actions .lab-button')]
+          .find((node) => node.textContent.includes(text));
+        if (!button) throw new Error('robot: no action ' + text);
+        button.click();
+      };
+      const hold = (code, ms) => new Promise((done) => {
+        stage.dispatchEvent(new KeyboardEvent('keydown', { code, bubbles: true }));
+        setTimeout(() => {
+          stage.dispatchEvent(new KeyboardEvent('keyup', { code, bubbles: true }));
+          setTimeout(done, 180);
+        }, ms);
+      });
+      const onTarget = () => Boolean(document.querySelector('.lab-readout b.is-ok'));
+      /* Settle before trusting the ring: it goes green while the arm is still
+         travelling, and what matters is whether it is green once it stops. */
+      const settled = async () => {
+        if (!onTarget()) return false;
+        await new Promise((r) => setTimeout(r, 420));
+        return onTarget();
+      };
+      const nudgeUntilOnTarget = async (codes, budget) => {
+        for (let attempt = 0; attempt < budget; attempt += 1) {
+          if (await settled()) return true;
+          await hold(codes[attempt % codes.length], 200);
+        }
+        return settled();
+      };
+
+      /* The jog is a flat 0.42 m/s with no ramp, so metres convert straight to
+         milliseconds. Home is (0.46, 0.78, 0.50); the pick station is
+         (0.66, 0.35, 0.46) and tray slot 01 is (−0.66, 0.35, 0.34). */
+      const jogMs = (metres) => Math.round((metres / 0.42) * 1000);
+      const ALL_AXES = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'KeyR', 'KeyF'];
+
+      click('Bắt đầu điều khiển');
+      await new Promise((r) => setTimeout(r, 400));
+      await hold('ArrowRight', jogMs(0.2));
+      await hold('KeyF', jogMs(0.43));
+      await hold('ArrowDown', jogMs(0.04));
+      if (!await nudgeUntilOnTarget(ALL_AXES, 30)) {
+        throw new Error('robot: never reached the pick point');
+      }
+      click('Đóng kẹp');
+      await new Promise((r) => setTimeout(r, 900));
+      await hold('KeyR', jogMs(0.16));
+      await hold('ArrowLeft', jogMs(1.32));
+      await hold('ArrowDown', jogMs(0.12));
+      await hold('KeyF', jogMs(0.16));
+      if (!await nudgeUntilOnTarget(ALL_AXES, 36)) {
+        throw new Error('robot: never reached the tray slot');
+      }
+      click('Mở kẹp');
+      await new Promise((r) => setTimeout(r, 1000));
+      click('Chạy tự động');
+      await new Promise((r) => setTimeout(r, 22000));
+    `,
+    settle: 1800,
+  },
+  {
+    /*
+     * A hint open, and the flash it replaces.
+     *
+     * "Gợi ý" is the one control in this section whose whole job is to render
+     * something — a step with no hint hides the button, so an empty panel is a
+     * silent failure. It is photographed on the drone because that lab's hint is
+     * the longest and the most likely to collide with the objective line above
+     * it or the control pads below.
+     */
+    name: 'practice-hint',
+    at: '#thuc-hanh',
+    run: `${PRACTICE('Trải nghiệm', '.lab--drone')}
+      ${ACTION('Khởi động')}
+      action.click();
+      await new Promise((r) => setTimeout(r, 900));
+      const hint = [...document.querySelectorAll('.lab-actions .lab-button')]
+        .find((node) => node.textContent.includes('Gợi ý'));
+      if (!hint) throw new Error('practice: no hint button');
+      hint.click();
+      await new Promise((r) => setTimeout(r, 400));
+      if (!document.querySelector('.lab-hint')) throw new Error('practice: hint did not open');
+    `,
+    settle: 1200,
+  },
+  {
+    /* Past the look step and jogging, so the target ring, the key legend and
+       the gripper action are all showing at once. */
+    name: 'practice-robot',
+    at: '#thuc-hanh',
+    run: `${PRACTICE('Vận hành', '.lab--robot')}
+      ${ACTION('Bắt đầu điều khiển')}
+      action.click();
+      const stage = document.querySelector('.lab--robot');
+      stage.focus();
+      await new Promise((r) => setTimeout(r, 500));
+      stage.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowRight', bubbles: true }));
+      await new Promise((r) => setTimeout(r, 900));
+      stage.dispatchEvent(new KeyboardEvent('keyup', { code: 'ArrowRight', bubbles: true }));
+      stage.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyF', bubbles: true }));
+      await new Promise((r) => setTimeout(r, 900));
+      stage.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyF', bubbles: true }));
+    `,
+    settle: 2200,
+  },
   { name: 'education', at: '#giao-duc', settle: 3600 },
   { name: 'proof', at: '#bai-hoc-mau', settle: 2200 },
   { name: 'cta', at: '#bat-dau-voi-yoolab' },
@@ -395,6 +977,7 @@ try {
   const send = (method, params) => browser.send(method, params, sessionId);
   await send('Page.enable');
   await send('Runtime.enable');
+
   await send('Emulation.setDeviceMetricsOverride', {
     width: viewport.width,
     height: viewport.height,
