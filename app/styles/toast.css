@@ -28,11 +28,13 @@
 }
 
 .toast--success {
-  background: linear-gradient(120deg, #1f6e68 0%, #2a8b82 100%);
+  background: linear-gradient(120deg, #cdf8f471 0%, #699490a4 100%);
+  color: #195658;
 }
 
 .toast--error {
-  background: #ad172b;
+  background: #f3c6cc;
+  color: #e87868;
 }
 
 @keyframes toast-in {
