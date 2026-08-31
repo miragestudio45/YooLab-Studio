@@ -75,12 +75,34 @@
   --font-mono: var(--font-sans);
 
   /* ------------------------------------------------------------ palette --- */
-  --color-accent: #ed8a72;
-  --color-accent-strong: #e87868;
-  --color-accent-deep: #c95f52;
-  --color-accent-soft: #f9d9cd;
-  --color-accent-wash: rgba(237, 138, 114, 0.11);
-  --color-accent-line: rgba(232, 120, 104, 0.34);
+  /*
+   * THE BRAND IS ONE COLOUR: #00AAAB. Not a ramp, not a sweep — every accent
+   * surface on this site is that value, flat.
+   *
+   * State the cost once, here, so nobody rediscovers it as a bug: #00AAAB reads
+   * 2.7:1 on the ivory ground. That is under the 4.5:1 body text wants and under
+   * the 3:1 large text and focus rings want. It is a deliberate, instructed
+   * brand decision — the accent is meant to be seen as the brand before it is
+   * meant to be read — and it is not drift. Anyone raising it should change
+   * `--color-accent-readable` below and nothing else.
+   */
+  --color-accent: #00AAAB;
+  --color-accent-strong: #00AAAB;
+  --color-accent-mid: #00AAAB;
+  --color-accent-deep: #00AAAB;
+
+  /* The single lever. Point this at #00AAAB (the shipped choice) or at a darker
+     step like #017E7F (4.5:1) to make every accent LABEL legible at once,
+     without touching a single fill. */
+  --color-accent-readable: #00AAAB;
+
+  /* Not brand colours — a tint and an ink, both derived from #00AAAB, that exist
+     so the brand can be a background at all. */
+  --color-accent-soft: #8CD9D9;
+  --color-accent-on: #042E2D;
+  --color-accent-hover: #018E8F;
+  --color-accent-wash: rgba(0, 170, 171, 0.11);
+  --color-accent-line: rgba(0, 170, 171, 0.42);
 
   --color-bg: #fbf8f4;
   --color-bg-deep: #f6efe6;
@@ -202,6 +224,14 @@
   --brand-deep: var(--color-accent-deep);
   --brand-accent: var(--color-accent);
   --brand-soft: var(--color-accent-soft);
+  /* The ramp's text-safe members. `--brand` FILLS; `--brand-ink` WRITES. */
+  --brand-mid: var(--color-accent-mid);
+  --brand-ink: var(--color-accent-readable);
+  --brand-on: var(--color-accent-on);
+  --brand-hover: var(--color-accent-hover);
+  /* The delivered mark's OWN ink. It belongs to the artwork, not to the accent
+     system, which is why it is a separate token and not a shade of the ramp. */
+  --brand-logo-ink: #195659;
   --violet: var(--color-lavender);
   --violet-soft: var(--color-lavender-soft);
   --blush: var(--color-blush);
@@ -254,26 +284,27 @@ button, a, input, select { color: inherit; font: inherit; }
 a { text-decoration: none; }
 button { cursor: pointer; }
 button:focus-visible, a:focus-visible, input:focus-visible {
-  outline: 2px solid var(--brand-accent);
+  outline: 2px solid var(--color-accent-mid);
   outline-offset: 3px;
 }
 
 /* ------------------------------------------------------------------ brand --- */
+/*
+ * The lockup is ARTWORK — mark AND wordmark. `.brand-wordmark`, which set
+ * "YooLab" in Plus Jakarta Sans 700 beside the mark, is gone with it: the
+ * letterforms in the real file are drawn, and a font standing in for them is
+ * the same mistake as a mark traced off a screenshot.
+ *
+ * It is one SVG in `currentColor`, so one rule per surface picks the tone.
+ */
 .brand-lockup, .brand {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  color: var(--brand-logo-ink);
   width: fit-content;
 }
 
-.brand-wordmark {
-  font-family: var(--font-display);
-  font-size: 19px;
-  font-weight: 700;
-  letter-spacing: -0.035em;
-}
-
-.brand-lockup--light .brand-wordmark { color: #fff; }
+.brand-lockup svg, .brand svg { display: block; flex: 0 0 auto; }
 
 /* ----------------------------------------------------------------- header --- */
 /* A thin glass rail. Its visual height changes without touching `--header-h`,
@@ -321,9 +352,8 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   gap: clamp(15px, 1.7vw, 32px);
 }
 
-.site-header .brand { color: inherit; gap: 8px; }
-.site-header .brand svg { flex: 0 0 auto; }
-.site-header .brand-wordmark { color: inherit; font-size: 18px; }
+.site-header .brand { color: var(--brand-logo-ink); }
+.site-header[data-theme='dark'] .brand { color: #fff; }
 
 .desktop-nav {
   display: flex;
@@ -367,7 +397,7 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   min-height: 34px;
   padding: 0 14px;
   border-radius: 9px;
-  color: #fff;
+  color: var(--color-accent-on);
   background: var(--brand);
   font-size: 13px;
   font-weight: 620;
@@ -375,8 +405,8 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   box-shadow: 0 6px 18px rgba(180, 88, 70, 0.2);
   transition: background 180ms ease, transform 180ms ease;
 }
-.header-cta:hover { background: var(--brand-deep); transform: translateY(-1px); }
-.header-cta span { color: var(--brand-soft); }
+.header-cta:hover { background: var(--brand-hover); transform: translateY(-1px); }
+.header-cta span { color: var(--color-accent-on); opacity: 0.66; }
 
 .menu-toggle, .mobile-nav { display: none; }
 
@@ -384,7 +414,7 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 /*
  * The hero is a story panel like the other three, so it gets the same shell grid
  * and no padding of its own beyond the reserved header band. Its copy column now
- * starts on the same alignment line as the YooStudio heading, the Library head
+ * starts on the same alignment line as the YooLab heading, the Library head
  * band and the footer — the `max(6.5vw, 26px)` it used before was a fourth
  * horizontal system nobody else on the page shared.
  */
@@ -431,7 +461,7 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   height: 7px;
   border-radius: 50%;
   background: var(--brand-accent);
-  box-shadow: 0 0 0 5px rgba(232, 120, 104, 0.13);
+  box-shadow: 0 0 0 5px rgba(0, 170, 171, 0.13);
   animation: pulse 1.2s ease-in-out infinite;
 }
 
@@ -521,10 +551,7 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 
 .hero h1 em, .story-copy h2 em, .section-heading h2 em,
 .education-intro h2 em, .start-heading h2 em, .bridge-copy h2 em, .final-cta h2 em {
-  color: transparent;
-  background: linear-gradient(100deg, var(--color-accent-deep) 2%, var(--color-accent-strong) 38%, var(--color-lavender) 98%);
-  background-clip: text;
-  -webkit-background-clip: text;
+  color: var(--color-accent);
   font-family: var(--font-display);
   font-style: italic;
   font-weight: 500;
@@ -548,15 +575,15 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   gap: 32px;
   padding: 0 24px;
   border-radius: 13px;
-  color: #fff;
-  background: linear-gradient(135deg, var(--brand-deep), var(--color-accent) 88%);
+  color: var(--color-accent-on);
+  background: var(--color-accent);
   box-shadow: 0 16px 40px rgba(180, 88, 70, 0.26);
   font-size: 13.5px;
   font-weight: 620;
   transition: transform 220ms ease, box-shadow 220ms ease;
 }
 .primary-button:hover { transform: translateY(-2px); box-shadow: 0 22px 48px rgba(180, 88, 70, 0.3); }
-.primary-button span { color: var(--brand-soft); }
+.primary-button span { color: var(--color-accent-on); opacity: 0.66; }
 
 .text-button {
   display: inline-flex;
@@ -731,7 +758,7 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 
 .section-kicker {
   margin: 0 0 clamp(10px, 1.4vh, 15px);
-  color: var(--brand);
+  color: var(--brand-ink);
   font-size: 10px;
   font-weight: 680;
   letter-spacing: 0.12em;
@@ -739,7 +766,7 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 }
 
 .section-kicker::before { display: none; }
-.section-kicker--light { color: var(--brand); }
+.section-kicker--light { color: var(--brand-ink); }
 
 /*
  * The display size is capped by viewport HEIGHT as well as width.
@@ -775,7 +802,7 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 .hero h1 em {
   display: block;
   margin-top: 0.08em;
-  color: var(--brand);
+  color: var(--brand-ink);
   background: none;
   font-style: normal;
   font-weight: 520;
@@ -784,7 +811,7 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 
 .story-copy h2 em {
   display: inline;
-  color: var(--brand);
+  color: var(--brand-ink);
   background: none;
   font-style: normal;
   font-weight: 520;
@@ -1191,7 +1218,7 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 }
 .bee-modes button span { font-size: 9px; opacity: 0.55; }
 .bee-modes button.is-active {
-  color: #fff;
+  color: var(--color-accent-on);
   background: var(--brand);
   box-shadow: 0 9px 22px rgba(180, 88, 70, 0.24);
 }
@@ -1255,7 +1282,7 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
  *
  *   A  .shell-cinematic  100vw, no wrapper. Hero and the creature stage.
  *   B  .shell-wide       min(1600px, 100vw - 64px). Product workspaces —
- *                        YooStudio and the Library. A workspace pinned to
+ *                        YooLab and the Library. A workspace pinned to
  *                        1100px inside a 1920 screen was the single biggest
  *                        source of stray whitespace on the old page.
  *   C  .shell-editorial  min(1400px, 100vw - gutters). All prose: intros,
@@ -1270,7 +1297,7 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
  *
  * `.shell` is the canonical one. The three regime names are aliases so the
  * existing markup keeps working, and they resolve to exactly the same box — which
- * is the point: the header, the YooStudio heading, the workspace, the Library
+ * is the point: the header, the YooLab heading, the workspace, the Library
  * head band, the Practice grid, Education, Proof and the footer all now share one
  * pair of alignment lines down the page.
  */
@@ -1390,7 +1417,7 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
   font-weight: 700;
   letter-spacing: 0.12em;
 }
-.formula-mode-tabs button.is-active { color: #3a1108; background: var(--brand-accent); box-shadow: 0 8px 20px rgba(201, 95, 82, 0.35); }
+.formula-mode-tabs button.is-active { color: #042E2D; background: var(--brand-accent); box-shadow: 0 8px 20px rgba(0, 170, 171, 0.35); }
 .formula-close {
   justify-self: end;
   display: grid;
@@ -1494,7 +1521,7 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
   text-align: center;
   color: var(--ink);
   background:
-    radial-gradient(circle at 50% 104%, rgba(232, 120, 104, 0.15), transparent 48%),
+    radial-gradient(circle at 50% 104%, rgba(0, 170, 171, 0.15), transparent 48%),
     linear-gradient(180deg, var(--color-bg) 0%, #f8efe2 100%);
 }
 .final-cta h2 {
@@ -1517,13 +1544,13 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
   min-height: 56px;
   padding: 0 24px;
   border-radius: 15px;
-  color: #3a1108;
+  color: #042E2D;
   background: var(--brand-accent);
   font-size: 12.5px;
   font-weight: 650;
-  box-shadow: 0 16px 38px rgba(201, 95, 82, 0.22);
+  box-shadow: 0 16px 38px rgba(0, 170, 171, 0.22);
 }
-.cta-main span { color: #3a1108; font-size: 15px; }
+.cta-main span { color: #042E2D; font-size: 15px; }
 /*
  * Two very faint tints, not two glowing orbs. On a light ground a saturated
  * radial reads as a bruise; at this alpha it only warms the corners.
@@ -1541,7 +1568,7 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
   width: 520px;
   height: 520px;
   background: radial-gradient(circle at 50% 50%,
-    rgba(246, 183, 159, 0.30) 0%, rgba(246, 183, 159, 0.11) 44%, rgba(246, 183, 159, 0) 72%);
+    rgba(140, 217, 217, 0.30) 0%, rgba(140, 217, 217, 0.11) 44%, rgba(140, 217, 217, 0) 72%);
 }
 .cta-orb--two {
   right: -190px;
@@ -1580,15 +1607,13 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
   border-top: 1px solid var(--line);
   background: #f8efe2;
 }
-.footer-brand { display: grid; grid-template-columns: 42px 1fr; align-content: start; gap: 0 12px; }
-.footer-brand svg { grid-row: 1 / 3; }
-.footer-brand b { font-family: var(--font-display); font-size: 20px; font-weight: 700; letter-spacing: -0.035em; }
-.footer-brand p { margin: 6px 0 0; color: var(--ink-3); font-size: 11px; line-height: 1.55; }
+.footer-brand { display: grid; align-content: start; justify-items: start; gap: 13px; color: var(--brand-logo-ink); }
+.footer-brand p { margin: 0; color: var(--ink-3); font-size: 11px; line-height: 1.55; }
 .footer-links { display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; }
 .footer-links div { display: flex; flex-direction: column; gap: 10px; }
 .footer-links b { margin-bottom: 6px; color: var(--ink-4); font-size: 9px; font-weight: 650; text-transform: uppercase; letter-spacing: 0.11em; }
 .footer-links a { color: var(--ink-2); font-size: 11.5px; }
-.footer-links a:hover { color: var(--brand); }
+.footer-links a:hover { color: var(--brand-ink); }
 .footer-bottom {
   grid-column: 1 / -1;
   display: flex;
@@ -1773,7 +1798,7 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
   border-left: 7px solid var(--brand-accent);
 }
 .bridge-arrow span {
-  color: var(--brand);
+  color: var(--brand-ink);
   font-size: 9.5px;
   font-weight: 700;
   letter-spacing: 0.1em;
@@ -1811,7 +1836,7 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
   font-size: 8.5px;
   font-style: normal;
 }
-.bridge-editor-side i:first-of-type { color: var(--brand); background: var(--tint-teal); }
+.bridge-editor-side i:first-of-type { color: var(--brand-ink); background: var(--tint-teal); }
 .bridge-editor-timeline { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
 .bridge-editor-timeline span {
   padding: 5px 0;
@@ -1958,7 +1983,7 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
   transform: translateY(-2px);
 }
 .bridge-feature-grid button:focus-visible {
-  outline: 2px solid var(--color-accent-strong);
+  outline: 2px solid var(--color-accent-mid);
   outline-offset: 3px;
 }
 .bridge-feature-grid button.is-active {
@@ -2028,7 +2053,7 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
 .bridge-cta:focus-visible,
 .bridge-toolbar button:focus-visible,
 .bridge-layers button:focus-visible {
-  outline: 2px solid var(--color-accent-strong);
+  outline: 2px solid var(--color-accent-mid);
   outline-offset: 3px;
 }
 .bridge-cta-mark {
@@ -2052,9 +2077,9 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
   gap: 8px;
   padding: 0 15px;
   border-radius: 999px;
-  color: var(--color-surface-raised);
-  background: linear-gradient(105deg, var(--color-lavender), var(--color-accent-strong));
-  box-shadow: 0 12px 24px color-mix(in srgb, var(--color-lavender) 20%, transparent);
+  color: var(--color-accent-on);
+  background: var(--color-accent);
+  box-shadow: 0 12px 24px color-mix(in srgb, var(--color-accent) 26%, transparent);
   font-size: 10px;
   font-weight: 680;
   white-space: nowrap;
@@ -2192,7 +2217,7 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
   border-color: var(--color-accent-line);
   color: var(--color-accent-deep);
 }
-.bridge-orbit-control:focus-visible { outline: 2px solid var(--color-accent-strong); outline-offset: 3px; }
+.bridge-orbit-control:focus-visible { outline: 2px solid var(--color-accent-mid); outline-offset: 3px; }
 .bridge-orbit-control svg { width: 18px; height: 18px; }
 .bridge-orbit-control path {
   fill: none;
@@ -2261,7 +2286,7 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
   transition: opacity 120ms ease;
 }
 .bridge-hotspot:focus-visible { outline: none; }
-.bridge-hotspot:focus-visible > b { outline: 2px solid var(--color-accent-strong); outline-offset: 3px; }
+.bridge-hotspot:focus-visible > b { outline: 2px solid var(--color-accent-mid); outline-offset: 3px; }
 .bridge-hotspots.is-isolated .bridge-hotspot:not(.is-active) { opacity: 0; pointer-events: none; }
 .bridge-hotspot > i {
   position: absolute;
@@ -2454,7 +2479,7 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
 }
 .bridge-animation-panel button.is-active > span { color: var(--color-lavender); }
 .bridge-animation-panel button:focus-visible,
-.bridge-annotation-panel button:focus-visible { outline: 2px solid var(--color-accent-strong); outline-offset: 2px; }
+.bridge-annotation-panel button:focus-visible { outline: 2px solid var(--color-accent-mid); outline-offset: 2px; }
 
 .bridge-annotation-panel {
   right: 16px;
@@ -2701,7 +2726,7 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
 .ribbon span {
   grid-row: 1 / span 2;
   align-self: center;
-  color: var(--color-accent-strong);
+  color: var(--brand-ink);
   font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 620;
@@ -3011,7 +3036,7 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
     margin-top: 10px;
     border: 0;
     border-radius: 11px;
-    color: #fff;
+    color: var(--color-accent-on);
     background: var(--brand);
     font-weight: 620;
   }
@@ -3080,7 +3105,7 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
  *   - the bridge editor mock, whose right-hand layer list ran past the frame.
  *     It drops to the rail + stage and keeps the timeline, which is the part
  *     that carries the claim.
- *   - the YooStudio tool row, five labelled buttons on one line. It becomes a
+ *   - the YooLab tool row, five labelled buttons on one line. It becomes a
  *     horizontal scroller rather than being cut in half.
  */
 @media (max-width: 720px) {

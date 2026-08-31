@@ -259,7 +259,7 @@ export function InclineLab() {
     const ink = read('--sim-ink', '#191720');
     const line = read('--sim-line', 'rgba(117,91,70,0.2)');
     const muted = read('--sim-muted', '#706a73');
-    const accent = read('--sim-accent', '#e87868');
+    const accent = read('--sim-accent', '#00AAAB');
     const rampTint = read('--inc-ramp', '#f7f2ea');
     const weightColor = read('--inc-weight', '#8d6bcc');
     const normalColor = read('--inc-normal', '#5fb6c4');

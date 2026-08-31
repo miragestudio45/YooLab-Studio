@@ -23,7 +23,7 @@
    * The role switch is the structural anchor, so the height budget is written
    * around it: head band, tab strip, and then the panel takes what is left.
    * `--edu-chrome` is what the panel has to subtract, in one place, the same
-   * contract the Library and YooStudio use.
+   * contract the Library and YooLab use.
    */
   --edu-head: clamp(104px, 15vh, 152px);
   --edu-tabs: 66px;
@@ -58,7 +58,7 @@
   transition: color 180ms ease, background 180ms ease, box-shadow 180ms ease;
 }
 .education-tabs button.is-active {
-  color: #fff;
+  color: var(--color-accent-on);
   background: var(--color-accent-strong);
   box-shadow: 0 9px 22px rgba(180, 88, 70, 0.24);
 }
@@ -96,7 +96,7 @@
 
 .education-kicker {
   margin: 0;
-  color: var(--color-accent-strong);
+  color: var(--brand-ink);
   font-size: 10px;
   font-weight: 680;
   letter-spacing: 0.14em;
@@ -136,7 +136,7 @@
   margin-top: clamp(18px, 2.6vh, 30px);
   padding: 0 22px;
   border-radius: var(--radius-md);
-  color: #fff;
+  color: var(--color-accent-on);
   background: var(--color-accent-strong);
   box-shadow: 0 14px 32px rgba(180, 88, 70, 0.24);
   font-size: 13px;
@@ -259,7 +259,7 @@
   text-align: center;
 }
 .edu-steps .is-done { color: var(--color-ink-2); background: var(--color-surface-2); }
-.edu-steps .is-active { border-color: transparent; color: #fff; background: var(--color-accent-strong); }
+.edu-steps .is-active { border-color: transparent; color: var(--color-accent-on); background: var(--color-accent-strong); }
 
 /* school */
 .edu-deploy {
@@ -402,7 +402,7 @@
   font-size: 12px;
   font-weight: 620;
 }
-.proof-action:hover { color: var(--color-accent-strong); }
+.proof-action:hover { color: var(--brand-ink); }
 
 .proof-note { max-width: 74ch; margin: clamp(20px, 3vh, 32px) 0 0; color: var(--color-muted); font-size: 11.5px; line-height: 1.7; }
 

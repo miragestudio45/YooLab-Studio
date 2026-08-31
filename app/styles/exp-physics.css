@@ -26,7 +26,7 @@
    */
   container-type: inline-size;
   --sim-ink: var(--color-ink);
-  --sim-accent: #e87868;
+  --sim-accent: #00AAAB;
   --sim-line: rgba(117, 91, 70, 0.2);
   --sim-muted: #706a73;
 }
@@ -77,7 +77,7 @@
 .sim-slider { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; }
 .sim-slider span { color: var(--color-muted); font-size: 10.5px; font-weight: 560; }
 .sim-slider b { color: var(--color-ink); font-size: 11px; font-weight: 620; text-align: right; }
-.sim-slider input { grid-column: 1 / -1; width: 100%; accent-color: var(--color-accent-strong); }
+.sim-slider input { grid-column: 1 / -1; width: 100%; accent-color: var(--brand-ink); }
 .sim-slider:has(input:disabled) { opacity: 0.45; }
 
 .sim-presets { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; }
@@ -100,7 +100,7 @@
   font-weight: 560;
 }
 .sim-presets button i { color: var(--color-muted-2); font-size: 9px; font-style: normal; }
-.sim-presets button.is-active { border-color: transparent; color: #fff; background: var(--color-accent-strong); }
+.sim-presets button.is-active { border-color: transparent; color: var(--color-accent-on); background: var(--color-accent-strong); }
 .sim-presets button.is-active i { color: rgba(255, 255, 255, 0.75); }
 
 .sim-fire {
@@ -112,7 +112,7 @@
   padding: 0 18px;
   border: 0;
   border-radius: var(--radius-sm);
-  color: #fff;
+  color: var(--color-accent-on);
   background: var(--color-accent-strong);
   font-size: 12px;
   font-weight: 620;
@@ -157,7 +157,7 @@
   font-weight: 500;
 }
 .incline-legend li i { width: 13px; height: 2px; border-radius: 2px; }
-.incline-legend .is-weight i { background: #c95f52; }
+.incline-legend .is-weight i { background: #00AAAB; }
 .incline-legend .is-normal i { background: #5fb6c4; }
 .incline-legend .is-friction i { background: #8d6bcc; }
 .incline-legend .is-push i { background: #b08a4a; }
@@ -327,16 +327,16 @@
   font-weight: 580;
 }
 .wave-modes button:hover { color: var(--color-ink-2); }
-.wave-modes button[aria-pressed="true"] { color: #fff; background: var(--color-accent-strong); }
+.wave-modes button[aria-pressed="true"] { color: var(--color-accent-on); background: var(--color-accent-strong); }
 
 .wave-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0; padding: 0; list-style: none; }
 .wave-legend li { display: flex; align-items: center; gap: 6px; color: var(--color-muted); font-size: 10px; }
 .wave-legend i { width: 14px; height: 2.5px; border-radius: 2px; }
 .wave-legend .is-first { background: #5fb6c4; }
 .wave-legend .is-second { background: #8d6bcc; }
-.wave-legend .is-sum { height: 3px; background: #e87868; }
+.wave-legend .is-sum { height: 3px; background: #00AAAB; }
 .wave-legend .is-node { width: 8px; height: 8px; border-radius: 50%; background: var(--color-ink); }
-.wave-legend .is-anti { width: 8px; height: 8px; border-radius: 50%; background: #e87868; }
+.wave-legend .is-anti { width: 8px; height: 8px; border-radius: 50%; background: #00AAAB; }
 
 /* ============================================================== circuits === */
 .sim.circuit { grid-template-rows: minmax(0, 1fr) auto auto auto; }

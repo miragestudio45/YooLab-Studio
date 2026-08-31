@@ -229,14 +229,16 @@ Mode behavior:
   nên chỉ có một live Formula context trên trang).
 - Formula shared masks: `public/asset/fish/sharedMaskAtlas.webp`,
   `deskSupplies_atlas.webp`, `eraser_baseColor.webp`.
-- Logo: `public/brand/yoolab-mark.svg` và `app/components/BrandMark.tsx`.
+- Logo: `public/brand/yoolab-logo.svg` (lockup ngang) và `public/brand/yoolab-icon.svg`
+  (app tile / favicon) — **vector chính thức do khách gửi**. `app/components/BrandMark.tsx`
+  được **sinh ra** từ hai file đó bằng `node scripts/build-brand-mark.mjs`; đừng sửa tay.
 - **HAR và ảnh tham chiếu đã ra khỏi `public/`** và nằm trong `reference-audit/`
   (xem README trong đó). `public/` giảm từ ~71 MB xuống 16 MB.
 
 ## Việc còn có thể làm
 
-- Nếu có logo vector chính thức, thay `public/brand/yoolab-mark.svg` và
-  `MARK_PATHS` trong `BrandMark.tsx` thay vì trace lại.
+- ~~Nếu có logo vector chính thức…~~ **Xong.** Bản trace từ bitmap đã bị thay bằng
+  vector thật; chạy lại `scripts/build-brand-mark.mjs` mỗi khi re-export SVG.
 - `public/og.png` vẫn là ảnh do bản trước sinh ra, dùng serif và một render sứa
   không phải asset thật. Nên dựng lại từ hero thật khi có dịp.
 - `public/asset/fish/particle.glb` và `little-fish.glb` chưa được surface (xem

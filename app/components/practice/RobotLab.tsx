@@ -789,7 +789,7 @@ export function RobotLab() {
             : Infinity;
           const near = distance < (held ? PLACE_TOLERANCE : PICK_TOLERANCE);
           const material = cell.targetMark.material as THREE.MeshBasicMaterial;
-          material.color.setHex(near ? 0x5aa05e : 0xe87868);
+          material.color.setHex(near ? 0x5aa05e : 0x00aaab);
           cell.targetMark.scale.setScalar(1 + Math.sin(pulseClock * 3.4) * 0.05);
         } else {
           cell.targetMark.visible = false;

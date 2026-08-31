@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { BrandMark } from './BrandMark';
+import { BrandLockup } from './BrandMark';
 
 /**
  * Navigation follows the journey, in order: see it, use the tool, find the
@@ -15,7 +15,7 @@ import { BrandMark } from './BrandMark';
  */
 const links = [
   ['Khám phá', '#kham-pha'],
-  ['YooStudio', '#cong-cu'],
+  ['YooLab', '#cong-cu'],
   ['Thư viện', '#thu-vien'],
   ['Thực hành', '#thuc-hanh'],
   ['Giáo dục', '#giao-duc'],
@@ -90,8 +90,7 @@ export function SiteHeader() {
     >
       <div className="site-header-inner">
         <a className="brand" href="#trang-chu" aria-label="YooLab — Trang chủ" onClick={() => setOpen(false)}>
-          <BrandMark size={25} variant="glyph" />
-          <span className="brand-wordmark">YooLab</span>
+          <BrandLockup height={19} />
         </a>
         <nav className="desktop-nav" aria-label="Các khu vực của YooLab">
           {links.map(([label, href]) => <a href={href} key={href}>{label}</a>)}

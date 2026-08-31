@@ -697,7 +697,7 @@ export function WaveLab({ params }: { params?: Record<string, string> }) {
     const monoStack = style.getPropertyValue('--font-mono').trim() || 'ui-monospace, monospace';
     const palette: Palette = {
       ink: style.getPropertyValue('--sim-ink').trim() || '#191720',
-      accent: style.getPropertyValue('--sim-accent').trim() || '#e87868',
+      accent: style.getPropertyValue('--sim-accent').trim() || '#00AAAB',
       line: style.getPropertyValue('--sim-line').trim() || 'rgba(117,91,70,0.2)',
       muted: style.getPropertyValue('--sim-muted').trim() || '#706a73',
       first: style.getPropertyValue('--wave-first').trim() || '#5fb6c4',

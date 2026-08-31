@@ -265,7 +265,7 @@ export function CircuitLab() {
 
     const style = getComputedStyle(canvas);
     const ink = style.getPropertyValue('--sim-ink').trim() || '#191720';
-    const accent = style.getPropertyValue('--sim-accent').trim() || '#e87868';
+    const accent = style.getPropertyValue('--sim-accent').trim() || '#00AAAB';
     const muted = style.getPropertyValue('--sim-muted').trim() || '#706a73';
     const line = style.getPropertyValue('--sim-line').trim() || 'rgba(117,91,70,0.2)';
     /*

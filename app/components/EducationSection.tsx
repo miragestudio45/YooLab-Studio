@@ -47,7 +47,7 @@ const ROLES: {
       { title: 'Giao bài', body: 'Chia sẻ để mở trên web, màn hình lớp học hoặc XR.' },
       { title: 'Tổ chức hoạt động', body: 'Thêm hotspot và câu hỏi trả lời ngay trên mô hình.' },
     ],
-    cta: { label: 'Xem YooStudio', href: '#cong-cu' },
+    cta: { label: 'Xem YooLab', href: '#cong-cu' },
   },
   {
     id: 'student',

@@ -25,7 +25,7 @@
    * A fitted section, on the `.tool-section` pattern.
    *
    * `--library-head` used to declare the head band's height so the app could
-   * subtract it. That is the mistake DESIGN.md §2 records against YooStudio, and
+   * subtract it. That is the mistake DESIGN.md §2 records against YooLab, and
    * this section had it too: the band gained the subject switcher, the estimate
    * did not move, and the bottom of the three panels went under the fold at
    * 1366. The band is an `auto` grid row now and the arithmetic belongs to the
@@ -82,10 +82,7 @@
   line-height: 1.04;
 }
 .library-head h2 em {
-  color: transparent;
-  background: linear-gradient(100deg, var(--color-accent-deep) 4%, var(--color-accent-strong) 46%, var(--color-lavender) 100%);
-  background-clip: text;
-  -webkit-background-clip: text;
+  color: var(--color-accent);
   font-family: var(--font-display);
   font-style: italic;
   font-weight: 500;
@@ -885,7 +882,7 @@
   height: 7px;
   border-radius: 50%;
   background: var(--color-accent-strong);
-  box-shadow: 0 0 0 3px rgba(232, 120, 104, 0.16);
+  box-shadow: 0 0 0 3px rgba(0, 170, 171, 0.16);
   transition: box-shadow 180ms ease;
 }
 .stage-pin-dot:hover { transform: scale(1.12); }
@@ -893,7 +890,7 @@
   background: var(--color-surface-raised);
   box-shadow: inset 0 0 0 1px var(--color-accent-line), 0 6px 16px rgba(87, 62, 43, 0.12);
 }
-.stage-pin[data-open] .stage-pin-dot i { box-shadow: 0 0 0 4px rgba(232, 120, 104, 0.22); }
+.stage-pin[data-open] .stage-pin-dot i { box-shadow: 0 0 0 4px rgba(0, 170, 171, 0.22); }
 
 .stage-pin-card {
   position: absolute;
@@ -1129,7 +1126,7 @@
   width: 15px;
   height: 15px;
   border: 1.6px solid var(--color-border-strong);
-  border-top-color: var(--color-accent-strong);
+  border-top-color: var(--brand-ink);
   border-radius: 50%;
   animation: stage-ring 760ms linear infinite;
 }
@@ -1169,7 +1166,7 @@
   padding: 0 22px;
   border: 0;
   border-radius: var(--radius-md);
-  color: #fff;
+  color: var(--color-accent-on);
   background: var(--color-accent-strong);
   box-shadow: 0 14px 34px rgba(180, 88, 70, 0.3);
   font-size: 13px;
@@ -1231,7 +1228,7 @@
   padding: 0 22px;
   border: 0;
   border-radius: var(--radius-md);
-  color: #fff;
+  color: var(--color-accent-on);
   background: var(--color-accent-strong);
   box-shadow: 0 14px 34px rgba(180, 88, 70, 0.3);
   font-size: 13px;
@@ -1569,7 +1566,7 @@
 .knowledge-actions .knowledge-primary {
   min-height: 40px;
   border-color: transparent;
-  color: #fff;
+  color: var(--color-accent-on);
   background: var(--color-accent-strong);
   box-shadow: 0 8px 18px rgba(200, 92, 72, 0.16);
   font-size: 12px;
@@ -1638,7 +1635,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.knowledge-credit a:hover { color: var(--color-accent-strong); }
+.knowledge-credit a:hover { color: var(--brand-ink); }
 .knowledge-credit small { margin-top: 3px; color: var(--color-muted); font-size: 10px; line-height: 1.55; }
 
 /* ============================================================ breakpoints === */
@@ -1896,11 +1893,11 @@
 /* One focus ring for the whole section, in the accent rather than in the
    platform's blue, and offset far enough to clear a 46 px circular well. */
 .library :focus-visible {
-  outline: 2px solid var(--color-accent-strong);
+  outline: 2px solid var(--color-accent-mid);
   outline-offset: 2px;
   border-radius: var(--radius-xs);
 }
 .library-search input:focus-visible { outline: none; }
 .library .stage-pin-dot:focus-visible { outline-offset: 3px; border-radius: 50%; }
 .library a { text-underline-offset: 0.22em; }
-.library input { caret-color: var(--color-accent-strong); }
+.library input { caret-color: var(--brand-ink); }

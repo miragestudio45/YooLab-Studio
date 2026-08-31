@@ -1025,8 +1025,8 @@ export function DroneLab() {
                 </g>
                 <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(117,91,70,0.24)" strokeWidth="2" />
                 {/* The fixed aircraft symbol. */}
-                <path d="M32 60h16l12 7 12-7h16" fill="none" stroke="#c95f52" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
-                <circle cx="60" cy="60" r="2.2" fill="#c95f52" />
+                <path d="M32 60h16l12 7 12-7h16" fill="none" stroke="#00AAAB" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+                <circle cx="60" cy="60" r="2.2" fill="#00AAAB" />
               </svg>
               <dl>
                 <div><dt>Nghiêng</dt><dd>{telemetry.roll.toFixed(0)}°</dd></div>

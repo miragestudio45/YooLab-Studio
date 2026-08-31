@@ -9,10 +9,14 @@ export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? 'https://yoolab.vn'),
   title: TITLE,
   description: DESCRIPTION,
-  icons: { icon: '/brand/yoolab-mark.svg' },
+  icons: {
+    icon: [{ url: '/brand/yoolab-icon.svg', type: 'image/svg+xml' }],
+    shortcut: '/brand/yoolab-icon.svg',
+    apple: '/brand/yoolab-icon.svg',
+  },
   openGraph: {
     title: TITLE,
-    description: 'Thư viện học liệu 3D đa môn, không gian biên soạn YooStudio và các trải nghiệm tương tác.',
+    description: 'Thư viện học liệu 3D đa môn, không gian biên soạn YooLab và các trải nghiệm tương tác.',
     type: 'website',
     locale: 'vi_VN',
     images: [{ url: '/og.png', width: 1792, height: 933, alt: 'YooLab — Không gian học tập 3D' }],
@@ -20,7 +24,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: TITLE,
-    description: 'Thư viện học liệu 3D đa môn, không gian biên soạn YooStudio và các trải nghiệm tương tác.',
+    description: 'Thư viện học liệu 3D đa môn, không gian biên soạn YooLab và các trải nghiệm tương tác.',
     images: ['/og.png'],
   },
 };

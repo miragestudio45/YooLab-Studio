@@ -125,10 +125,47 @@ into a fifth of the visible page before the section's subject had started.
 
 ## 4. Colour
 
-Warm off-white ground, one coral accent, soft lavender / cyan / blush for subject
-coding only. Every colour is a token in `globals.css`; nothing downstream
-hard-codes a hex. Section backgrounds step by a few units of value so the eye
-never meets an edge — ivory → white → warm cream → ivory → blush-cream.
+**The brand is one colour: `#00AAAB`.** Not a ramp and not a gradient — every
+accent surface on this site is that value, flat. Buttons, chips, bars, dots,
+marks, kickers, links, focus rings, the display italic: all `#00AAAB`.
+
+Three values support it, and none of them is a second brand colour:
+
+| Token | Value | Job |
+|---|---|---|
+| `--color-accent` | `#00AAAB` | **the colour** — and its four aliases all resolve here |
+| `--color-accent-on` | `#042E2D` | text **on** a `#00AAAB` fill (5.1:1) |
+| `--color-accent-soft` | `#8CD9D9` | a tint of it, for washes and spinner tracks |
+| `--color-accent-hover` | `#018E8F` | hover only, so a brand control still answers the pointer |
+
+### The cost, stated once
+
+`#00AAAB` reads **2.7:1** on the ivory ground. That is below the 4.5:1 body text
+needs and below the 3:1 large text and focus rings need. This is an instructed
+brand decision — the accent is to be seen as the brand before it is to be read —
+and it is **not drift**. Do not "fix" it by nudging accent labels darker one rule
+at a time; that is how a single colour turns back into a ramp.
+
+There is exactly one lever. `--color-accent-readable` is what every accent
+**label** resolves through, and it currently points at `#00AAAB`. Pointing it at
+`#017E7F` instead makes every accent label on the site legible at 4.5:1 in one
+edit, without touching a single fill. That is the whole remedy, and it is one line.
+
+### What did not change
+
+The ground is untouched: `#fbf8f4` ivory → `#fffdf9` white → `#f7f2ea` cream,
+with warm-brown borders (`rgba(117,91,70,·)`) and shadows (`rgba(87,62,43,·)`).
+A build that rotated the ground onto the brand hue was tried and rejected — it
+read colder and thinner and bought nothing. **A warm ivory under a cool teal is
+the design.** Lavender / cyan / blush / sage / cream remain for subject coding
+only, at their original values.
+
+Gradients that mixed the accent with lavender — the display italics in the hero,
+the bridge and the Library head, and the bridge CTA pill — are now solid. One
+colour means one colour, and the italic's emphasis was always carried by the
+italic, the weight drop and the size rather than by the ramp inside it.
+
+Every colour is a token in `globals.css`; nothing downstream hard-codes a hex.
 
 ## 5. Surfaces
 
@@ -136,7 +173,8 @@ Three separate bordered, shadowed cards with a 14 px gutter — not one box with
 dividers. A divider says "paragraphs of one document"; a gutter says "instruments
 side by side". That gap is most of the difference between a section and an
 application. Radii 22 / 14 / 10 / 7. Shadows are wide and very low-alpha
-(`0 16px 44px rgba(87,62,43,.06)`).
+(`0 16px 44px rgba(87,62,43,.06)`) — warm brown, like the borders, and unchanged
+by the accent swap.
 
 ## 6. Composition — the Explore chapters
 

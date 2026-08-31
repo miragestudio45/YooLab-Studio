@@ -474,7 +474,7 @@ export async function createSixAxisArm(): Promise<SixAxisArm> {
    */
   const glowGeometry = keep(new THREE.CircleGeometry(0.3, 48));
   const glowMaterial = keep(new THREE.MeshBasicMaterial({
-    color: 0xe87868,
+    color: 0x00aaab,
     transparent: true,
     opacity: 0,
     depthWrite: false,
