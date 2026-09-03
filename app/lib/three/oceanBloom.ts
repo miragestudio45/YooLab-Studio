@@ -47,9 +47,16 @@ function passMaterial(fragmentShader: string, uniforms: Record<string, THREE.IUn
   });
 }
 
-export function createOceanBloomPass(compact: boolean): OceanBloomPass {
+export function createOceanBloomPass(
+  compact: boolean,
+  /* Half-float unless `lib/three/hdrTarget.ts` found this GPU cannot render into
+     one. Bloom is the pass with the most to lose from eight bits — its whole job
+     is the range above white — so it takes the probe's answer rather than
+     assuming, and banded glow beats no glow. */
+  targetType: THREE.TextureDataType = THREE.HalfFloatType,
+): OceanBloomPass {
   const targetOptions = {
-    type: THREE.HalfFloatType,
+    type: targetType,
     minFilter: THREE.LinearFilter,
     magFilter: THREE.LinearFilter,
     generateMipmaps: false,

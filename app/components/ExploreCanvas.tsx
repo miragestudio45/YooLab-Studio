@@ -22,6 +22,7 @@ import {
 } from '../lib/three/creatures';
 import { createVisibilityGate } from '../lib/three/visibility';
 import { isLeanDevice, pixelRatioCap } from '../lib/three/deviceTier';
+import { hdrMipTargetType, hdrTargetSupport, hdrTargetType } from '../lib/three/hdrTarget';
 import { createQualityLadder } from '../lib/three/qualityLadder';
 import { createOceanWorld, type OceanWorld } from '../lib/ocean/scene';
 import { OCEAN_CAMERA, oceanFovFor } from '../lib/ocean/camera';
@@ -340,6 +341,24 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 0.9;
+    /*
+     * Whether the specimens may use `transmission` at all.
+     *
+     * `!lean` is the budget half of this and always was. The new half is the
+     * capability, and it is the same capability the bee's refraction capture
+     * needs: three's transmission target is a **mipmapped half-float** surface,
+     * resolved out of 4× MSAA and read back through a roughness LOD. A GPU that
+     * cannot be trusted with our own mipmapped half-float target cannot be
+     * trusted with three's either — and there, the failure is not a soft
+     * backdrop but the specimen itself rendering in torn blocks, because what
+     * the membranes show through themselves *is* that target.
+     *
+     * So the probe answers both, and the fallback is a path this project
+     * already designed and tuned: `createJellyfishCreature` and
+     * `createFishCreature` both carry a blended, non-transmissive variant with
+     * its own opacities.
+     */
+    const transmissionSafe = !lean && hdrTargetSupport(renderer).mipmappable;
     let pixelRatio = maxPixelRatio;
     renderer.setPixelRatio(pixelRatio);
     renderer.domElement.setAttribute('aria-hidden', 'true');
@@ -437,7 +456,9 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
         minFilter: THREE.LinearMipmapLinearFilter,
         magFilter: THREE.LinearFilter,
         generateMipmaps: true,
-        type: THREE.HalfFloatType,
+        /* Probed on `created`, not on the main renderer: this is a second
+           context, and capability answers do not travel between them. */
+        type: hdrMipTargetType(created),
         depthBuffer: true,
       });
       foregroundSceneCapture.texture.colorSpace = THREE.LinearSRGBColorSpace;
@@ -488,6 +509,7 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
       simulate: !reduceMotion,
       planeWidth: 2,
       planeHeight: 2,
+      targetType: hdrTargetType(renderer),
     });
     // Parented to the camera: the choreography moves the camera constantly, and
     // the environment has to stay a full-frame backdrop through all of it.
@@ -510,13 +532,23 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
     };
     const keyColorTarget = new THREE.Color();
 
-    // Mipmapped on purpose: the bee shell reads its refraction with an explicit
-    // LOD so surface roughness blurs what is behind the glass.
+    /*
+     * Mipmapped on purpose: the bee shell reads its refraction with an explicit
+     * LOD so surface roughness blurs what is behind the glass.
+     *
+     * And 8-bit rather than half-float wherever the GPU cannot be trusted to
+     * build that mip chain. `textureLod` past level 0 on a texture whose levels
+     * were never generated is undefined, not blurry — the shell would refract
+     * whatever memory happened to be there — and `generateMipmap` on RGBA16F is
+     * the single most driver-dependent call this page makes. The capture is a
+     * blurred backdrop seen through a ruby, so eight bits costs it nothing that
+     * the roughness blur was not going to take anyway.
+     */
     const sceneCapture = new THREE.WebGLRenderTarget(1, 1, {
       minFilter: THREE.LinearMipmapLinearFilter,
       magFilter: THREE.LinearFilter,
       generateMipmaps: true,
-      type: THREE.HalfFloatType,
+      type: hdrMipTargetType(renderer),
       depthBuffer: true,
     });
     sceneCapture.texture.colorSpace = THREE.LinearSRGBColorSpace;
@@ -544,9 +576,9 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
 
     /* ------------------------------------------------------------ transition --- */
     const waterline = createWaterlinePass();
-    const oceanBloom = createOceanBloomPass(lean);
+    const oceanBloom = createOceanBloomPass(lean, hdrTargetType(renderer));
     const targetOptions = {
-      type: THREE.HalfFloatType,
+      type: hdrTargetType(renderer),
       minFilter: THREE.LinearFilter,
       magFilter: THREE.LinearFilter,
       generateMipmaps: false,
@@ -776,7 +808,7 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
             finish: 'ocean',
             /* See the option's own note: one transmissive material anywhere in
                the scene costs a second render of the whole reef every frame. */
-            transmissive: !lean,
+            transmissive: transmissionSafe,
             maxAnisotropy,
             environment: specimenEnvironment.texture,
           });
@@ -788,7 +820,7 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
             // This is why the jellyfish chapter measured 37 fps against the fish
             // chapter's 60 on identical geometry — three membranes with
             // `transmission` make the renderer draw the reef twice per frame.
-            transmissive: !lean,
+            transmissive: transmissionSafe,
             finish: 'ocean',
             maxAnisotropy,
             environment: specimenEnvironment.texture,
