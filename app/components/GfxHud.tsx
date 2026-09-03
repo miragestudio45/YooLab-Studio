@@ -89,6 +89,8 @@ export function GfxHud() {
 
   const capabilities = report.capabilities as {
     hdrProbe?: { measured?: Record<string, boolean>; inForce?: Record<string, boolean> };
+    transmissionProbe?: { resolve?: boolean; mips?: boolean };
+    appleSafePath?: { active?: boolean; reasons?: string[]; renderer?: string };
     explore?: Record<string, unknown>;
     quality?: { level?: number; label?: string; dpr?: number };
   };
@@ -120,11 +122,16 @@ export function GfxHud() {
     >
       {[
         `gfx  ${report.flags.join(',') || '(none)'}${copied ? '   ✓ copied' : '   — tap to copy'}`,
+        `SAFE ${capabilities.appleSafePath?.active ? 'APPLE PATH ON' : 'off'}`
+        + `  ${(capabilities.appleSafePath?.reasons ?? []).join(' ') || '—'}`,
+        `gpu  ${(capabilities.appleSafePath?.renderer || 'unknown').slice(0, 44)}`,
         `fps  ${fps}   dpr ${report.device.dpr}   tier ${capabilities.quality?.level ?? '?'} ${capabilities.quality?.label ?? ''}`,
         `ctx  ${report.contexts.count}  lost ${report.contexts.lost}  restored ${report.contexts.restored}`,
         `     ${report.contexts.labels.join(', ') || '(none)'}`,
         `hdr  render ${on(capabilities.hdrProbe?.inForce?.renderable)}  mip ${on(capabilities.hdrProbe?.inForce?.mipmappable)}`
         + `  (measured ${on(capabilities.hdrProbe?.measured?.renderable)}/${on(capabilities.hdrProbe?.measured?.mipmappable)})`,
+        `xmit msaa-resolve ${on(capabilities.transmissionProbe?.resolve)}  mipchain ${on(capabilities.transmissionProbe?.mips)}`,
+        `tgt  ${String(explore.hdrTargets ?? '?')}`,
         `pass trans ${on(explore.transmission)}  bloom ${on(explore.bloom)}  fg ${on(explore.foreground)}`
         + `  msaa ${on(explore.msaa)}  liquid ${on(explore.liquidSim)}`,
         `dev  lean ${on(explore.lean)}  handheld ${on(report.device.handheld)}  cores ${report.device.cores}`,

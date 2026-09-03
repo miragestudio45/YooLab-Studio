@@ -47,6 +47,7 @@
  */
 
 export type GfxFeature =
+  | 'apple-safe'
   | 'transmission'
   | 'hdr'
   | 'mip'
@@ -129,10 +130,23 @@ export type GfxEvent = { at: number; label: string; kind: 'lost' | 'restored' | 
 /** Ring buffer. Long enough for a full scroll pass, short enough to never grow. */
 const events: GfxEvent[] = [];
 const EVENT_CAP = 120;
+/**
+ * How many context losses this page has seen, ever.
+ *
+ * Counted across the whole session rather than over the live contexts, because
+ * a lost context is usually a *replaced* context: by the time anything asks,
+ * the entry that recorded the loss has been swept away. The number has to
+ * outlive it, because one loss is enough to stop trusting this GPU.
+ */
+let lossTotal = 0;
+export function gfxContextLossCount(): number {
+  return lossTotal;
+}
 
 function note(label: string, kind: GfxEvent['kind']) {
   events.push({ at: Math.round(performance.now()), label, kind });
   if (events.length > EVENT_CAP) events.shift();
+  if (kind === 'lost') lossTotal += 1;
   if (kind === 'lost' || kind === 'restored') {
     /* Never noise. Logged even in production because these two are the events
        that explain a canvas going blank, and iOS Safari drops the oldest
@@ -142,10 +156,13 @@ function note(label: string, kind: GfxEvent['kind']) {
 }
 
 function nameOf(canvas: HTMLCanvasElement): string {
+  /* `||`, not `??`: an unclassed canvas has `className === ''`, which is not
+     nullish, so the nullish chain stopped there and reported every Studio and
+     Library surface as an empty name. */
   return labels.get(canvas)
-    ?? canvas.className
-    ?? canvas.parentElement?.className
-    ?? 'anonymous';
+    || canvas.className
+    || canvas.parentElement?.className
+    || 'anonymous';
 }
 
 /**
@@ -170,6 +187,18 @@ function register(
   gl: WebGLRenderingContext | WebGL2RenderingContext,
   kind: string,
 ) {
+  /*
+   * Capability probes are not part of the census.
+   *
+   * `appleSafePath` opens a 1x1 context to read the GL renderer string and
+   * hands it straight back with `loseContext`. That is a deliberate release,
+   * but it arrives here as a `webglcontextlost` event like any other — and one
+   * of the safe path's own triggers is "a context has been lost". Left
+   * unmarked, the probe put every machine on the planet onto the fallback path
+   * a beat after it started, which is a worse bug than the one it was
+   * diagnosing.
+   */
+  if (canvas.dataset.gfxProbe) return;
   if (tracked.some((entry) => entry.gl === gl)) return;
   tracked.push({ canvas, gl, kind, lost: 0, restored: 0 });
   canvas.addEventListener('webglcontextlost', (event) => {
@@ -232,6 +261,7 @@ export function trackRenderer(canvas: HTMLCanvasElement, label: string): () => v
 export function gfxContextCount(): number {
   return sweep().length;
 }
+
 
 /* --------------------------------------------------------------- capabilities --- */
 
