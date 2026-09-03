@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { gfxAllows, gfxRecord } from './gfx';
 
 /**
  * Whether this GPU can actually be trusted with half-float render targets.
@@ -211,35 +212,37 @@ function runProbe(renderer: THREE.WebGLRenderer): HdrTargetSupport {
 }
 
 /**
- * `?gfx=safe` — take the conservative answer without asking the GPU.
+ * Probe this renderer once, then let the URL override either answer.
  *
- * A probe can only catch a driver that gets a small case visibly wrong, and the
+ * The probe is evidence and the flag is a hypothesis, and both are needed: a
+ * probe can only catch a driver that gets a small case *visibly* wrong, and the
  * failures this file exists for are reported from devices nobody here owns. So
- * there is one way to put a machine on the fallback path by hand: append
- * `?gfx=safe` to the URL and reload. It is how a reported artefact gets
- * confirmed as *this* class of bug in one reload rather than one build, and it
- * is read once per page load with no persistence — closing the tab ends it.
+ * `?gfx=no-hdr` and `?gfx=no-mip` force the fallback on a machine the probe
+ * passed, and `?gfx=hdr` / `?gfx=mip` force the fast path on one it failed —
+ * which is how the question "is this the pass that corrupts the picture" gets
+ * answered in a reload instead of a build. See `lib/three/gfx.ts`.
  */
-function forcedSafe(): boolean {
-  if (typeof window === 'undefined') return false;
-  try {
-    return new URLSearchParams(window.location.search).get('gfx') === 'safe';
-  } catch {
-    return false;
-  }
-}
-
-/** Probe this renderer once and remember the answer for as long as it lives. */
 export function hdrTargetSupport(renderer: THREE.WebGLRenderer): HdrTargetSupport {
   const known = cache.get(renderer);
   if (known) return known;
-  const support = forcedSafe() ? { renderable: false, mipmappable: false } : runProbe(renderer);
+
+  const probed = runProbe(renderer);
+  const support: HdrTargetSupport = {
+    renderable: gfxAllows('hdr', probed.renderable),
+    /* Mipmapped half-float needs both: a GPU that renders into one at all, and
+       one whose mip chain is usable. `no-hdr` therefore implies `no-mip`
+       without the caller having to pass both. */
+    mipmappable: gfxAllows('hdr', probed.renderable) && gfxAllows('mip', probed.mipmappable),
+  };
   cache.set(renderer, support);
-  if (process.env.NODE_ENV !== 'production') {
-    console.info(
-      `[hdrTarget] half-float render targets: renderable=${support.renderable}, mipmappable=${support.mipmappable}`,
-    );
-  }
+
+  /* Recorded, not just logged: on an iPad there is nothing reading the console,
+     and `window.__gfx.report()` is how this answer gets off the device. */
+  gfxRecord('hdrProbe', { measured: probed, inForce: support });
+  console.info(
+    `[gfx] half-float targets — measured renderable=${probed.renderable} mipmappable=${probed.mipmappable}`
+    + `, in force renderable=${support.renderable} mipmappable=${support.mipmappable}`,
+  );
   return support;
 }
 

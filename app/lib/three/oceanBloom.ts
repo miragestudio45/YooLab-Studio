@@ -20,6 +20,11 @@ export type OceanBloomPass = {
     strength: number,
     exposure: number,
     target: THREE.WebGLRenderTarget | null,
+    /* False skips the extract and both blur passes and composites with a
+       strength of zero — three half-float targets and three full-screen draws
+       that stop happening, which is what makes `?gfx=no-bloom` an elimination
+       step rather than a dimmer. */
+    enabled?: boolean,
   ): void;
   dispose(): void;
 };
@@ -192,8 +197,8 @@ export function createOceanBloomPass(
       bloomB.setSize(width, height);
     },
     prepare,
-    render(renderer, source, strength, exposure, target) {
-      prepare(renderer, source);
+    render(renderer, source, strength, exposure, target, enabled = true) {
+      if (enabled) prepare(renderer, source);
       compositeUniforms.uSource.value = source;
       compositeUniforms.uBloom.value = bloomA.texture;
       compositeUniforms.uStrength.value = strength;
