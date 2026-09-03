@@ -11,6 +11,7 @@ import {
 } from '../lib/formula/carRuntime';
 import { createProceduralEnvironment, studioEnvironmentPalette } from '../lib/three/environment';
 import { createVisibilityGate, whenOnScreen } from '../lib/three/visibility';
+import { pixelRatioCap } from '../lib/three/deviceTier';
 
 /**
  * Live Formula preview for the library card.
@@ -59,7 +60,7 @@ export function FormulaPreview({ onOpen }: { onOpen: () => void }) {
       renderer.outputColorSpace = THREE.SRGBColorSpace;
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
       renderer.toneMappingExposure = 1.0;
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+      renderer.setPixelRatio(pixelRatioCap('panel'));
       renderer.setClearColor(0x000000, 0);
       host.insertBefore(renderer.domElement, host.firstChild);
       renderer.domElement.className = 'formula-preview-canvas';

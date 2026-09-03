@@ -22,7 +22,7 @@
   font-size: 11px;
   font-weight: 580;
 }
-.globe-layers button.is-active { color: #fff; background: var(--color-accent-strong); }
+.globe-layers button.is-active { color: var(--color-accent-on); background: var(--color-accent-strong); }
 
 .globe-search input {
   width: 100%;
@@ -131,7 +131,7 @@
   white-space: nowrap;
 }
 .earth-scale button:hover { color: var(--color-ink-2); }
-.earth-scale button.is-active { color: #fff; background: var(--color-accent-strong); }
+.earth-scale button.is-active { color: var(--color-accent-on); background: var(--color-accent-strong); }
 
 .earth-side {
   display: grid;

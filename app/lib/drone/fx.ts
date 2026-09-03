@@ -53,7 +53,7 @@ export function createMotionTrail(): MotionTrail {
   geometry.setDrawRange(0, 0);
 
   const material = new THREE.LineBasicMaterial({
-    color: 0xe87868,
+    color: 0x00aaab,
     transparent: true,
     opacity: 0.5,
     depthWrite: false,

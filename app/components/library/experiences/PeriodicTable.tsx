@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { createVisibilityGate } from '../../../lib/three/visibility';
+import { pixelRatioCap } from '../../../lib/three/deviceTier';
 import {
   CATEGORY_COLOR,
   CATEGORY_LABEL,
@@ -158,7 +159,7 @@ function AtomView({ element, onBack }: { element: ElementData; onBack: () => voi
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.setClearColor(0x000000, 0);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
+    renderer.setPixelRatio(pixelRatioCap('panel'));
     renderer.domElement.setAttribute('aria-hidden', 'true');
     renderer.domElement.className = 'model-stage-canvas';
     host.appendChild(renderer.domElement);

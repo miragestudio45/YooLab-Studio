@@ -9,6 +9,7 @@ import {
   refreshSkinnedBounds,
 } from '../../lib/three/creatures';
 import { createLibraryStage } from '../../lib/three/libraryEnvironment';
+import { useManagedContext } from '../../lib/three/useManagedContext';
 import { createOrbitRig, createSubjectFit, type OrbitRig, type SubjectFit } from '../../lib/three/framing';
 import type { ModelAnchor, ModelClip, ModelFraming, ModelPreset } from '../../lib/library/types';
 import { StageChrome, StageClipRow, StageRail, StageRailGroup, StageToolButton } from './StageChrome';
@@ -507,7 +508,21 @@ export function ModelStage({ url, preset, framing, clips, defaultClip, lockRoot,
   /** The guide card is spent once the visitor has actually driven the model. */
   const markTouched = useCallback(() => setTouched(true), []);
 
+  /*
+   * Under the page's context budget — see `lib/three/useManagedContext.ts`.
+   *
+   * The stage's own `active()` gate already stops it drawing while it is off
+   * screen. This stops it HOLDING a GPU context while it is far off screen,
+   * which matters on iOS Safari where the per-page limit is low enough that a
+   * page over it has the browser take the oldest context away from whichever
+   * canvas owns it — the difference between a page that stutters and one that
+   * flickers. React runs this component's real cleanup and real setup on either
+   * side of the change, so there is no second teardown path to keep correct.
+   */
+  const held = useManagedContext(hostRef, 'library-model', 1);
+
   useEffect(() => {
+    if (!held) return;
     const host = hostRef.current;
     const mount = viewRef.current;
     if (!host || !mount) return;
@@ -742,7 +757,7 @@ export function ModelStage({ url, preset, framing, clips, defaultClip, lockRoot,
         host.style.removeProperty(`--pin-${index}-hit`);
       }
     };
-  }, [url, preset]);
+  }, [held, url, preset]);
 
   const ready = state === 'ready';
   const listedClips = (clips ?? []).filter((entry) => available.includes(entry.name));

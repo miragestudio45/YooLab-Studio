@@ -1,5 +1,5 @@
 /* ==========================================================================
-   YooStudio — the authoring section (#cong-cu)
+   YooLab — the authoring section (#cong-cu)
 
    ONE file, one layer.
 
@@ -318,8 +318,8 @@
    */
   --ed-teal: #195658;          /* Color/Green Offical */
   --ed-teal-bright: #00aaab;   /* Color/Neon Green */
-  --ed-teal-soft: #96deda;     /* Color/Gradient Brand, light stop */
-  --ed-teal-deep: #50c9c3;     /* Color/Gradient Brand, dark stop */
+  --ed-teal-soft: #8CD9D9;     /* Color/Gradient Brand, light stop */
+  --ed-teal-deep: #00AAAB;     /* Color/Gradient Brand, dark stop */
   --ed-ink: #1c1c1c;           /* Dark/Black Grey 1 */
   --ed-ink-2: #5d7e81;         /* Color/Brand Menu */
   --ed-line: #d9d9d9;          /* Light/Grey Sup 2 — control borders */
@@ -463,7 +463,7 @@
 /* -------------------------------------------------------------- brand --- */
 
 /*
- * The mark is the frame's `Logo YooStudio` (48980:166621), all three layers.
+ * The mark is the frame's `Logo YooLab` (48980:166621), all three layers.
  *
  * It was a rounded square with a teal gradient poured into it and a re-tinted
  * canvas glyph on top: the right colour family, the wrong silhouette. The real
@@ -762,7 +762,7 @@
 .studio-chip--violet { background: linear-gradient(90deg, #d487ff 0%, #b47dff 100%); }
 .studio-chip--peach { background: linear-gradient(90deg, #ffecd2 0%, #fcb69f 100%); }
 .studio-chip--sky { background: linear-gradient(90deg, #a1c4fd 0%, #9fe1ff 100%); }
-.studio-chip--teal { background: linear-gradient(90deg, #96deda 0%, #50c9c3 100%); }
+.studio-chip--teal { background: linear-gradient(90deg, #8CD9D9 0%, #00AAAB 100%); }
 .studio-chip--wide { padding-inline: calc(11 * var(--u)); }
 .studio-chip-caret { font-size: calc(15 * var(--t)); opacity: 0.9; }
 
@@ -1860,12 +1860,12 @@
   flex: none;
   place-items: center;
   border-radius: 50%;
-  background: #ef7b67;
-  box-shadow: 0 5px 12px rgba(214, 91, 73, 0.18);
+  background: #00AAAB;
+  box-shadow: 0 5px 12px rgba(0, 170, 171, 0.18);
   transition: transform 0.24s var(--ease-reveal), box-shadow 0.24s var(--ease-reveal);
 }
 
-.tool-story__cta:hover > i { box-shadow: 0 7px 16px rgba(214, 91, 73, 0.26); transform: translateX(3px); }
+.tool-story__cta:hover > i { box-shadow: 0 7px 16px rgba(0, 170, 171, 0.26); transform: translateX(3px); }
 .tool-story__cta > i > span { position: relative; width: 12px; height: 1.4px; border-radius: 1px; background: #fff; }
 
 .tool-story__cta > i > span::after {
@@ -1975,7 +1975,7 @@
  *
  * A four-panel authoring desktop is not a phone interface, and shrinking one
  * until it fits produces neither. What has to survive here is the *claim* — that
- * YooStudio is a real editor with a real 3D scene on a real timeline — so the
+ * YooLab is a real editor with a real 3D scene on a real timeline — so the
  * rails go, the canvas keeps the room, and the timeline keeps four named tracks
  * and a playhead. Everything removed is a control a thumb could not have hit.
  */

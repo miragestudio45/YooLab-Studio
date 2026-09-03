@@ -787,6 +787,35 @@ const SHOTS = [
     settle: 2200,
   },
   { name: 'education', at: '#giao-duc', settle: 3600 },
+  /*
+   * Education's own detail shots.
+   *
+   * The section stopped being a diagram beside a list and became a picture of
+   * the lesson player, which means it now has the same problem YooStudio and the
+   * Library have: an 11 px rail label, a 17 px pin mark and a 6 px track node are
+   * all invisible at frame scale, and "the tool rail looks fine" is not a claim a
+   * 1512-wide capture can support. Same treatment, same reason.
+   */
+  { name: 'education-player', at: '#giao-duc', settle: 3600, clipOf: { sel: '.edu-viewer', scale: 2 } },
+  { name: 'education-object', at: '#giao-duc', settle: 3600, clipOf: { sel: '.edu-object', scale: 3.4 } },
+  { name: 'education-transport', at: '#giao-duc', settle: 3600, clipOf: { sel: '.edu-transport', scale: 3 } },
+  { name: 'education-tools', at: '#giao-duc', settle: 3600, clipOf: { sel: '.edu-tools', scale: 4 } },
+  { name: 'education-brief', at: '#giao-duc', settle: 2600, clipOf: { sel: '.education-brief', scale: 2.2 } },
+  { name: 'education-features', at: '#giao-duc', settle: 2600, clipOf: { sel: '.education-features', scale: 2.2 } },
+  /* The other two roles, so a tab that only ever gets clicked by hand is not
+     the one place a broken lesson can hide. */
+  {
+    name: 'education-student',
+    at: '#giao-duc',
+    settle: 3200,
+    run: `[...document.querySelectorAll('.education-tabs button')][1].click();`,
+  },
+  {
+    name: 'education-school',
+    at: '#giao-duc',
+    settle: 3200,
+    run: `[...document.querySelectorAll('.education-tabs button')][2].click();`,
+  },
   { name: 'proof', at: '#bai-hoc-mau', settle: 2200 },
   { name: 'cta', at: '#bat-dau-voi-yoolab' },
 ];
@@ -951,7 +980,15 @@ const child = spawn(chrome, [
   '--window-position=-32000,-32000',
   '--no-first-run',
   '--no-default-browser-check',
-  '--disable-features=Translate,MediaRouter',
+  /* `CalculateNativeWinOcclusion` joins the list for the same reason the three
+     flags below it are here: this window is off-screen on purpose, and Chrome
+     backgrounds a renderer it believes nobody can see — which drops
+     `requestAnimationFrame` to about 1 Hz and hands a capture harness a WebGL
+     panel that has composited two frames. See `probe.mjs` for the long version. */
+  '--disable-features=Translate,MediaRouter,CalculateNativeWinOcclusion',
+  '--disable-backgrounding-occluded-windows',
+  '--disable-renderer-backgrounding',
+  '--disable-background-timer-throttling',
   '--force-device-scale-factor=1',
   '--hide-scrollbars',
   '--mute-audio',

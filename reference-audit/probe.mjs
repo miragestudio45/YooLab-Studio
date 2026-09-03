@@ -58,8 +58,10 @@ function connect(url) {
     let buffer = Buffer.alloc(0);
     let upgraded = false;
     const handlers = new Map();
+    const events = new Set();
     let nextId = 1;
     const api = {
+      on(listener) { events.add(listener); return () => events.delete(listener); },
       send(method, params = {}, sessionId) {
         const id = nextId += 1;
         const message = { id, method, params };
@@ -96,7 +98,15 @@ function connect(url) {
         buffer = buffer.subarray(offset + length);
         let message;
         try { message = JSON.parse(payload); } catch { continue; }
-        const waiting = message.id !== undefined ? handlers.get(message.id) : undefined;
+        if (message.id === undefined) {
+          /* A CDP EVENT. These were being parsed and then dropped, which is why
+             this harness could report "nothing rendered" without being able to
+             say why: every console error and every uncaught exception on the
+             page was invisible to it. */
+          for (const listener of events) listener(message);
+          continue;
+        }
+        const waiting = handlers.get(message.id);
         if (!waiting) continue;
         handlers.delete(message.id);
         if (message.error) waiting.fail(new Error(message.error.message));
@@ -124,7 +134,7 @@ const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
  * it at a file of JavaScript, give it a viewport, and it prints whatever that
  * file returns. Used while diagnosing a layout fault, not in CI.
  *
- *   node reference-audit/probe.mjs <script.mjs-ish> [--viewport w1366] [--url ...]
+ *   node reference-audit/probe.mjs <script.mjs-ish> [--viewport w1366] [--url ...] [--dpr 2] [--handheld]
  */
 const argv = process.argv.slice(2);
 const flag = (name, fallback) => {
@@ -141,6 +151,31 @@ const key = flag('--viewport', 'w1366');
    from a command-line flag reliably — CDP's media emulation will. */
 const reduced = argv.includes('--reduced');
 if (reduced) argv.splice(argv.indexOf('--reduced'), 1);
+/*
+ * `--dpr 2`, because half this project's performance questions are retina
+ * questions and this harness could not ask one.
+ *
+ * Every pixel-ratio ceiling in `app/lib/three/deviceTier.ts` is a `Math.min`
+ * against `devicePixelRatio`, so on the 1x display this harness was pinned to,
+ * every one of them is inert and a capture proves nothing about the machines
+ * that were reported as stuttering. The flag drives both Chrome's own scale
+ * factor and CDP's metrics override; they have to agree or the page reports one
+ * ratio and renders at the other.
+ */
+const dpr = Number(flag('--dpr', '1')) || 1;
+/*
+ * `--handheld`, because `mobile: true` is not what the site actually tests for.
+ *
+ * `Emulation.setDeviceMetricsOverride({ mobile: true })` changes the viewport
+ * and the user-agent hints; it does NOT change the `hover` and `pointer` media
+ * features. `app/layout.tsx` and `app/lib/three/deviceTier.ts` both branch on
+ * `(hover: none) and (pointer: coarse)` — the only reliable way to tell a tablet
+ * from the laptop iPadOS claims to be — so without emulating those two features
+ * a 390 px capture takes the DESKTOP branch and the phone budget goes untested.
+ * That is exactly the kind of gap that ships.
+ */
+const handheld = argv.includes('--handheld');
+if (handheld) argv.splice(argv.indexOf('--handheld'), 1);
 const file = argv[0];
 if (!file) { console.error('usage: probe.mjs <file> [--viewport w1366]'); process.exit(1); }
 const source = readFileSync(file, 'utf8');
@@ -157,7 +192,27 @@ const child = spawn(chrome, [
   `--window-size=${width},${height}`,
   '--window-position=-32000,-32000',
   '--no-first-run', '--no-default-browser-check', '--hide-scrollbars',
-  '--force-device-scale-factor=1', '--mute-audio', 'about:blank',
+  /*
+   * Anti-occlusion. Without these, half the numbers this harness prints are lies.
+   *
+   * The window is deliberately off-screen at -32000,-32000 so a capture run does
+   * not steal the desktop. Chrome's native occlusion tracking notices that the
+   * window is not visible and backgrounds the renderer, at which point
+   * `requestAnimationFrame` drops to about 1 Hz — and a frame-time census then
+   * reports a 60 fps page as a 1 fps page with 1,000 ms frames. It is
+   * intermittent, because whether the window is judged occluded depends on what
+   * else is on the desktop, which is exactly what makes it dangerous: a run
+   * looks like a catastrophic regression and re-running it "fixes" the code.
+   *
+   * Three separate mechanisms have to be turned off, because they throttle for
+   * three different reasons: native occlusion detection, renderer backgrounding
+   * and background timer throttling.
+   */
+  '--disable-features=CalculateNativeWinOcclusion',
+  '--disable-backgrounding-occluded-windows',
+  '--disable-renderer-backgrounding',
+  '--disable-background-timer-throttling',
+  `--force-device-scale-factor=${dpr}`, '--mute-audio', 'about:blank',
 ], { stdio: 'ignore' });
 
 try {
@@ -173,14 +228,39 @@ try {
   const send = (method, params) => browser.send(method, params, sessionId);
   await send('Page.enable');
   await send('Runtime.enable');
-  await send('Emulation.setDeviceMetricsOverride', {
-    width, height, deviceScaleFactor: 1, mobile: width < 700,
+  await send('Log.enable').catch(() => {});
+  /*
+   * Everything the page complained about.
+   *
+   * Printed alongside the probe's own result rather than instead of it: a probe
+   * that returns `{ canvases: [] }` and says nothing else is indistinguishable
+   * from a page that legitimately has no canvases, and the difference is usually
+   * one uncaught exception during hydration.
+   */
+  const pageLog = [];
+  browser.on((message) => {
+    if (message.sessionId && message.sessionId !== sessionId) return;
+    const { method, params } = message;
+    if (method === 'Runtime.exceptionThrown') {
+      const detail = params?.exceptionDetails;
+      pageLog.push(`EXCEPTION ${detail?.exception?.description ?? detail?.text ?? 'unknown'}`);
+    } else if (method === 'Runtime.consoleAPICalled' && ['error', 'warning', 'assert'].includes(params?.type)) {
+      const text = (params.args ?? [])
+        .map((arg) => arg.description ?? (arg.value !== undefined ? String(arg.value) : arg.type))
+        .join(' ');
+      pageLog.push(`${String(params.type).toUpperCase()} ${text}`);
+    } else if (method === 'Log.entryAdded' && params?.entry?.level === 'error') {
+      pageLog.push(`LOG ${params.entry.text}`);
+    }
   });
-  if (reduced) {
-    await send('Emulation.setEmulatedMedia', {
-      features: [{ name: 'prefers-reduced-motion', value: 'reduce' }],
-    });
-  }
+  await send('Emulation.setDeviceMetricsOverride', {
+    width, height, deviceScaleFactor: dpr, mobile: width < 700,
+  });
+  const features = [];
+  if (reduced) features.push({ name: 'prefers-reduced-motion', value: 'reduce' });
+  if (handheld) features.push({ name: 'hover', value: 'none' }, { name: 'pointer', value: 'coarse' });
+  if (features.length) await send('Emulation.setEmulatedMedia', { features });
+  if (handheld) await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
   await send('Page.navigate', { url });
   for (let attempt = 0; attempt < 80; attempt += 1) {
     await wait(250);
@@ -200,6 +280,11 @@ try {
     console.error(result.exceptionDetails.exception?.description ?? 'eval failed');
   } else {
     console.log(JSON.stringify(result.result?.value, null, 2));
+  }
+  if (pageLog.length) {
+    console.error(`
+--- page reported ${pageLog.length} problem(s) ---`);
+    for (const line of pageLog.slice(0, 12)) console.error(line.slice(0, 700));
   }
   browser.close();
 } finally {

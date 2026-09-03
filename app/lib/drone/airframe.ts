@@ -208,7 +208,7 @@ export async function createDroneRig(): Promise<DroneRig> {
    * subtle answer to a question the objective line asked directly. A beacon that
    * comes on says it in the first frame.
    */
-  const beacon = new THREE.PointLight(0xe87868, 0, 1.6, 2);
+  const beacon = new THREE.PointLight(0x00aaab, 0, 1.6, 2);
   beacon.position.set(0, 0.012, -0.1);
   root.add(beacon);
 

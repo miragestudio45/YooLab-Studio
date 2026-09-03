@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { pixelRatioCap } from '../../../lib/three/deviceTier';
 
 /**
  * Projectile motion — a real simulation.
@@ -99,7 +100,7 @@ export function ProjectileLab() {
     if (!canvas) return;
     const context = canvas.getContext('2d');
     if (!context) return;
-    const ratio = Math.min(window.devicePixelRatio, 2);
+    const ratio = pixelRatioCap('panel');
     const width = canvas.clientWidth;
     const cssHeight = canvas.clientHeight;
     if (canvas.width !== Math.floor(width * ratio) || canvas.height !== Math.floor(cssHeight * ratio)) {
@@ -111,7 +112,7 @@ export function ProjectileLab() {
 
     const style = getComputedStyle(canvas);
     const ink = style.getPropertyValue('--sim-ink').trim() || '#191720';
-    const accent = style.getPropertyValue('--sim-accent').trim() || '#e87868';
+    const accent = style.getPropertyValue('--sim-accent').trim() || '#00AAAB';
     const line = style.getPropertyValue('--sim-line').trim() || 'rgba(117,91,70,0.2)';
     const muted = style.getPropertyValue('--sim-muted').trim() || '#706a73';
     /*

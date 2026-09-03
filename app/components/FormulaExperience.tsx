@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { CAR_BASE, disposeScene } from '../lib/formula/carRuntime';
 import { createCarWorkshop, type CarWorkshop } from '../lib/formula/carScene';
 import { createProceduralEnvironment, studioEnvironmentPalette } from '../lib/three/environment';
+import { pixelRatioCap } from '../lib/three/deviceTier';
 
 /**
  * The full-screen Formula workshop.
@@ -71,7 +72,7 @@ function FormulaCanvas({
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 0.94;
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+    renderer.setPixelRatio(pixelRatioCap('panel'));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     host.insertBefore(renderer.domElement, host.firstChild);

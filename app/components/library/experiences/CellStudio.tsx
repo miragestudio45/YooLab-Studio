@@ -282,7 +282,7 @@ function shellLayer(
   skin.renderOrder = 6;
   group.add(skin);
   group.add(new THREE.Mesh(rimGeometry, new THREE.MeshBasicMaterial({
-    color: 0xe87868, wireframe: true, transparent: true, opacity: 0.1,
+    color: 0x00aaab, wireframe: true, transparent: true, opacity: 0.1,
   })));
   if (rotateZ) group.rotation.z = rotateZ;
   context.attach(id, group);
