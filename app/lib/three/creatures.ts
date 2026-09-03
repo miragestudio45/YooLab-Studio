@@ -471,6 +471,20 @@ export type FishCreatureOptions = {
   maxAnisotropy?: number;
   /** Optional specimen-only PMREM; keeps a blue world from tinting white scales. */
   environment?: THREE.Texture;
+  /**
+   * Whether the fins may be transmissive.
+   *
+   * `transmission` is not a shading parameter like the others on this material:
+   * the moment ANY visible material in a scene carries it, three renders the
+   * whole opaque scene a SECOND time each frame into a half-resolution
+   * transmission target and generates its mip chain, so the reef behind the fish
+   * is drawn twice for a 0.18 effect on two thin fins. The jellyfish already had
+   * exactly this switch for exactly this reason; the fish did not, and it is the
+   * fish that is on screen for the longer of the two chapters.
+   *
+   * Defaults to true, so nothing that does not ask for the cheap path changes.
+   */
+  transmissive?: boolean;
 };
 
 /**
@@ -506,6 +520,10 @@ export type FishCreatureOptions = {
 export function createFishCreature(gltf: GLTF, options: FishCreatureOptions): CreatureHandle {
   const visual = gltf.scene;
   const ocean = (options.finish ?? 'studio') === 'ocean';
+  /* Wet fins without the second scene pass. Iridescence, clearcoat and the
+     tight roughness all survive — they are per-pixel and cost nothing extra —
+     and what goes is the 0.18 of light that passed THROUGH the fin. */
+  const finTransmission = ocean && (options.transmissive ?? true);
   const fades: FadeTarget[] = [];
   const created: THREE.Material[] = [];
 
@@ -532,8 +550,8 @@ export function createFishCreature(gltf: GLTF, options: FishCreatureOptions): Cr
         alphaTest: ocean ? 0.76 : 0.82,
         opacity: 1,
         depthWrite: true,
-        transmission: ocean ? 0.18 : 0,
-        thickness: ocean ? 0.16 : 0,
+        transmission: finTransmission ? 0.18 : 0,
+        thickness: finTransmission ? 0.16 : 0,
         ior: ocean ? 1.48 : 1.4,
         iridescence: ocean ? 0.48 : 0.4,
         iridescenceIOR: ocean ? 1.48 : 1.28,

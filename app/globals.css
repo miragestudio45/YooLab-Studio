@@ -3193,3 +3193,86 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
  */
 .explore-story,
 .story-panel { scroll-margin-top: 0; }
+
+/* ======================================================== lean GPU budget === */
+/*
+ * What a machine that cannot afford the design does not get.
+ *
+ * `data-gpu="lean"` is stamped on `<html>` before the first paint by the
+ * bootstrap in `app/layout.tsx`, from the same unambiguous signals
+ * `lib/three/deviceTier.ts` reads: a coarse pointer with no hover, four cores or
+ * fewer, four gigabytes or less. Ambiguous machines keep everything.
+ *
+ * The one thing it takes away is the backdrop blur, and the reason is that a
+ * backdrop blur is the only CSS feature on this page whose cost is PER FRAME
+ * rather than once. Everything else here — the shadows, the gradients, the
+ * hairlines — is painted when it changes. A blurred backdrop is recomputed
+ * whenever anything behind it repaints, so the fixed header, which sits over a
+ * full-viewport WebGL canvas for the whole Explore chapter, is re-blurring a
+ * full-width band sixty times a second on top of everything the renderer is
+ * doing. On WebKit that is expensive enough to be visible, and it never appears
+ * in a profile of the render loop because it is not in the render loop.
+ *
+ * Nothing here changes a layout, a size, a colour relationship or a piece of
+ * type. Every surface that was translucent stays translucent; the four that
+ * were translucent ENOUGH to need the blur to be readable get the opacity the
+ * blur was providing, so a 10 px label over a moving reef is still a 10 px
+ * label over a moving reef and not a 10 px label over a reef.
+ */
+:root[data-gpu='lean'] :where(
+  .site-header,
+  .bee-modes,
+  .formula-header,
+  .formula-panel,
+  .bridge-pin,
+  .bridge-viewer,
+  .bridge-viewer-head,
+  .bridge-viewer-context,
+  .bridge-orbit-control,
+  .bridge-orbit-hint,
+  .bridge-hotspot > b,
+  .bridge-layers,
+  .bridge-annotation-panel,
+  .bridge-toolbar,
+  .mobile-nav,
+  .stage-rail,
+  .stage-clips,
+  .stage-guide,
+  .stage-pin-dot,
+  .stage-pin-card,
+  .model-stage-hint,
+  .stage-spin,
+  .practice-live,
+  .practice-open,
+  .practice-tools,
+  .practice-modal-scrim,
+  .lab-badge,
+  .lab-steps,
+  .lab-objective,
+  .lab-hint,
+  .lab-button,
+  .lab-readout,
+  .lab-pad button,
+  .tool-story,
+  .studio-canvas-menu,
+  .studio-canvas-side button,
+  .studio-playbar,
+  .cell-badge,
+  .earth-probe,
+  .earth-scale,
+  .mol-group
+) {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* The four surfaces whose readability was actually coming from the blur. Each
+   one sits over a live canvas, so there is no static ground underneath to
+   borrow contrast from. */
+:root[data-gpu='lean'] .site-header { background: rgba(255, 250, 244, 0.9); }
+:root[data-gpu='lean'] .site-header[data-theme='dark'] { background: rgba(6, 20, 44, 0.86); }
+:root[data-gpu='lean'] .bee-modes { background: rgba(255, 255, 255, 0.88); }
+:root[data-gpu='lean'] .bridge-viewer-context { background: rgba(255, 255, 255, 0.9); }
+:root[data-gpu='lean'] .bridge-toolbar {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(255, 248, 244, 0.94));
+}

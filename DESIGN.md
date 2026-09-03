@@ -425,3 +425,179 @@ lavender for the mechanism and amber for the curiosity, ordered by the component
 rather than by each entry — a column of identically tinted callouts is a column
 with no callouts in it, and no specimen gets to put its curiosity above its
 physics.
+
+---
+
+## 12. Education — one player, three lessons
+
+The section's product is the **lesson player**, and the role tabs change its
+content rather than its shape.
+
+Before this pass each role got a different mock: a "compose" frame with four
+empty rounded squares for a tool rail, an "explore" stage, and a two-by-two
+"deploy" grid. Three shapes with three intrinsic heights meant switching role
+resized the section, and none of the three had room to be more than a diagram of
+itself — the compose frame's timeline was four saturated bars in `#A852FC`,
+`#2B7FFF`, `#00C950` and `#F6339A`, four colours that exist nowhere else on this
+site.
+
+One frame now holds five regions, and the split is the product's own:
+
+| Region | Holds | Why there |
+|---|---|---|
+| left, floating | five tools, one live | the grid runs *under* it, so it reads as a palette on a canvas rather than a second panel |
+| centre | the specimen, a masked ground grid, a contact shadow, three pins | — |
+| top-right | reset / fit / menu | the corner a subject never occupies |
+| bottom bar | play, step readout, a five-node track, auto-rotate, prev/next | its axis is time, so it sits along the bottom |
+| right column | object outline, quick note, media shelf, add-note | it belongs to the specimen, not to the canvas, so it runs full height |
+
+Three rules hold it together:
+
+- **Every string is the Library's own.** The specimen name, its subtitle, its
+  four part names and the quick note are the same strings
+  `lib/library/subjects/biology.ts` publishes for that asset. Nothing here is
+  anatomy invented to fill a label, and swapping a role swaps a lesson that
+  actually exists.
+- **Every mark is one family.** The rail, the stage controls, the transport and
+  the capability row all draw from `studio/EditorIcons` — the generated Figma
+  set. The first pass mixed `IconText`, which is a *filled* hexagon badge, into a
+  column of four line marks, and used `IconComponents` — a square, a triangle, a
+  cross and a circle — for "Tách lớp"; a 4× capture of a 48 px rail is what
+  showed both. The three role marks in the segmented control are the one
+  exception and are authored to the generated set's own language (24-unit box,
+  1.26 stroke, round caps) because that set has no mortarboard and no
+  institution.
+- **A stale reflection, never a stale creature.** The bee's two refraction
+  captures run at 30 Hz; see §13.
+
+### The height contract, and the width it gives up
+
+`.education-stage` is the third section built on the pattern §2 argues for: a
+screen-tall grid, `auto` rows that measure themselves, `minmax(0, 1fr)` for the
+product. `--edu-head` and its hard-coded 66 px tab strip are gone, and with them
+the last token on this site that guessed how tall a heading would be.
+
+It is `height: var(--fit-h)`, not `min-height`. With a minimum only, the grid is
+`auto`-height, a `minmax(0, 1fr)` row resolves to its content's max-content
+height and the panel grows past the viewport — 726 px inside a 665 px budget at
+1024×768, which `measure.mjs` caught and no screenshot would have.
+
+The section's fitted floor moved from **1000 px to 1180 px**, because the player
+needs 64% of the shell before its own panels stop being narrower than the product
+they are a picture of. That leaves the brief a 340 px column at 1024, where five
+rows whose bodies each wrap twice are 420 px of content in a 283 px budget. The
+number is recorded in KNOWN_LIMITATIONS.md and asserted by `measure.mjs`.
+
+---
+
+## 13. The GPU budget — `lib/three/deviceTier.ts`
+
+Every WebGL surface used to pick its own resolution ceiling by hand — 1.75 in the
+editor, 1.6 in the explore canvas, 2 in the thumbnail baker, 1.4/1.75 in the
+Library stage — and three of them then wrote their own adaptive downscaler on
+top, with three sets of thresholds and no way back up. Ten numbers, none
+measured. There is now one module, and it makes two decisions in deliberately
+different ways.
+
+**Everything that can be measured is measured.** Nothing in a user-agent string
+distinguishes an M3 Max from a 2017 Intel Iris — or a 13-inch MacBook Air, which
+reports eight cores, eight gigabytes and a fine pointer, so every signal calls it
+a desktop. `lib/three/qualityLadder.ts` owns an ordered ladder of rungs and walks
+it from frame times alone. The signals survive only as a *starting rung*, so a
+phone does not spend its first seconds discovering that it is a phone; a machine
+that starts low and turns out to be fast climbs all the way back to full.
+
+The order is by what a rung costs the picture, cheapest first, and the ladder
+**stops descending the moment the budget is met** — so the quality given up is
+only ever what it took to hold the frame:
+
+| Rung | Gives up | Why here |
+|---|---|---|
+| 1–3 | Supersampling, down to 1:1 | The only thing on this page nobody can see. A 1x display has none to spend, so it gets no rungs here at all — which is why the list is built from the device's own ceiling rather than written as a constant. |
+| 4 | Suspended dust and god-ray quads | Large, additive, overdraw-heavy, decoration by construction |
+| 5 | Bubbles | Same class, and a crossing effect rather than part of the reef |
+| 6 | Reef instance counts | The coral and rock fields |
+| 7 | Schools, then megafauna | The specimen the chapter is *about* is never touched |
+| 8 | Sharpness below 1:1 | Last, because it is the first rung that spends surplus it does not have |
+
+Every density lever is a `setDrawRange`, an `InstancedMesh.count` or a `visible`
+— see `OceanDensity` in `ocean/scene.ts`. Nothing is reallocated, nothing is
+re-uploaded, and climbing back is free because the buffers still hold every
+authored transform. That is what makes reef density something a measurement can
+move rather than something a device test has to guess right once and live with.
+
+Three guards, and all three are here because a measurement caught the version
+without them:
+
+- **Descending is a hypothesis.** After three rungs the ladder asks whether the
+  frame time actually improved; under 8% and it climbs straight back and refuses
+  to descend for 30 s. The hero of this page is substantially bound by the
+  browser compositing three full-screen layers — a cost set by the CSS box that
+  no rung can reach — and a one-way governor pointed at it slid to its floor and
+  bought 6 fps for a visibly softer picture.
+- **Load is not a frame rate.** Any window containing a frame over 100 ms is
+  discarded, and descending needs two consecutive over-budget windows. At the
+  earlier 250 ms threshold, a window full of 40–150 ms frames from a model
+  arriving had a mean over budget with nothing in it big enough to discard, and a
+  screenshot pass caught the jellyfish chapter running a thinned reef on a
+  machine that holds 60 fps at full density.
+- **Only oscillation is punished.** Climbing takes five consecutive comfortable
+  windows, doubling to forty — but only when a descent *undoes a climb*. Doubling
+  on every descent, including the initial search, left an emulated phone two
+  rungs below what it could hold at a locked 60 fps.
+
+### The context budget — `lib/three/contextRegistry.ts`
+
+Pausing a render loop stops the work; it does not release the context. A full
+page held five at once. On a desktop that is wasted memory; on iOS Safari the
+per-page limit is low and a page over it has the browser **take the oldest
+context away**, which is the difference between a page that stutters and one that
+flickers.
+
+So there are two layers. `visibility.ts` answers "should this draw a frame?".
+This answers "should this hold a context at all?" — keeping the nearest N
+surfaces, N being 2 on a handheld, 3 on a lean device and 4 otherwise. That is
+the one place a device signal is still load-bearing rather than advisory, and it
+has to be: a context limit is a property of the browser, so there is nothing to
+measure.
+
+Managed surfaces gate their existing effect on a boolean (`useManagedContext`)
+rather than exposing a second teardown path. `createLibraryStage` hands its
+renderer to six consumers that call `setRenderTarget`, `capabilities` and
+`setAnimationLoop` on it directly, and one that passes it to a workshop builder;
+swapping that renderer underneath them is not a safe operation, while letting
+React run the component's own cleanup and setup is.
+
+Two surfaces are deliberately outside it:
+
+- **The bee's foreground pass** is chapter-scoped, not distance-scoped, because
+  what decides whether the bee is on screen is the dive. It is built when the bee
+  arrives and released 2.5 s after it leaves, so a scrubbed crossing rebuilds
+  nothing.
+- **The Explore canvas itself is never released.** Rebuilding it means re-parsing
+  a 2.6 MB rigged bee and the whole reef, which is seconds of work charged to the
+  one interaction — scrolling back to the top — that would pay for it. What it
+  gives back instead are its two full-viewport half-float composite targets,
+  about 60 MB at a retina frame, six seconds after it leaves the screen;
+  `ensureTargets` is already lazy, so the composite re-allocates them on the next
+  frame that needs one.
+
+No flash, and the guarantee is structural rather than cosmetic: surfaces are
+admitted at 1.6 viewports and released at 3 — 4.5 for the editor, the page's most
+expensive rebuild — so **every state change happens off screen**. Nothing is
+released within 6 s of being acquired, so a flick through the whole page acquires
+along the way and releases nothing until it settles.
+
+`ExploreCanvas` still distinguishes the two ideas by name, for the decisions that
+genuinely cannot be walked back at runtime: MSAA, seabed tessellation and the
+transmission pass are fixed when the context and the geometry are built.
+`compact` is a **width** and decides composition; `lean` is a **budget**.
+Everything the ladder owns used to be signalled and is now measured.
+
+The stylesheet reads the same tier through `data-gpu="lean"`, stamped on `<html>`
+before the first paint by the bootstrap in `layout.tsx`. It removes exactly one
+thing: the backdrop blurs. A blurred backdrop is the only CSS on this page whose
+cost is **per frame** rather than once — it is recomputed whenever anything
+behind it repaints, and the fixed header sits over a full-viewport WebGL canvas
+for the whole Explore chapter. The four surfaces whose readability was coming
+from the blur get the opacity it was providing.

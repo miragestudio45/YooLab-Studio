@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { LibraryIcon } from '../LibraryIcons';
 import { usePrefersReducedMotion } from '../../../lib/usePrefersReducedMotion';
 import { createVisibilityGate } from '../../../lib/three/visibility';
+import { pixelRatioCap } from '../../../lib/three/deviceTier';
 import { createProceduralEnvironment } from '../../../lib/three/environment';
 import { libraryEnvironmentPalette } from '../../../lib/three/libraryEnvironment';
 import { createContactShadow, createLearningGrid } from '../../../lib/three/studioBackdrop';
@@ -232,7 +233,7 @@ function MoleculeStage({
        "its own renderer" was quietly becoming "its own look". */
     renderer.toneMappingExposure = 0.92;
     renderer.setClearColor(0x000000, 0);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, compact ? 1.4 : 1.7));
+    renderer.setPixelRatio(pixelRatioCap('panel'));
     renderer.domElement.setAttribute('aria-hidden', 'true');
     renderer.domElement.className = 'stage-canvas';
     host.appendChild(renderer.domElement);

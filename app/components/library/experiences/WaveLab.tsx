@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePrefersReducedMotion } from '../../../lib/usePrefersReducedMotion';
+import { pixelRatioCap } from '../../../lib/three/deviceTier';
 
 /**
  * Waves — one engine, three lessons.
@@ -684,7 +685,7 @@ export function WaveLab({ params }: { params?: Record<string, string> }) {
     const width = canvas.clientWidth;
     const height = canvas.clientHeight;
     if (width < 8 || height < 8) return;
-    const ratio = Math.min(window.devicePixelRatio, 2);
+    const ratio = pixelRatioCap('panel');
     if (canvas.width !== Math.floor(width * ratio) || canvas.height !== Math.floor(height * ratio)) {
       canvas.width = Math.floor(width * ratio);
       canvas.height = Math.floor(height * ratio);

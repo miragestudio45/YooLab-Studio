@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { pixelRatioCap } from '../../../lib/three/deviceTier';
 
 /**
  * The inclined plane — a force bench, not an animated block.
@@ -242,7 +243,7 @@ export function InclineLab() {
     if (!canvas) return;
     const context = canvas.getContext('2d');
     if (!context) return;
-    const ratio = Math.min(window.devicePixelRatio, 2);
+    const ratio = pixelRatioCap('panel');
     const width = canvas.clientWidth;
     const height = canvas.clientHeight;
     if (canvas.width !== Math.floor(width * ratio) || canvas.height !== Math.floor(height * ratio)) {

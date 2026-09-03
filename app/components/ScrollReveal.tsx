@@ -1,6 +1,22 @@
 'use client';
 
 import { useEffect } from 'react';
+import * as THREE from 'three';
+import { managedContextReport } from '../lib/three/contextRegistry';
+
+/*
+ * Keep fetched asset bytes in memory for the page's lifetime.
+ *
+ * Now that a stage can be released and re-acquired, its model is fetched again
+ * on the way back — and three's `FileLoader` cache is off by default, so every
+ * remount was a fresh request even though the bytes had not changed. Enabling
+ * it once, at module scope, means a re-acquire pays only for the DRACO decode
+ * and the shader compile.
+ *
+ * Set here rather than in each loader because it is one global switch and this
+ * module is the page's existing run-once client bootstrap.
+ */
+THREE.Cache.enabled = true;
 
 /**
  * The page-wide reveal.
@@ -71,6 +87,22 @@ export function ScrollReveal() {
       observer.disconnect();
       root.classList.remove('reveal-ready');
     };
+  }, []);
+
+  /*
+   * Dev-only census hook.
+   *
+   * Hung off this component because it is the page's existing run-once client
+   * bootstrap, and because the question "how many GPU contexts is this page
+   * holding right now, and which ones" has no other answer available from
+   * outside: `document.querySelectorAll('canvas')` counts elements, and a
+   * released surface has no element to count.
+   */
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'production') return;
+    const target = window as unknown as { __contexts?: unknown };
+    target.__contexts = managedContextReport;
+    return () => { delete target.__contexts; };
   }, []);
 
   return null;

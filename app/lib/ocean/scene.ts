@@ -93,6 +93,29 @@ type ReefLayout = {
   schools: Record<string, [number, number, number][]>;
 };
 
+/**
+ * How much of the authored reef to actually draw, as fractions of what was
+ * built. Every field is safe to change on any frame.
+ *
+ * These are deliberately not build-time options. Each one maps onto a draw
+ * range or an instance count — `setDrawRange` on the two particle systems,
+ * `InstancedMesh.count` on the reef and the schools, `visible` on the megafauna
+ * — so nothing is reallocated, nothing is re-uploaded, and going back up is
+ * free because the buffers still hold every authored transform. That is what
+ * lets `lib/three/qualityLadder.ts` treat reef density as something it can
+ * measure its way into and out of, rather than something a user-agent test has
+ * to guess correctly once and live with.
+ */
+export type OceanDensity = {
+  /** Suspended dust and the god-ray quads. */
+  particles: number;
+  bubbles: number;
+  /** Coral and rock instance counts. */
+  reef: number;
+  /** School sizes; at 0 the megafauna and ambient clownfish leave too. */
+  fauna: number;
+};
+
 export type OceanWorld = {
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera;
@@ -103,6 +126,12 @@ export type OceanWorld = {
   environment: THREE.Texture;
   update(delta: number, elapsed: number, dive: number, presence: { fish: number; jelly: number }): void;
   resize(aspect: number): void;
+  /**
+   * Draw less of the reef, without rebuilding any of it. Never touches the
+   * specimen the chapter is about — the fish and the jellyfish are owned by
+   * `ExploreCanvas` and are not in this scene's density accounting at all.
+   */
+  setDensity(density: OceanDensity): void;
   dispose(): void;
 };
 
@@ -1113,9 +1142,14 @@ export async function createOceanWorld(
   scene.add(caustics.mesh);
   const rays = createRays(compact ? 3 : 5);
   scene.add(rays.group);
-  const dust = createDust(compact ? 900 : 1900);
+  /* The authored counts are kept because the density control expresses itself
+     as a FRACTION of what was built, and once a draw range has been narrowed
+     the buffer no longer says how long it originally was. */
+  const dustCount = compact ? 900 : 1900;
+  const dust = createDust(dustCount);
   scene.add(dust);
-  const bubbles = createBubbles(compact ? 220 : 520);
+  const bubbleCount = compact ? 220 : 520;
+  const bubbles = createBubbles(bubbleCount);
   bubbles.material.uniforms.uPixelRatio.value = renderer.getPixelRatio();
   scene.add(bubbles.points);
 
@@ -1597,6 +1631,15 @@ export async function createOceanWorld(
   /* ------------------------------------------------------------------ frame --- */
   let aspect = 1;
 
+  /* Filled on the first `setDensity` call — see the note there for why it
+     cannot be built here. */
+  let densityTargets: {
+    reefMeshes: { mesh: THREE.InstancedMesh; max: number }[];
+    schoolMeshes: { mesh: THREE.InstancedMesh; max: number }[];
+    megafauna: THREE.Object3D[];
+    ambient: THREE.Object3D[];
+  } | null = null;
+
   return {
     scene,
     camera,
@@ -1608,6 +1651,45 @@ export async function createOceanWorld(
       aspect = next;
       camera.aspect = aspect;
       camera.updateProjectionMatrix();
+    },
+    setDensity(density) {
+      /* Snapshotted on first use rather than at construction: `swimmers` and
+         the organimo reef are filled by awaited loads further down this
+         function, so a list taken at build time would be short. */
+      if (!densityTargets) {
+        const reefMeshes: { mesh: THREE.InstancedMesh; max: number }[] = [];
+        reef.traverse((object) => {
+          const mesh = object as THREE.InstancedMesh;
+          if (mesh.isInstancedMesh) reefMeshes.push({ mesh, max: mesh.count });
+        });
+        densityTargets = {
+          reefMeshes,
+          schoolMeshes: schools.map((school) => ({ mesh: school.mesh, max: school.mesh.count })),
+          megafauna: swimmers.map((swimmer) => swimmer.root),
+          ambient: clownSwimmers.map((swimmer) => swimmer.root),
+        };
+      }
+      const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
+      const particles = clamp01(density.particles);
+      dust.geometry.setDrawRange(0, Math.round(dustCount * particles));
+      bubbles.points.geometry.setDrawRange(0, Math.round(bubbleCount * clamp01(density.bubbles)));
+      /* One shaft always survives: the rays are what say "this is sunlight
+         through water", and none at all is a different scene rather than a
+         cheaper one. */
+      const rayKeep = Math.max(1, Math.round(rays.group.children.length * particles));
+      for (let i = 0; i < rays.group.children.length; i += 1) {
+        rays.group.children[i].visible = i < rayKeep;
+      }
+      const reefFraction = clamp01(density.reef);
+      for (const entry of densityTargets.reefMeshes) {
+        entry.mesh.count = Math.max(1, Math.round(entry.max * reefFraction));
+      }
+      const fauna = clamp01(density.fauna);
+      for (const entry of densityTargets.schoolMeshes) {
+        entry.mesh.count = Math.round(entry.max * fauna);
+      }
+      for (const root of densityTargets.megafauna) root.visible = fauna > 0.2;
+      for (const root of densityTargets.ambient) root.visible = fauna > 0;
     },
     update(delta: number, elapsed: number, dive: number, presence: { fish: number; jelly: number }) {
       placeOceanCamera(camera, dive);

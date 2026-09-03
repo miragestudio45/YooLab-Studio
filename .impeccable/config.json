@@ -35,6 +35,15 @@
         ],
         "createdAt": "2026-08-28T02:14:50.221Z",
         "reason": "incumbent committed world: the italic em in every display heading on this page carries the same accent-to-lavender gradient (globals.css:521-526, seven selectors). The Library heading matching it is page consistency, not a Library decision; de-gradienting this one heading alone would make it the odd band."
+      },
+      {
+        "rule": "codex-grid-background",
+        "value": "*",
+        "files": [
+          "app/styles/sections.css"
+        ],
+        "createdAt": "2026-09-02T17:20:36.400Z",
+        "reason": "Claude: .edu-viewer-floor is the ground plane of the lesson player's 3D viewport (inside .edu-viewer-stage), which is the canvas/measurement case the rule exempts, not page decoration. It is bottom-masked (linear 34-78% intersected with a radial pool at 52%/96%) so no line is visible beside the specimen's bell, and a contact-shadow ellipse on the same surface aligns with it so the model reads as standing on it. The user's reference image for this section shows this exact grid in this exact place."
       }
     ]
   }

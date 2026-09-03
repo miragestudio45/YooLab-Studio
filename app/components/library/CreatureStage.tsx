@@ -14,6 +14,7 @@ import {
   type CreatureHandle,
 } from '../../lib/three/creatures';
 import { createLibraryStage } from '../../lib/three/libraryEnvironment';
+import { useManagedContext } from '../../lib/three/useManagedContext';
 import type { LearningGrid } from '../../lib/three/studioBackdrop';
 import { createOrbitRig, createSubjectFit, type OrbitRig, type SubjectFit } from '../../lib/three/framing';
 import type { BeeMaterialSet } from '../../lib/three/beeOptics';
@@ -161,7 +162,21 @@ export function CreatureStage({
     learningGridRef.current?.setVisible(gridVisible);
   }, [gridVisible]);
 
+  /*
+   * Under the page's context budget — see `lib/three/useManagedContext.ts`.
+   *
+   * The stage's own `active()` gate already stops it drawing while it is off
+   * screen. This stops it HOLDING a GPU context while it is far off screen,
+   * which matters on iOS Safari where the per-page limit is low enough that a
+   * page over it has the browser take the oldest context away from whichever
+   * canvas owns it — the difference between a page that stutters and one that
+   * flickers. React runs this component's real cleanup and real setup on either
+   * side of the change, so there is no second teardown path to keep correct.
+   */
+  const held = useManagedContext(hostRef, 'library-creature', 1);
+
   useEffect(() => {
+    if (!held) return;
     const host = hostRef.current;
     const mount = viewRef.current;
     if (!host || !mount) return;
@@ -434,7 +449,7 @@ export function CreatureStage({
         host.style.removeProperty(`--anchor-${key}-visible`);
       }
     };
-  }, [appearance, creature, initialSpin]);
+  }, [held, appearance, creature, initialSpin]);
 
   useEffect(() => {
     if (state !== 'ready' || !mode) return;
