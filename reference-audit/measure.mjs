@@ -68,7 +68,11 @@ const TARGETS = [
    * role's claim and lede) with the list and the shot following, so a report of
    * "CUT" there would be the probe describing the design as a defect.
    */
-  { id: 'giao-duc', must: '.education-panel', label: 'Education panel', fitAbove: 1000 },
+  /* 1180, not 1000. The section's product became a five-region application that
+     needs 64% of the shell, which leaves its brief column too narrow to fit a
+     five-row list at 1024. See the note in `sections.css` and the table in
+     KNOWN_LIMITATIONS.md. */
+  { id: 'giao-duc', must: '.education-panel', label: 'Education panel', fitAbove: 1180 },
   { id: 'bai-hoc-mau', must: '.proof-grid', label: 'Proof row', fitAbove: 700 },
   { id: 'bat-dau-voi-yoolab', must: '.final-cta > div:last-child', label: 'CTA actions' },
 ];

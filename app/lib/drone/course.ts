@@ -31,8 +31,8 @@ import * as THREE from 'three';
  * the lesson is done, which is what the free-flight mode is for.
  */
 
-const CORAL = 0xe87868;
-const CORAL_DEEP = 0xc95f52;
+const CORAL = 0x00aaab;
+const CORAL_DEEP = 0x008c8d;
 const SAGE = 0x769d74;
 const LAVENDER = 0x8d6bcc;
 

@@ -1,4 +1,4 @@
-import { BrandMark } from './components/BrandMark';
+import { BrandLockup } from './components/BrandMark';
 import { BridgeSection } from './components/BridgeSection';
 import { EducationSection } from './components/EducationSection';
 import { ExploreStory } from './components/ExploreStory';
@@ -18,7 +18,7 @@ import { IconQuiz, IconSpace, IconSteps, IconText } from './components/studio/Ed
  *
  *   01 Explore    what is YooLab?              (Bee -> Fish -> Jellyfish)
  *   02 Bridge     that was a lesson — and you can build it
- *   03 YooStudio  how do I make one?
+ *   03 YooLab  how do I make one?
  *   04 Workflow   where does a lesson go?      (one ribbon, not a section)
  *   05 Library    where does content come from? (the multi-subject workspace)
  *   06 Practice   what can I simulate?
@@ -144,15 +144,14 @@ export default function Home() {
 
         <footer className="site-footer">
           <div className="footer-brand">
-            <BrandMark size={42} />
-            <b>YooLab</b>
+            <BrandLockup height={26} />
             <p>Không gian học tập 3D/XR<br />cho một thế hệ tò mò.</p>
           </div>
           <div className="footer-links">
             <div>
               <b>Sản phẩm</b>
               <a href="#kham-pha">Khám phá</a>
-              <a href="#cong-cu">YooStudio</a>
+              <a href="#cong-cu">YooLab</a>
               <a href="#thu-vien">Thư viện</a>
               <a href="#thuc-hanh">Thực hành &amp; STEM</a>
             </div>

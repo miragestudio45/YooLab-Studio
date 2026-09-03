@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { createProceduralEnvironment, exploreEnvironmentPalette } from './environment';
+import { pixelRatioCap } from './deviceTier';
 import { loadLibraryGltf, refreshSkinnedBounds, registerSpecularGlossiness } from './creatures';
 
 /**
@@ -70,7 +71,17 @@ function ensureRuntime(): Runtime {
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 0.96;
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  /*
+   * 1.5, not 2 — and 1 on a lean device.
+   *
+   * A bake is 560 x 420 and is then displayed at 56 px in the Library rail, 44 px
+   * in the knowledge panel and at most ~500 px on the education stage. Ratio 2
+   * on top of that was four times the fragment work of ratio 1 for pixels that
+   * are scaled DOWN everywhere they appear — and because this queue is
+   * serialised, they delayed the next chip in the rail rather than costing
+   * nothing.
+   */
+  renderer.setPixelRatio(pixelRatioCap('thumb'));
   renderer.setClearColor(0x000000, 0);
   const draco = new DRACOLoader();
   draco.setDecoderPath('/asset/draco/');

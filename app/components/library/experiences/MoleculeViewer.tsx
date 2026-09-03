@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { LibraryIcon } from '../LibraryIcons';
 import { usePrefersReducedMotion } from '../../../lib/usePrefersReducedMotion';
 import { createVisibilityGate } from '../../../lib/three/visibility';
+import { pixelRatioCap } from '../../../lib/three/deviceTier';
 import { createProceduralEnvironment } from '../../../lib/three/environment';
 import { libraryEnvironmentPalette } from '../../../lib/three/libraryEnvironment';
 import { createContactShadow, createLearningGrid } from '../../../lib/three/studioBackdrop';
@@ -56,7 +57,7 @@ const MODE_LIST: { id: RenderMode; label: string; hint: string }[] = [
 const BOND_RADIUS: Record<RenderMode, number> = { ball: 0.07, space: 0, wire: 0.05 };
 
 /** Highlight for the selected atom and for the atoms being measured. */
-const HIGHLIGHT = new THREE.Color('#e87868');
+const HIGHLIGHT = new THREE.Color('#00AAAB');
 
 const UNIT_X = new THREE.Vector3(1, 0, 0);
 const UNIT_Y = new THREE.Vector3(0, 1, 0);
@@ -232,7 +233,7 @@ function MoleculeStage({
        "its own renderer" was quietly becoming "its own look". */
     renderer.toneMappingExposure = 0.92;
     renderer.setClearColor(0x000000, 0);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, compact ? 1.4 : 1.7));
+    renderer.setPixelRatio(pixelRatioCap('panel'));
     renderer.domElement.setAttribute('aria-hidden', 'true');
     renderer.domElement.className = 'stage-canvas';
     host.appendChild(renderer.domElement);
@@ -364,7 +365,7 @@ function MoleculeStage({
     const guidePoints = new THREE.BufferAttribute(new Float32Array(9), 3);
     guideGeometry.setAttribute('position', guidePoints);
     const guideMaterial = new THREE.LineBasicMaterial({
-      color: 0xc95f52, transparent: true, opacity: 0.85,
+      color: 0x008c8d, transparent: true, opacity: 0.85,
     });
     const guide = new THREE.Line(guideGeometry, guideMaterial);
     guide.visible = false;

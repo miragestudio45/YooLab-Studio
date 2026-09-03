@@ -136,7 +136,7 @@ export function ExploreStory() {
               </a>
               <a className="text-button" href="#cong-cu">
                 <span className="play-icon" aria-hidden="true">▶</span>
-                Mở YooStudio
+                Mở YooLab
               </a>
             </div>
           </div>

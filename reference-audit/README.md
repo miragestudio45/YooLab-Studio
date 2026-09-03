@@ -13,6 +13,8 @@ shipping as website assets.
 | `design/ezgif-1b0b7f3260a94a.webp` | Reference raster | Unused by the site |
 | `design/Background/1.jpg` | Earlier background candidate | Superseded by the liquid shader |
 
-The YooLab mark in `app/components/BrandMark.tsx` and `public/brand/yoolab-mark.svg`
-is traced from `design/figma.png`. If an official vector logo ever arrives,
-replace those two files rather than re-tracing.
+The YooLab mark **used to be** traced from `design/figma.png`. It no longer is:
+`public/brand/yoolab-logo.svg` and `public/brand/yoolab-icon.svg` are the
+official vectors, and `app/components/BrandMark.tsx` is generated from them by
+`scripts/build-brand-mark.mjs`. Nothing about the mark is read off this
+screenshot any more — only the YooStudio timeline colours still are.

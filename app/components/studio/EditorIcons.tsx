@@ -1,5 +1,5 @@
 /**
- * The YooStudio editor icon set — GENERATED, do not edit by hand.
+ * The YooLab editor icon set — GENERATED, do not edit by hand.
  *
  * Source: the Figma frame this section reproduces (file gNiA73XdPHkMVBCyB6dKTH,
  * node 48976:106200), exported node by node into
@@ -31,8 +31,8 @@ export const IconCreate = ({ className }: IconProps) => (
     </g>
     <defs>
     <linearGradient id="create-paint0_linear_0_77" x1="0" y1="22" x2="44" y2="22" gradientUnits="userSpaceOnUse">
-    <stop stopColor="#96DEDA"/>
-    <stop offset="1" stopColor="#50C9C3"/>
+    <stop stopColor="#8CD9D9"/>
+    <stop offset="1" stopColor="#00AAAB"/>
     </linearGradient>
     </defs>
   </svg>

@@ -218,7 +218,7 @@ export function LibraryWorkspace() {
         height so the app could subtract it, and every time the band gained a
         line the workspace lost the bottom of a panel at whichever width the
         estimate went wrong. The layout engine measures the real heading now.
-        See DESIGN.md §2, which learned this the same way in YooStudio.
+        See DESIGN.md §2, which learned this the same way in YooLab.
       */}
       <div className="library-stage">
         {/* ----------------------------------------------------- head band --- */}

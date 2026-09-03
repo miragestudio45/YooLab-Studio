@@ -12,6 +12,9 @@ import {
   type MaterialShader,
 } from '../lib/formula/carRuntime';
 import { createProceduralEnvironment, studioEnvironmentPalette } from '../lib/three/environment';
+import { createVisibilityGate } from '../lib/three/visibility';
+import { pixelRatioCap } from '../lib/three/deviceTier';
+import { useManagedContext } from '../lib/three/useManagedContext';
 import {
   IconAi, IconAudio, IconBell, IconCamera, IconChevronDown, IconClock, IconClose, IconCollapse,
   IconComponents, IconCopy, IconCreate, IconCube3d, IconDecor, IconDuplicate, IconEffects,
@@ -158,7 +161,7 @@ const NOTE_DIRECTIONS: { path: string; dot: [number, number] }[] = [
 
 /* --------------------------------------------------------------- 3D stage --- */
 
-function CarViewport({ mode, explode, playing, light, showGrid, resetKey, onReady, onError }: {
+function CarViewport({ mode, explode, playing, light, showGrid, resetKey, onReady, onRelease, onError }: {
   mode: StudioMode;
   explode: number;
   playing: boolean;
@@ -166,6 +169,8 @@ function CarViewport({ mode, explode, playing, light, showGrid, resetKey, onRead
   showGrid: boolean;
   resetKey: number;
   onReady: () => void;
+  /** Called when the GPU context is handed back, so the parent can un-ready. */
+  onRelease: () => void;
   onError: () => void;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -183,7 +188,24 @@ function CarViewport({ mode, explode, playing, light, showGrid, resetKey, onRead
   useEffect(() => { gridRef.current = showGrid; }, [showGrid]);
   useEffect(() => { resetRef.current = resetKey; }, [resetKey]);
 
+  /*
+    * Under the page's context budget.
+    *
+    * The gate a few hundred lines down stops this editor DRAWING while it is off
+    * screen, which was worth 58 million triangles a second. This stops it
+    * HOLDING a GPU context while it is far off screen, which is a different
+    * problem with a different victim: on iOS Safari the per-page context limit
+    * is low, and a page over it has the browser take the oldest context away
+    * from whichever canvas happens to own it.
+    */
+  /* 4.5 viewports, not the default 3: this is the page's most expensive surface
+     to rebuild (measured at 1.3–2 s to a finished car with warm bytes), so it is
+     only released once the visitor is clearly past the editor. A device with
+     real context pressure still displaces it — see `releaseViewports`. */
+  const held = useManagedContext(hostRef, 'studio-car', 1, 4.5);
+
   useEffect(() => {
+    if (!held) return;
     const host = hostRef.current;
     if (!host) return;
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -203,9 +225,23 @@ function CarViewport({ mode, explode, playing, light, showGrid, resetKey, onRead
      */
     renderer.toneMapping = THREE.NeutralToneMapping;
     renderer.toneMappingExposure = 1.16;
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
+    renderer.setPixelRatio(pixelRatioCap('panel'));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    /*
+     * The shadow map is re-rendered when the car moves, not every frame.
+     *
+     * `PCFSoftShadowMap` on one directional light is a second full depth pass
+     * over the whole car — about 400 k triangles — and three's default is to
+     * redraw it on every frame forever. This car is stationary except while the
+     * kit is exploding or drive mode is playing, and a directional light's
+     * shadow does not depend on where the CAMERA is, so orbiting the viewport
+     * changes nothing in that map. `autoUpdate: false` plus an explicit
+     * `needsUpdate` on the frames that actually moved something removes the pass
+     * from every other frame.
+     */
+    renderer.shadowMap.autoUpdate = false;
+    renderer.shadowMap.needsUpdate = true;
     renderer.domElement.style.touchAction = 'none';
     host.appendChild(renderer.domElement);
 
@@ -389,6 +425,21 @@ function CarViewport({ mode, explode, playing, light, showGrid, resetKey, onRead
         carVisual = gltf.scene;
         carPieces.push(...prepareCarVisual(carVisual, carMaterials.materials, 4.7));
         carRoot.add(carVisual);
+        /*
+         * Compile now, off the render loop, so the gate below can be tight.
+         *
+         * The editor's programs are the reason a visibility gate on this canvas
+         * needed a generous margin: a car with fourteen materials, a shadow map
+         * and a custom kit-assembly shader injected into every one of them
+         * compiles in one long frame, and if that frame is the first one after
+         * the section scrolls into view then the visitor sees the stutter. With
+         * the programs already built, resuming is one ordinary frame — which is
+         * what lets the margin come down from 220 px to 60 and stops this
+         * viewport from drawing 36 million triangles a second while the visitor
+         * is two sections away reading the Library.
+         */
+        renderer.compile(scene, camera);
+        renderer.shadowMap.needsUpdate = true;
         host.dataset.ready = 'true';
         onReady();
       })
@@ -448,10 +499,42 @@ function CarViewport({ mode, explode, playing, light, showGrid, resetKey, onRead
     const rollQuaternion = new THREE.Quaternion();
     const cameraTarget = new THREE.Vector3();
     const lookTarget = new THREE.Vector3();
+    /*
+     * THE GATE. This editor is not the only thing on the page.
+     *
+     * Every other WebGL panel in this project pauses while it is off screen —
+     * `ExploreCanvas`, `FormulaPreview`, the Library's shared stage, every
+     * Practice lab. This one did not, and it was the single most expensive
+     * mistake on the site: a per-canvas draw-call census taken while parked on
+     * each section measured this viewport at **9,200 draw calls and 58 million
+     * triangles per second on every section of the page**, footer included. It
+     * was 41% of all GPU work during the jellyfish chapter, which is one of the
+     * two chapters that had been reported as stuttering, and it was drawing a
+     * car nobody could see.
+     *
+     * The margin is deliberately small. `rootMargin` is symmetric, so a
+     * generous one keeps the editor running long after the visitor has scrolled
+     * past it — at 220 px this viewport was still measured at 36 M triangles a
+     * second with the Library section filling the screen, because the editor's
+     * section is exactly one viewport tall and its bottom edge was still inside
+     * the margin. The arrival stutter that a margin exists to prevent is handled
+     * properly instead, by `renderer.compile` above.
+     */
+    const gate = createVisibilityGate(host.closest('.tool-section') ?? host, 60);
+    let tabVisible = document.visibilityState !== 'hidden';
+    const onVisibility = () => { tabVisible = document.visibilityState !== 'hidden'; };
+    document.addEventListener('visibilitychange', onVisibility);
+
+    /* What the shadow map is allowed to ignore: a frame where nothing that casts
+       one has moved. Seeded true so the first shadow is drawn. */
+    let shadowKit = -1;
+    let shadowCarX = Number.NaN;
+
     const timer = new THREE.Timer();
     renderer.setAnimationLoop(() => {
       timer.update();
       const delta = Math.min(timer.getDelta(), 0.05);
+      if (!gate.visible() || !tabVisible) return;
       const targetKit = modeRef.current === 'assemble' ? explodeRef.current / 100 : 0;
       kitProgress += (targetKit - kitProgress) * Math.min(1, delta * 4.8);
       for (const group of shaderGroups) {
@@ -516,12 +599,36 @@ function CarViewport({ mode, explode, playing, light, showGrid, resetKey, onRead
       camera.position.lerp(cameraTarget, 1 - Math.pow(0.025, delta));
       lookTarget.set(carRoot.position.x, -0.26, 0);
       camera.lookAt(lookTarget);
+
+      /* Redraw the depth pass only on frames where the car actually moved. The
+         thresholds are a tenth of a shadow-map texel at this light distance, so
+         nothing visible is ever a frame stale. */
+      if (Math.abs(kitProgress - shadowKit) > 0.0004 || Math.abs(carRoot.position.x - shadowCarX) > 0.0008) {
+        shadowKit = kitProgress;
+        shadowCarX = carRoot.position.x;
+        renderer.shadowMap.needsUpdate = true;
+      }
+
       renderer.render(scene, camera);
     });
 
     return () => {
       disposed = true;
+      /*
+       * The ready flag has to go with the canvas.
+       *
+       * This effect can now run more than once — the context registry releases
+       * this surface when it is three viewports away and re-acquires it on the
+       * way back — and a `data-ready` left set on a host with no canvas in it is
+       * a lie about the component's own state. A probe caught it before a
+       * visitor could: it read `ready` while the canvas was absent, which is
+       * exactly the state a loading poster keys off.
+       */
+      delete host.dataset.ready;
+      onRelease();
       renderer.setAnimationLoop(null);
+      gate.dispose();
+      document.removeEventListener('visibilitychange', onVisibility);
       observer.disconnect();
       renderer.domElement.removeEventListener('pointerdown', onPointerDown);
       renderer.domElement.removeEventListener('pointermove', onPointerMove);
@@ -536,7 +643,7 @@ function CarViewport({ mode, explode, playing, light, showGrid, resetKey, onRead
       renderer.dispose();
       renderer.domElement.remove();
     };
-  }, [onError, onReady]);
+  }, [held, onError, onReady, onRelease]);
 
   return <div className="studio-car-viewport" ref={hostRef} aria-label="Mô hình xe Formula 3D tương tác" />;
 }
@@ -578,6 +685,9 @@ export function StudioDemo() {
   const duration = space.duration;
   const progress = (Math.min(time, duration) / duration) * 100;
   const handleReady = useCallback(() => setReady(true), []);
+  /* The viewport's context can be released and rebuilt now, so "ready" is a
+     state that can go backwards. */
+  const handleRelease = useCallback(() => setReady(false), []);
   const handleError = useCallback(() => setFailed(true), []);
 
   useEffect(() => {
@@ -688,6 +798,7 @@ export function StudioDemo() {
               mode={mode}
               onError={handleError}
               onReady={handleReady}
+              onRelease={handleRelease}
               playing={playing}
               resetKey={resetKey}
               showGrid={showGrid}

@@ -10,10 +10,14 @@ export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? 'https://yoolab.vn'),
   title: TITLE,
   description: DESCRIPTION,
-  icons: { icon: '/brand/yoolab-mark.svg' },
+  icons: {
+    icon: [{ url: '/brand/yoolab-icon.svg', type: 'image/svg+xml' }],
+    shortcut: '/brand/yoolab-icon.svg',
+    apple: '/brand/yoolab-icon.svg',
+  },
   openGraph: {
     title: TITLE,
-    description: 'Thư viện học liệu 3D đa môn, không gian biên soạn YooStudio và các trải nghiệm tương tác.',
+    description: 'Thư viện học liệu 3D đa môn, không gian biên soạn YooLab và các trải nghiệm tương tác.',
     type: 'website',
     locale: 'vi_VN',
     images: [{ url: '/og.png', width: 1792, height: 933, alt: 'YooLab — Không gian học tập 3D' }],
@@ -21,7 +25,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: TITLE,
-    description: 'Thư viện học liệu 3D đa môn, không gian biên soạn YooStudio và các trải nghiệm tương tác.',
+    description: 'Thư viện học liệu 3D đa môn, không gian biên soạn YooLab và các trải nghiệm tương tác.',
     images: ['/og.png'],
   },
 };
@@ -46,6 +50,31 @@ const REVEAL_BOOTSTRAP = `try{
       if(!document.querySelector('[data-reveal][data-revealed]')) d.classList.remove('reveal-ready');
     },2500);
   }
+  /*
+   * The GPU tier, stamped before the first paint.
+   *
+   * data-gpu="lean" is what lets the STYLESHEET spend less on a machine that
+   * cannot afford it — specifically the backdrop blurs, which are the one CSS
+   * feature on this page that costs per frame rather than once. A blurred
+   * backdrop over a surface that is repainting sixty times a second is
+   * re-blurred sixty times a second, and the fixed header sits over a
+   * full-viewport WebGL canvas for the entire Explore chapter. On WebKit that
+   * is the most expensive rule on the page and it is invisible in a profile of
+   * the render loop, because it is not in the render loop.
+   *
+   * It has to be a pre-paint inline script rather than a React effect for the
+   * same reason \`reveal-ready\` does: a header that mounts blurred and then
+   * un-blurs is worse than one that was never blurred.
+   *
+   * The test is the same one \`lib/three/deviceTier.ts\` makes — kept in sync by
+   * hand because this string runs before any module is parsed — and it errs
+   * toward keeping the design: only unambiguous evidence downgrades.
+   */
+  var n=navigator;
+  var handheld=matchMedia('(hover: none) and (pointer: coarse)').matches;
+  var cores=n.hardwareConcurrency||8;
+  var mem=n.deviceMemory||0;
+  if(handheld||cores<=4||(mem>0&&mem<=4)) d.setAttribute('data-gpu','lean');
 }catch(e){}`;
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

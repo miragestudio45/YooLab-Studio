@@ -21,6 +21,8 @@ import {
   type CreatureHandle,
 } from '../lib/three/creatures';
 import { createVisibilityGate } from '../lib/three/visibility';
+import { isLeanDevice, pixelRatioCap } from '../lib/three/deviceTier';
+import { createQualityLadder } from '../lib/three/qualityLadder';
 import { createOceanWorld, type OceanWorld } from '../lib/ocean/scene';
 import { OCEAN_CAMERA, oceanFovFor } from '../lib/ocean/camera';
 import { frameSubject, seabedSafeY, SUBJECT_STAGES, type SubjectPlacement } from '../lib/ocean/stage';
@@ -276,11 +278,47 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
 
   useEffect(() => {
     const host = hostRef.current;
-    const foregroundHost = foregroundHostRef.current;
-    if (!host || !foregroundHost) return;
+    const foregroundHostMaybe = foregroundHostRef.current;
+    if (!host || !foregroundHostMaybe) return;
+    /*
+     * An explicitly typed alias, because narrowing does not cross a hoisted
+     * `function` declaration.
+     *
+     * TypeScript carries a `const`'s narrowed type into arrow functions, but a
+     * `function` declaration can be called before the narrowing runs, so inside
+     * `drawBeeForeground` below the compiler falls back to the DECLARED type —
+     * `HTMLDivElement | null`. Annotating the alias makes the declared type
+     * non-null, which is the honest fix rather than a `!` at the use site.
+     */
+    const foregroundHost: HTMLDivElement = foregroundHostMaybe;
     const story = host.closest('.explore-story') as HTMLElement | null;
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const compact = window.matchMedia('(max-width: 780px)').matches;
+    /*
+     * Two different questions, and they used to have one answer.
+     *
+     * `compact` is a WIDTH: it decides composition — how the copy sits, how the
+     * creature is fitted, whether a second reef layer is clutter in a 390 px
+     * frame. `lean` is a BUDGET: it decides how much geometry the reef is built
+     * out of. A 13-inch MacBook Air at 1512 px is not compact and is very much
+     * lean, and because every density knob in `ocean/scene.ts` keyed off
+     * `compact` alone, that machine was handed the full-fat reef — a 128 x 420
+     * seabed, 1,900 dust motes, 520 bubbles — while its integrated GPU was the
+     * one being reported as stuttering.
+     */
+    const lean = compact || isLeanDevice();
+    /*
+     * Where the ladder BEGINS — the only thing the device signals still decide.
+     *
+     * A handheld starts a few rungs down so its first seconds are not spent
+     * discovering that it is a phone; anything else starts at or near full. The
+     * numbers are deliberately shallow — a measurement two seconds away is
+     * worth more than a guess now, and an emulated phone measured a locked
+     * 60 fps at rung 4 while the old start of 4 was keeping it there. Neither is
+     * a verdict: either can end up anywhere on the ladder, including full
+     * quality on a device this test called weak.
+     */
+    const startRung = compact ? 3 : (isLeanDevice() ? 1 : 0);
 
     /* ================================================================ land === */
     const landScene = new THREE.Scene();
@@ -288,55 +326,157 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
     landCamera.position.copy(LAND_SHOTS[0].position);
     landScene.add(landCamera);
 
-    const maxPixelRatio = compact ? 1.3 : 1.6;
+    /* One place decides this now, for every canvas on the site. See
+       `lib/three/deviceTier.ts` for why the retina ceiling came down. */
+    const maxPixelRatio = pixelRatioCap('cinema');
     const renderer = new THREE.WebGLRenderer({
-      antialias: !compact,
+      /* MSAA on a full-viewport buffer that is already resolution-governed pays
+         twice for the same edge. A lean device spends that budget on resolution
+         instead, which helps every pixel rather than only the silhouettes. */
+      antialias: !lean,
       alpha: false,
       powerPreference: 'high-performance',
     });
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 0.9;
-    let pixelRatio = Math.min(window.devicePixelRatio, maxPixelRatio);
+    let pixelRatio = maxPixelRatio;
     renderer.setPixelRatio(pixelRatio);
     renderer.domElement.setAttribute('aria-hidden', 'true');
     host.insertBefore(renderer.domElement, host.firstChild);
 
     /*
-     * A real foreground pass for the bee.
+     * A real foreground pass for the bee — and the page's most releasable
+     * WebGL context.
      *
      * FlowerValleyLayer is a DOM canvas, so no amount of alpha shaping inside
      * that canvas can put the WebGL bee above it. This second renderer draws
      * only layer 1 (the bee and its lights) into a transparent sibling canvas.
      * The original renderer still owns the complete land/ocean composite; this
      * pass only restores the correct visual order: world, flowers, bee, copy.
+     *
+     * ## Why it is built on demand and torn down again
+     *
+     * It exists for ONE creature in the first two of nine sections. Held for the
+     * whole visit it was a full-viewport GL context, an MSAA default framebuffer
+     * and a half-float mipmapped capture target sitting idle from the bridge all
+     * the way to the footer — pure cost on a desktop, and on iOS Safari one of
+     * the five contexts that push a page toward the limit at which the browser
+     * starts dropping the oldest.
+     *
+     * So it is chapter-scoped rather than distance-scoped: it is not in
+     * `contextRegistry`, because what decides whether the bee is on screen is
+     * the dive, not how far the section is from the viewport. `ensureForeground`
+     * is idempotent and cheap after the first call; `dropForeground` only fires
+     * once the bee has been gone for `FOREGROUND_LINGER_MS`, so the crossing can
+     * be scrubbed back and forth without rebuilding anything.
      */
-    const foregroundRenderer = new THREE.WebGLRenderer({
-      antialias: !compact,
-      alpha: true,
-      premultipliedAlpha: true,
-      powerPreference: 'high-performance',
-    });
-    foregroundRenderer.outputColorSpace = THREE.SRGBColorSpace;
-    foregroundRenderer.toneMapping = THREE.ACESFilmicToneMapping;
-    foregroundRenderer.toneMappingExposure = renderer.toneMappingExposure;
-    foregroundRenderer.setClearColor(0x000000, 0);
-    foregroundRenderer.setPixelRatio(Math.min(window.devicePixelRatio, compact ? 1.1 : 1.35));
-    foregroundRenderer.domElement.className = 'explore-foreground-canvas';
-    foregroundRenderer.domElement.setAttribute('aria-hidden', 'true');
-    foregroundHost.appendChild(foregroundRenderer.domElement);
+    let foregroundRenderer: THREE.WebGLRenderer | null = null;
+    let foregroundSceneCapture: THREE.WebGLRenderTarget | null = null;
+    /*
+     * Last opacity written to the DOM. An inline style assignment invalidates
+     * the element's computed style whether or not the value changed, and this
+     * one used to run on every frame of the entire page — including the two
+     * ocean chapters, where it wrote the string "0.000" sixty times a second
+     * forever.
+     *
+     * Declared up here with the lifecycle rather than beside its reader, because
+     * `dropForeground` resets it and a `let` below would be in its temporal dead
+     * zone for anything that ran early.
+     */
+    let paintedForegroundOpacity = -1;
+    /*
+     * The bee's refraction capture, on every other frame.
+     *
+     * An A/B on a retina hero measured the whole foreground pass at 9.5 ms of a
+     * 16.7 ms budget: 37.6 fps with it, 58.5 fps without. Almost all of that is
+     * the CAPTURE — a full render of the land scene into a target, in a second
+     * WebGL context, so that the ruby shell has something to bend.
+     *
+     * The capture is the one pass on this page that can honestly be amortised.
+     * The shell samples it through an explicit mip LOD, so what reaches a pixel
+     * is already blurred by surface roughness; behind the bee is a liquid plate
+     * whose simulation moves over seconds, not frames; and the camera at the
+     * hero is drifting, not cutting. A capture one frame stale, seen through
+     * that much blur, is not a thing anyone can point at — and it halves the
+     * most expensive pass in the hero.
+     *
+     * The bee itself is still drawn every frame. This is a stale REFLECTION, not
+     * a stale creature, and the difference is the whole reason it is safe.
+     */
+    let captureFrame = 0;
+    /* Long enough that scrubbing the crossing never rebuilds, short enough that
+       a visitor who has moved on is not still paying for it. */
+    const FOREGROUND_LINGER_MS = 2500;
+    let foregroundIdleSince = -1;
 
-    /* Render targets are context-local. Giving the foreground renderer its own
-       mipmapped scene capture preserves the exact ruby refraction instead of
-       replacing it with a flat colour approximation. */
-    const foregroundSceneCapture = new THREE.WebGLRenderTarget(1, 1, {
-      minFilter: THREE.LinearMipmapLinearFilter,
-      magFilter: THREE.LinearFilter,
-      generateMipmaps: true,
-      type: THREE.HalfFloatType,
-      depthBuffer: true,
-    });
-    foregroundSceneCapture.texture.colorSpace = THREE.LinearSRGBColorSpace;
+    const ensureForeground = () => {
+      if (foregroundRenderer) return foregroundRenderer;
+      const created = new THREE.WebGLRenderer({
+        antialias: !lean,
+        alpha: true,
+        premultipliedAlpha: true,
+        powerPreference: 'high-performance',
+      });
+      created.outputColorSpace = THREE.SRGBColorSpace;
+      created.toneMapping = THREE.ACESFilmicToneMapping;
+      created.toneMappingExposure = renderer.toneMappingExposure;
+      created.setClearColor(0x000000, 0);
+      /* A second full-viewport context drawing one creature over a transparent
+         buffer, so it tracks a step under the main one. */
+      created.setPixelRatio(Math.max(0.7, pixelRatio - 0.15));
+      created.domElement.className = 'explore-foreground-canvas';
+      created.domElement.setAttribute('aria-hidden', 'true');
+      foregroundHost.appendChild(created.domElement);
+      foregroundRenderer = created;
+
+      /* Render targets are context-local. Giving the foreground renderer its own
+         mipmapped scene capture preserves the exact ruby refraction instead of
+         replacing it with a flat colour approximation. */
+      foregroundSceneCapture = new THREE.WebGLRenderTarget(1, 1, {
+        minFilter: THREE.LinearMipmapLinearFilter,
+        magFilter: THREE.LinearFilter,
+        generateMipmaps: true,
+        type: THREE.HalfFloatType,
+        depthBuffer: true,
+      });
+      foregroundSceneCapture.texture.colorSpace = THREE.LinearSRGBColorSpace;
+      resizeForeground();
+      /* An odd counter means the next drawn frame captures, so a brand-new
+         target is never what the shell refracts. */
+      captureFrame = 0;
+      return created;
+    };
+
+    const dropForeground = () => {
+      if (!foregroundRenderer) return;
+      foregroundSceneCapture?.dispose();
+      foregroundSceneCapture = null;
+      foregroundRenderer.setAnimationLoop(null);
+      foregroundRenderer.dispose();
+      /* Not just `dispose`: that frees three's own objects but leaves the GL
+         context attached to a live canvas, which is exactly the thing this is
+         here to give back. */
+      foregroundRenderer.forceContextLoss();
+      /* The element goes with it. A canvas whose context has been released
+         composites as nothing, and a transparent full-viewport rectangle over
+         the composite is a layer the browser still has to blend. */
+      foregroundRenderer.domElement.remove();
+      foregroundRenderer = null;
+      foregroundIdleSince = -1;
+      paintedForegroundOpacity = -1;
+    };
+    /*
+     * How much of the frame the two refraction captures are rendered at.
+     *
+     * The bee's shell reads its capture through an explicit mip LOD, so the
+     * image is blurred by surface roughness before it reaches a pixel — which is
+     * exactly why the capture can be smaller than the frame. It was a flat 0.8
+     * (64% of the pixels) on every machine; a lean device now renders 34% of
+     * them, and because there are TWO of these targets and each is drawn once
+     * per frame, that is the largest fragment saving available in the hero.
+     */
+    const captureScale = lean ? 0.46 : 0.66;
 
     const landEnvironment = createProceduralEnvironment(renderer, exploreEnvironmentPalette);
     landScene.environment = landEnvironment.texture;
@@ -344,7 +484,7 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
     /* --------------------------------------------------------- liquid stage --- */
     const liquid = createLiquidSurface({
       palette: LAND_PALETTES[0],
-      simScale: compact ? 0.16 : 0.24,
+      simScale: lean ? 0.16 : 0.24,
       simulate: !reduceMotion,
       planeWidth: 2,
       planeHeight: 2,
@@ -404,7 +544,7 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
 
     /* ------------------------------------------------------------ transition --- */
     const waterline = createWaterlinePass();
-    const oceanBloom = createOceanBloomPass(compact);
+    const oceanBloom = createOceanBloomPass(lean);
     const targetOptions = {
       type: THREE.HalfFloatType,
       minFilter: THREE.LinearFilter,
@@ -423,6 +563,40 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
       oceanTarget = new THREE.WebGLRenderTarget(renderWidth, renderHeight, targetOptions);
       oceanTarget.texture.colorSpace = THREE.LinearSRGBColorSpace;
     };
+
+    /*
+     * Give the composite targets back while the story is off screen.
+     *
+     * These two are the largest single allocation on the page: a full-viewport
+     * half-float RGBA target is about 30 MB at a 1512 x 982 retina frame, and
+     * there are two of them, plus the bloom's pair and the refraction capture.
+     * They only exist for the crossing, and they are the reason the Explore
+     * canvas dominates this page's GPU memory rather than its GPU time.
+     *
+     * Unlike the context itself, they are free to give back: `ensureTargets` is
+     * already lazy and idempotent, so the composite re-allocates them the next
+     * time it actually runs. Nothing is re-parsed, no shader is recompiled, and
+     * the waterline pass reads whichever texture it is handed on the frame it
+     * runs — which is why this is safe where releasing the context is not.
+     *
+     * The context stays. Rebuilding it would mean re-parsing a 2.6 MB rigged bee
+     * and the whole reef, which is seconds of work on the one interaction —
+     * scrolling back to the top — that would have to pay for it. Memory is the
+     * pressure on iOS; this returns the memory without buying a stutter.
+     */
+    const dropTargets = () => {
+      if (!landTarget && !oceanTarget) return;
+      landTarget?.dispose();
+      oceanTarget?.dispose();
+      landTarget = null;
+      oceanTarget = null;
+      waterline.uniforms.uLand.value = null;
+      waterline.uniforms.uOcean.value = null;
+    };
+    /* Long enough that the bridge — which is one section below and pulls the
+       story's tail up under itself — never triggers it. */
+    const TARGET_LINGER_MS = 6000;
+    let offscreenSince = -1;
 
     /* -------------------------------------------------------------- creatures --- */
     let bee: CreatureHandle | undefined;
@@ -501,13 +675,30 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
       ];
       // Starts on the fly clip: the very first thing the bee does is fly in.
       beeActions[2]?.reset().fadeIn(0.01).play();
-      /* Compile the foreground variant before it becomes visible. */
-      const sceneTexture = beeMaterialSet.optical.uScene.value;
-      beeMaterialSet.optical.uScene.value = foregroundSceneCapture.texture;
-      landCamera.layers.set(1);
-      foregroundRenderer.compile(landScene, landCamera);
-      landCamera.layers.set(0);
-      beeMaterialSet.optical.uScene.value = sceneTexture;
+      /*
+       * Compile the foreground variant before it becomes visible.
+       *
+       * Read through `handle.materials`, not the outer `beeMaterialSet`: that
+       * binding is a mutable `let` and the compiler cannot prove it is still
+       * assigned here, which was three of this file's four type errors. And
+       * `materials` is genuinely optional on `CreatureHandle` — it is the bee's
+       * own optical set and the other two creatures do not have one — so the
+       * honest shape is a guard rather than an assertion: with no optical set
+       * there is no refraction to pre-compile and nothing to swap.
+       */
+      const opticals = handle.materials?.optical;
+      /* The bee has just arrived, so the foreground context is wanted now — and
+         building it here rather than on the first visible frame is the whole
+         point of pre-compiling. */
+      const foreground = ensureForeground();
+      if (opticals && foregroundSceneCapture) {
+        const sceneTexture = opticals.uScene.value;
+        opticals.uScene.value = foregroundSceneCapture.texture;
+        landCamera.layers.set(1);
+        foreground.compile(landScene, landCamera);
+        landCamera.layers.set(0);
+        opticals.uScene.value = sceneTexture;
+      }
       host.dataset.ready = 'true';
     };
 
@@ -529,7 +720,10 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
         try {
           oceanEnvironment = createProceduralEnvironment(renderer, oceanEnvironmentPalette);
           specimenEnvironment = createProceduralEnvironment(renderer, specimenEnvironmentPalette);
-          const world = await createOceanWorld(renderer, oceanEnvironment.texture, { compact, reduceMotion });
+          /* `compact: lean`. The ocean's own parameter is named for the width
+             it used to be handed; what it has always actually meant is "build
+             the cheap version of this reef", and that is a budget question. */
+          const world = await createOceanWorld(renderer, oceanEnvironment.texture, { compact: lean, reduceMotion });
           if (disposed) { world.dispose(); return; }
           /*
            * The ocean camera has to be told the shape of the window it is about
@@ -547,6 +741,12 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
            */
           world.resize(landCamera.aspect);
           ocean = world;
+          /* The reef is built at full density and then told the rung in force.
+             The ladder may already have descended several rungs while the land
+             chapters were on screen, and a world that ignored that would arrive
+             at full density and be measured back down — a visible pop on
+             exactly the frame the crossing must not stutter on. */
+          world.setDensity(ladder.current());
           /*
            * A node carrying the approved camera's transform, so a subject mark
            * can be written in the frame's own axes.
@@ -574,15 +774,21 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
           fish = createFishCreature(fishGltf, {
             targetSize: CREATURE_SPAN.fish,
             finish: 'ocean',
+            /* See the option's own note: one transmissive material anywhere in
+               the scene costs a second render of the whole reef every frame. */
+            transmissive: !lean,
             maxAnisotropy,
             environment: specimenEnvironment.texture,
           });
           jelly = createJellyfishCreature(jellyGltf, {
             targetSize: CREATURE_SPAN.jelly,
-            // Phones get the blended path: three sorts transmissive and
-            // transparent objects into separate passes, so either all three
-            // membranes are transmissive or none of them is.
-            transmissive: !compact,
+            // Phones AND weak desktops get the blended path: three sorts
+            // transmissive and transparent objects into separate passes, so
+            // either all three membranes are transmissive or none of them is.
+            // This is why the jellyfish chapter measured 37 fps against the fish
+            // chapter's 60 on identical geometry — three membranes with
+            // `transmission` make the renderer draw the reef twice per frame.
+            transmissive: !lean,
             finish: 'ocean',
             maxAnisotropy,
             environment: specimenEnvironment.texture,
@@ -731,6 +937,19 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
     /* ---------------------------------------------------------------- resize --- */
     let viewportWidth = 1;
     let viewportHeight = 1;
+    /* Sizing the bee pass is its own step because it now has two callers: the
+       shared resize, and `ensureForeground` when it builds a fresh context that
+       has never been sized. A `function` declaration, so it is available to
+       `ensureForeground` above it. */
+    function resizeForeground() {
+      if (!foregroundRenderer || !foregroundSceneCapture) return;
+      foregroundRenderer.setSize(viewportWidth, viewportHeight, false);
+      const ratio = foregroundRenderer.getPixelRatio();
+      foregroundSceneCapture.setSize(
+        Math.max(1, Math.floor(viewportWidth * ratio * captureScale)),
+        Math.max(1, Math.floor(viewportHeight * ratio * captureScale)),
+      );
+    }
     const resize = () => {
       viewportWidth = Math.max(host.clientWidth, 1);
       viewportHeight = Math.max(host.clientHeight, 1);
@@ -739,12 +958,7 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
       landCamera.updateProjectionMatrix();
       ocean?.resize(aspect);
       renderer.setSize(viewportWidth, viewportHeight, false);
-      foregroundRenderer.setSize(viewportWidth, viewportHeight, false);
-      const foregroundRatio = foregroundRenderer.getPixelRatio();
-      foregroundSceneCapture.setSize(
-        Math.max(1, Math.floor(viewportWidth * foregroundRatio * 0.8)),
-        Math.max(1, Math.floor(viewportHeight * foregroundRatio * 0.8)),
-      );
+      resizeForeground();
       const ratio = renderer.getPixelRatio();
       renderWidth = Math.floor(viewportWidth * ratio);
       renderHeight = Math.floor(viewportHeight * ratio);
@@ -755,8 +969,8 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
       const half = Math.tan(THREE.MathUtils.degToRad(20)) * distance;
       liquid.mesh.scale.set(half * landCamera.aspect, half, 1);
       sceneCapture.setSize(
-        Math.max(1, Math.floor(renderWidth * 0.8)),
-        Math.max(1, Math.floor(renderHeight * 0.8)),
+        Math.max(1, Math.floor(renderWidth * captureScale)),
+        Math.max(1, Math.floor(renderHeight * captureScale)),
       );
       landTarget?.setSize(renderWidth, renderHeight);
       oceanTarget?.setSize(renderWidth, renderHeight);
@@ -791,9 +1005,59 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
     let beeFlightState = 2;
     let paintedDive = -1;
     let worstFrame = 0;
-    let frameAccumulator = 0;
-    let frameCount = 0;
-    let downscales = 0;
+    /*
+     * Adaptive quality, as a measured LADDER rather than one lever.
+     *
+     * Two versions preceded this. The first counted 1.4-second windows, allowed
+     * two steps down and had no way back up — so the 20-second frame this page
+     * spends parsing a 2.6 MB rigged bee was read as "this GPU is slow" and left
+     * the canvas soft for the rest of the session on every machine. The second
+     * fixed the direction but still adapted the pixel ratio and nothing else,
+     * which means that on a frame resolution cannot save it kept lowering the
+     * resolution.
+     *
+     * `lib/three/qualityLadder.ts` owns the whole ordered set instead — surplus
+     * resolution, then particles, bubbles, reef density, secondary fauna, and
+     * only then sharpness below 1:1. It stops descending the moment the budget
+     * is met, climbs back on measured headroom with a doubling penalty so a page
+     * on the edge settles rather than pumps, and abandons a descent that three
+     * rungs in has bought less than 8%.
+     *
+     * The device signals survive only as a STARTING rung, so a phone does not
+     * spend its first three seconds discovering its own limits. They are no
+     * longer the authority: a machine that starts low and turns out to be fast
+     * climbs all the way back to full.
+     */
+    const ladder = createQualityLadder({
+      dprCeiling: maxPixelRatio,
+      /*
+       * Below one buffer pixel per CSS pixel is the ladder's LAST rung, not its
+       * range. Measured: with a 0.75 floor the previous one-way controller slid
+       * a retina hero to ratio 0.85 — a 1224 x 765 buffer in a 1440 x 900 box,
+       * an upscaled full-viewport 3D scene — and bought 6 fps for a visibly
+       * softer picture, because that frame is substantially bound by the browser
+       * compositing three full-screen layers, a cost set by the CSS box that no
+       * pixel ratio can reach.
+       */
+      dprFloor: lean ? 0.7 : 0.85,
+      start: startRung,
+      /* Two full-viewport passes per frame in the hero, up to four during the
+         crossing, so "slow" starts earlier here than on a panel canvas. */
+      budgetMs: 21,
+      comfortMs: 13.4,
+      apply: (rung) => {
+        pixelRatio = rung.dpr;
+        renderer.setPixelRatio(rung.dpr);
+        /* The bee pass tracks a step under the main one — when it exists at
+           all. `ensureForeground` reads `pixelRatio` for the same sum, so a
+           context built after a rung change is born at the right size. */
+        foregroundRenderer?.setPixelRatio(Math.max(0.7, rung.dpr - 0.15));
+        /* `ocean` is undefined until the dive starts it; `startOcean` applies
+           the rung in force once the world exists. */
+        ocean?.setDensity(rung);
+        resize();
+      },
+    });
     /* QA hook: collapse every damped value onto its target on the next frame. */
     let snapFrames = 0;
     const timer = new THREE.Timer();
@@ -801,7 +1065,15 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
     renderer.setAnimationLoop(() => {
       timer.update();
       const delta = Math.min(timer.getDelta(), 0.05);
-      if (!gate.visible() || !documentVisible) return;
+      if (!gate.visible() || !documentVisible) {
+        /* Off screen: stop drawing now, and hand the composite targets back if
+           this looks settled rather than a scroll passing through. */
+        const now = performance.now();
+        if (offscreenSince < 0) offscreenSince = now;
+        else if (now - offscreenSince > TARGET_LINGER_MS) dropTargets();
+        return;
+      }
+      offscreenSince = -1;
       const elapsed = timer.getElapsed();
       const motionTime = reduceMotion ? 0 : elapsed;
 
@@ -1118,24 +1390,10 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
         drawLand(null);
       }
 
-      drawBeeForeground(dive);
+      drawBeeForeground(dive, performance.now());
 
       if (delta > worstFrame) worstFrame = delta;
-
-      /* adaptive resolution: two sustained slow windows step the ratio down */
-      frameAccumulator += delta;
-      frameCount += 1;
-      if (frameAccumulator > 1.4) {
-        const average = frameAccumulator / frameCount;
-        frameAccumulator = 0;
-        frameCount = 0;
-        if (average > 0.0235 && downscales < 2 && pixelRatio > 0.85) {
-          downscales += 1;
-          pixelRatio = Math.max(0.85, pixelRatio - 0.25);
-          renderer.setPixelRatio(pixelRatio);
-          resize();
-        }
-      }
+      ladder.note(delta);
     });
 
     /**
@@ -1145,8 +1403,13 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
      * shell refracts the backdrop *and* its own core. It has to happen before the
      * land pass whichever target that pass is going to.
      */
+    let landCaptureFrame = 0;
     function drawLand(target: THREE.WebGLRenderTarget | null) {
-      if (bee && beePresence > 0.01 && beeShell && beeWings) {
+      /* The same amortisation, for the same reason, on the main context's copy
+         of the same capture. Two full scene renders per frame existed to feed
+         two mip-blurred refraction lookups; they now feed them at 30 Hz. */
+      landCaptureFrame += 1;
+      if (bee && beePresence > 0.01 && beeShell && beeWings && landCaptureFrame % 2 === 1) {
         beeShell.visible = false;
         beeWings.visible = false;
         renderer.setRenderTarget(sceneCapture);
@@ -1160,36 +1423,91 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
     }
 
     const foregroundResolution = new THREE.Vector2();
-    function drawBeeForeground(dive: number) {
+    /*
+     * The bee's refraction capture, on every other frame.
+     *
+     * An A/B on a retina hero measured the whole foreground pass at 9.5 ms of a
+     * 16.7 ms budget: 37.6 fps with it, 58.5 fps without. Almost all of that is
+     * the CAPTURE — a full render of the land scene into a target, in a second
+     * WebGL context, so that the ruby shell has something to bend. The bee's own
+     * draw is one creature over a transparent buffer.
+     *
+     * The capture is the one pass on this page that can honestly be amortised.
+     * The shell samples it through an explicit mip LOD, so what reaches a pixel
+     * is already blurred by surface roughness; behind the bee is a liquid plate
+     * whose simulation moves over seconds, not frames; and the camera at the
+     * hero is drifting, not cutting. A capture one frame stale, seen through
+     * that much blur, is not a thing anyone can point at — and it halves the
+     * most expensive pass in the hero.
+     *
+     * The bee itself is still drawn every frame. This is a stale REFLECTION, not
+     * a stale creature, and the difference is the whole reason it is safe.
+     */
+    function drawBeeForeground(dive: number, nowMs: number) {
       const visibility = 1 - smoothstep(0.04, 0.3, dive);
-      foregroundHost.style.opacity = visibility.toFixed(3);
-      if (!bee || !beeMaterialSet || beePresence < 0.006 || visibility < 0.006) {
-        foregroundRenderer.clear();
-        return;
+      const wanted = !!bee && !!beeMaterialSet && beePresence >= 0.006 && visibility >= 0.006;
+
+      /*
+       * The context's whole lifecycle, decided here.
+       *
+       * `wanted` is the honest question — is the bee on screen — and it is the
+       * only thing that should hold this context. The linger keeps a scrubbed
+       * crossing from rebuilding: cross into the water and back out inside two
+       * and a half seconds and nothing is torn down at all.
+       */
+      if (wanted) {
+        foregroundIdleSince = -1;
+        ensureForeground();
+      } else if (foregroundRenderer) {
+        if (foregroundIdleSince < 0) foregroundIdleSince = nowMs;
+        if (nowMs - foregroundIdleSince > FOREGROUND_LINGER_MS) {
+          dropForeground();
+        }
       }
 
+      /* Written only while the layer exists, and only when it moves. An inline
+         style assignment invalidates computed style whether the value changed or
+         not, and this ran on every frame of the whole page. */
+      if (foregroundRenderer && Math.abs(visibility - paintedForegroundOpacity) > 0.002) {
+        paintedForegroundOpacity = visibility;
+        foregroundHost.style.opacity = visibility.toFixed(3);
+      }
+
+      const target = foregroundSceneCapture;
+      if (!wanted || !beeMaterialSet || !foregroundRenderer || !target) {
+        foregroundRenderer?.clear();
+        return;
+      }
+      const pass = foregroundRenderer;
+
       const sceneTexture = beeMaterialSet.optical.uScene.value;
-      beeMaterialSet.optical.uScene.value = foregroundSceneCapture.texture;
-      foregroundRenderer.getDrawingBufferSize(foregroundResolution);
+      beeMaterialSet.optical.uScene.value = target.texture;
+      pass.getDrawingBufferSize(foregroundResolution);
       beeMaterialSet.optical.uSceneResolution.value.copy(foregroundResolution);
-      foregroundRenderer.toneMappingExposure = renderer.toneMappingExposure;
+      pass.toneMappingExposure = renderer.toneMappingExposure;
       const wingsVisible = beeWings?.visible ?? false;
       const shellVisible = beeShell?.visible ?? false;
       if (beeWings) beeWings.visible = false;
       if (beeShell) beeShell.visible = false;
 
-      /* Capture the liquid backdrop plus ruby core in this WebGL context. */
-      landCamera.layers.set(0);
-      landCamera.layers.enable(1);
-      foregroundRenderer.setRenderTarget(foregroundSceneCapture);
-      foregroundRenderer.render(landScene, landCamera);
+      /* Capture the liquid backdrop plus ruby core in this WebGL context.
+         Every other frame — see `captureFrame` above for why that is safe. The
+         first frame after the bee appears always captures, so the shell is never
+         drawn against an empty target. */
+      captureFrame += 1;
+      if (captureFrame % 2 === 1) {
+        landCamera.layers.set(0);
+        landCamera.layers.enable(1);
+        pass.setRenderTarget(target);
+        pass.render(landScene, landCamera);
+      }
       if (beeWings) beeWings.visible = wingsVisible;
       if (beeShell) beeShell.visible = shellVisible;
 
       /* Then draw only the complete Bee into the transparent DOM canvas. */
-      foregroundRenderer.setRenderTarget(null);
+      pass.setRenderTarget(null);
       landCamera.layers.set(1);
-      foregroundRenderer.render(landScene, landCamera);
+      pass.render(landScene, landCamera);
       landCamera.layers.set(0);
       beeMaterialSet.optical.uScene.value = sceneTexture;
       beeMaterialSet.optical.uSceneResolution.value.set(renderWidth, renderHeight);
@@ -1207,6 +1525,9 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
         /* Proof that the crossing allocates nothing: sample before and after and
            compare. A shader compiled or a texture uploaded mid-transition is the
            root cause of the jank the brief describes, and it is countable. */
+        /* What the quality ladder has decided, and why. The only way to tell a
+           machine that measured its way to rung 5 from one that started there. */
+        quality: () => ({ ...ladder.report(), depth: ladder.depth(), rung: ladder.current() }),
         info: () => ({
           programs: renderer.info.programs?.length ?? 0,
           textures: renderer.info.memory.textures,
@@ -1306,9 +1627,7 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
       liquid.dispose();
       landEnvironment.dispose();
       sceneCapture.dispose();
-      foregroundSceneCapture.dispose();
-      foregroundRenderer.dispose();
-      foregroundRenderer.domElement.remove();
+      dropForeground();
       loader.dispose();
       renderer.dispose();
       renderer.domElement.remove();

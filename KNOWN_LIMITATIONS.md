@@ -177,11 +177,19 @@ report says `scrolls` rather than `CUT`:
 | Product bridge | 700 px | The two states stack; the arrow turns vertical |
 | YooStudio | 700 px | Editor keeps its height, the section scrolls |
 | Practice & STEM | 1180 px | Rail becomes a row of tabs above the stage; below 1000 the brief column moves under it |
-| Education | 1000 px | Role panel stacks under the switcher |
+| Education | **1180 px** | Lesson player stacks under the brief card; the capability row goes to two columns |
 | Sample lessons | 700 px | Four cards become one column |
 
 Library, the hero, the three creature chapters and the CTA compose in one
 viewport at **every** tested size, 390 to 1920.
+
+**Education's number moved from 1000 to 1180 in this pass**, and the reason is a
+shape change rather than a regression. Its product is now the lesson player —
+tool rail, stage, object column, transport bar — and that needs 64% of the shell
+before its own panels stop being narrower than the product they are a picture of.
+The brief column is therefore 340 px at 1024, where five rows whose bodies each
+wrap twice are 420 px of content in a 283 px budget; no amount of tightening
+closes 137 px. `measure.mjs` asserts the new floor.
 
 The alternative for the four above would be shrinking the evidence — a 200 px
 product shot in Education, a thumbnail-sized lab stage in Practice — to win an
@@ -256,3 +264,162 @@ needs a measured-height animation, not a magic number.
 All copy is Vietnamese. There is no i18n layer, no locale routing and no English
 version. Element names use the IUPAC forms of the 2018 curriculum, with the
 familiar Vietnamese name in parentheses where one is established.
+
+## Performance: what was measured, what was fixed, what is still true
+
+Measured with `reference-audit/probe.mjs` against a **production** build, warm
+(the page walked once so no sample contains a model parse or a shader compile),
+at 1440×900 with `--dpr 2` so the retina case is actually exercised.
+
+### The harness was lying before any of this
+
+Two faults in the audit tooling had to be fixed before a number meant anything,
+and both had been silently polluting results:
+
+- **Chrome was backgrounding the off-screen window.** The harness parks Chrome at
+  `-32000,-32000` so a run does not steal the desktop; Chrome's occlusion
+  tracking then decides nobody can see it and throttles `requestAnimationFrame`
+  to about 1 Hz. A frame census reports a 60 fps page as 1 fps with 1,000 ms
+  frames — intermittently, depending on what else is on the desktop, which is
+  what makes it dangerous: a run looks like a catastrophic regression and
+  re-running "fixes" the code. Both `probe.mjs` and `shots.mjs` now pass
+  `--disable-features=CalculateNativeWinOcclusion` plus the two backgrounding
+  flags.
+- **`--dpr` did not exist.** Every pixel-ratio ceiling in the project is a
+  `Math.min` against `devicePixelRatio`, so on the 1× display the harness was
+  pinned to, every one of them is inert. `probe.mjs` now takes `--dpr` and drives
+  both Chrome's scale factor and CDP's metrics override with it.
+- **`--handheld` did not exist either.** `setDeviceMetricsOverride({mobile:true})`
+  changes the viewport, not the `hover` and `pointer` media features — and those
+  are what `layout.tsx` and `deviceTier.ts` branch on. A 390 px capture was
+  therefore taking the desktop budget, and the phone path went untested.
+
+### The largest fault was drawing something nobody could see
+
+A per-canvas draw-call census (patch `drawElements`/`drawArrays` on the
+prototypes, bucket by `canvas`, park at each section) found that **YooStudio's
+car viewport rendered at full rate on every section of the page** — 9,200 draw
+calls and 58 million triangles per second, on the footer, on Education, and on
+both ocean chapters. It was the only WebGL surface on the site without a
+visibility gate, and it was 41% of all GPU work during the jellyfish chapter,
+which is one of the two chapters that had been reported as stuttering.
+
+It is now gated, its shadow map is no longer re-rendered on frames where the car
+has not moved, and its programs are compiled off the render loop so the gate can
+be tight (60 px, not 220 — `rootMargin` is symmetric, and at 220 px the editor
+was still measured at 36 M triangles a second with the Library filling the
+screen).
+
+### The hero's bottleneck was a reflection
+
+An A/B at retina put the whole bee foreground pass at 9.5 ms of a 16.7 ms budget
+(37.6 fps with it, 58.5 without). Almost all of it was the *capture* — a full
+render of the land scene into a target, in a second WebGL context, so the ruby
+shell has something to bend. Both refraction captures now run at 30 Hz. This is
+safe for one specific reason: the shell samples them through an explicit mip LOD,
+so what reaches a pixel is already blurred by surface roughness, and behind the
+bee is a liquid plate whose simulation moves over seconds. **The bee itself is
+still drawn every frame** — it is a stale reflection, never a stale creature.
+
+### Results
+
+| Section | before | after |
+|---|---|---|
+| Hero | 48.5 fps, 11 frames over 32 ms | **55.1 fps, 6** |
+| Bee study | 60.1 | 60 |
+| Fish | 60 | 59.6 |
+| Jellyfish | 55.6 fps, 3 over 32 ms | 54.7 fps, **0** |
+| YooStudio | 52.9 | **56.4** |
+| Library | 60.1 | 59.9 |
+| Practice | 59.7 | 56.5 |
+| Education | 60 | 60.3 |
+
+…and the explore canvas is doing it at **2088 × 1305 instead of 1584 × 990** —
+73% more pixels — because the old one-way downscaler had slid to 1.1 and could
+not come back, while the new governor reverts a step that does not measurably
+help. The two figures within a frame of each other (Fish, Library, Practice) are
+run-to-run variance on a 2.8 s sample, not signal.
+
+On the lean path — emulated phone, 390 × 844 at dpr 3, `--handheld` — every
+section holds **60 fps with at most one frame over 32 ms**.
+
+## Performance, second pass: context lifecycle and a measured quality ladder
+
+The first pass removed wasted work. This one removed wasted *context* and
+replaced the device test with measurement.
+
+### Contexts are now budgeted, not just paused
+
+`lib/three/contextRegistry.ts` keeps the nearest N GPU surfaces and releases the
+rest; `lib/three/useManagedContext.ts` gates each component's existing effect on
+a boolean, so React runs the real cleanup and the real setup and there is no
+second teardown path to keep correct. Measured on a production build, counting
+live WebGL contexts (the flower valley is Canvas2D and is not one):
+
+| Standing in | Before | Desktop now | Phone now |
+|---|---|---|---|
+| Hero | 5 | 2 | 2 |
+| Fish | 5 | 3 | 2 |
+| Jellyfish → Practice | 5 | 4 | 3 |
+| Education | 5 | 3 | 3 |
+| Footer | 5 | 3 | **1** |
+
+The bee's foreground pass — a full-viewport context and MSAA framebuffer that
+existed for one creature in the first two of nine sections — is now built when
+the bee arrives and released 2.5 s after it leaves. Scrubbing the crossing four
+times in three seconds rebuilds nothing.
+
+### Quality is measured, in an order
+
+`lib/three/qualityLadder.ts` replaces `createFrameGovernor` for the Explore
+canvas: pixel ratio down to 1:1, then particles, bubbles, reef density and
+secondary fauna, then sharpness below 1:1 last. Every density lever is a draw
+range or an instance count, so it is reversible for free. See DESIGN.md §13 for
+the rung table and the three guards.
+
+### Results
+
+Warm steady state, production build, same harness for every row:
+
+| Section | Before, desktop dpr2 | After, desktop dpr2 | After, phone dpr3 |
+|---|---|---|---|
+| Hero | 48.5 fps, **11** frames >32 ms | 56.9 fps, **0** | 57.4 fps, **0** |
+| Fish | 60 fps, 0 | 57.5 fps, 0 | 57.4 fps, 0 |
+| Jellyfish | 55.6 fps, **3** | 57.3 fps, **0** | 57.5 fps, 0 |
+| YooStudio | 52.9 fps, **1** | 57.2 fps, **0** | 57.5 fps, 0 |
+| Education | 60 fps, 0 | 57.5 fps, 0 | 57.6 fps, 0 |
+
+The headline is the last column of each pair: **no section drops a frame any
+more**, on either configuration. The absolute figure moved from 60 to ~57.4 in
+this run *uniformly, including Education* — which holds no canvas at all — so
+that is load on the measuring machine and not a cost in the page.
+
+And it is doing it at full quality: the ladder settled on **rung 0** with the
+explore buffer at 2088 x 1305 for a 1440 x 900 CSS box, against 1584 x 990 before.
+73% more pixels, no density reduction, no dropped frames.
+
+### What is still true
+
+- **The Explore canvas never releases its context.** Deliberate. Rebuilding it
+  means re-parsing a 2.6 MB rigged bee and the whole reef — seconds of work
+  charged to the one interaction, scrolling back to the top, that would pay for
+  it. It gives back its two full-viewport half-float composite targets instead
+  (~60 MB at a retina frame) six seconds after leaving the screen. It is why the
+  desktop count above bottoms out at 3 rather than 0.
+- **Re-acquiring the editor is not instant.** Measured across three cycles with
+  warm bytes: the canvas is back in 0.5–1.1 s, a finished car in 1.3–2 s. The
+  1.6-viewport admit distance is the runway that keeps that off screen, and the
+  editor's release distance is raised to 4.5 viewports so it only happens once
+  the visitor is clearly gone. On a phone the two-context budget can still
+  displace it, and there a fast scroll back up to YooStudio can arrive before the
+  car does and show the section's own loading line. That is a loading state, not
+  a context-lost flash — but it is not free either, and on a device with real
+  context pressure it is the right trade.
+- **A retina laptop with integrated graphics is still not detectable**, and no
+  longer needs to be. The ladder measures it. `isLeanDevice()` now only picks a
+  starting rung and the context budget; it cannot pin quality anywhere.
+- **None of this has been run on real iOS Safari.** Every figure here is Chrome
+  with emulated device metrics and emulated `hover`/`pointer` media features. The
+  context census and the phone budget are the things most worth re-checking on a
+  real device, because the limit they are written against is a WebKit property
+  nothing here can observe.

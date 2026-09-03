@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePrefersReducedMotion } from '../../../lib/usePrefersReducedMotion';
+import { pixelRatioCap } from '../../../lib/three/deviceTier';
 
 /**
  * Waves — one engine, three lessons.
@@ -684,7 +685,7 @@ export function WaveLab({ params }: { params?: Record<string, string> }) {
     const width = canvas.clientWidth;
     const height = canvas.clientHeight;
     if (width < 8 || height < 8) return;
-    const ratio = Math.min(window.devicePixelRatio, 2);
+    const ratio = pixelRatioCap('panel');
     if (canvas.width !== Math.floor(width * ratio) || canvas.height !== Math.floor(height * ratio)) {
       canvas.width = Math.floor(width * ratio);
       canvas.height = Math.floor(height * ratio);
@@ -697,7 +698,7 @@ export function WaveLab({ params }: { params?: Record<string, string> }) {
     const monoStack = style.getPropertyValue('--font-mono').trim() || 'ui-monospace, monospace';
     const palette: Palette = {
       ink: style.getPropertyValue('--sim-ink').trim() || '#191720',
-      accent: style.getPropertyValue('--sim-accent').trim() || '#e87868',
+      accent: style.getPropertyValue('--sim-accent').trim() || '#00AAAB',
       line: style.getPropertyValue('--sim-line').trim() || 'rgba(117,91,70,0.2)',
       muted: style.getPropertyValue('--sim-muted').trim() || '#706a73',
       first: style.getPropertyValue('--wave-first').trim() || '#5fb6c4',

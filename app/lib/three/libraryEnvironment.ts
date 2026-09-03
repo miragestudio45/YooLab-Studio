@@ -10,6 +10,7 @@ import {
   type StudioBackdrop,
 } from './studioBackdrop';
 import { createVisibilityGate } from './visibility';
+import { createFrameGovernor, pixelRatioCap } from './deviceTier';
 
 /**
  * Library viewer environment — a warm ivory room.
@@ -159,8 +160,7 @@ export function createLibraryStage(host: HTMLElement, options: LibraryStageOptio
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = bridgeAppearance ? 0.86 : 0.92;
   renderer.setClearColor(bridgeAppearance ? BRIDGE_CLEAR_COLOR : LIBRARY_CLEAR_COLOR, 1);
-  let pixelRatio = Math.min(window.devicePixelRatio, compact ? 1.4 : 1.75);
-  renderer.setPixelRatio(pixelRatio);
+  renderer.setPixelRatio(pixelRatioCap('panel'));
   renderer.domElement.setAttribute('aria-hidden', 'true');
   renderer.domElement.className = 'stage-canvas';
   // A canvas is inline by default, which leaves a baseline gap under it.
@@ -262,11 +262,35 @@ export function createLibraryStage(host: HTMLElement, options: LibraryStageOptio
   const onVisibility = () => { tabVisible = document.visibilityState !== 'hidden'; };
   document.addEventListener('visibilitychange', onVisibility);
 
-  // Adaptive resolution. Two sustained slow windows are allowed to step the
-  // ratio down; the bee stage renders the scene twice, so one step is often not
-  // enough on integrated graphics.
-  let slowFrames = 0;
-  let downscales = 0;
+  /*
+    * Adaptive resolution, through the shared governor.
+    *
+    * What was here counted forty slow FRAMES, which is 0.66 s at 60 fps and
+    * 2.7 s at 15 fps — so the slower the machine, the longer it waited before
+    * helping. It also had no way back up, and this stage's first specimen is
+    * mounted while the section is thousands of pixels below the fold: the model
+    * fetch and the shader compile that follows it are exactly the kind of stall
+    * that used to be read as "this GPU is slow" and cost the stage its
+    * resolution for the rest of the visit.
+    */
+  const governor = createFrameGovernor({
+    start: pixelRatioCap('panel'),
+    /* This canvas sits inside a card next to 10 px labels, so it keeps at least
+       one buffer pixel per CSS pixel on any machine that has not told us it
+       cannot afford one. Same decision, and the same measurement behind it, as
+       in `ExploreCanvas`. */
+    floor: 0.8,
+    crispFloor: 1,
+    /* One pass over one specimen, so it can hold a tighter budget than the
+       full-viewport cinematic canvas does. */
+    budgetMs: 19,
+    comfortMs: 13,
+    step: 0.25,
+    apply: (next) => {
+      renderer.setPixelRatio(next);
+      resize();
+    },
+  });
 
   return {
     renderer,
@@ -281,16 +305,7 @@ export function createLibraryStage(host: HTMLElement, options: LibraryStageOptio
     renderSize,
     onResize: (handler) => { handlers.push(handler); },
     active: () => gate.visible() && tabVisible,
-    noteFrame: (delta) => {
-      if (downscales >= 2) return;
-      slowFrames = delta > 0.028 ? slowFrames + 1 : 0;
-      if (slowFrames <= 40) return;
-      slowFrames = 0;
-      downscales += 1;
-      pixelRatio = Math.max(0.8, pixelRatio - 0.3);
-      renderer.setPixelRatio(pixelRatio);
-      resize();
-    },
+    noteFrame: (delta) => governor.note(delta),
     dispose: () => {
       renderer.setAnimationLoop(null);
       document.removeEventListener('visibilitychange', onVisibility);

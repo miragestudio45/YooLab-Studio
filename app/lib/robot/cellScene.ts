@@ -587,7 +587,7 @@ export async function createRobotCellScene(): Promise<RobotCellScene> {
    */
   const targetGeometry = keep(new THREE.RingGeometry(0.24, 0.3, 48));
   const targetMaterial = keep(new THREE.MeshBasicMaterial({
-    color: 0xe87868,
+    color: 0x00aaab,
     transparent: true,
     opacity: 0.9,
     side: THREE.DoubleSide,

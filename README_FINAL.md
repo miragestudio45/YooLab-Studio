@@ -59,11 +59,16 @@ shell is 1376 and every edge agrees.
 ## Colour: one token block
 
 Every colour on the site resolves to a token in the `:root` block at the top of
-`app/globals.css`. This round runs the coral/ivory experiment — `--color-accent:
-#ed8a72`, `--color-accent-strong: #e87868` on `--color-bg: #fbf8f4` — and the
-older variable names (`--brand`, `--surface`, `--ink`, `--line`, …) are aliased to
-those tokens at the bottom of the same block. Swapping back to the official
-YooLab brand is an edit to one block, not a find-and-replace across 2,900 lines.
+`app/globals.css`. It now runs the **official brand**: the gradient
+`#96DEDA → #50C9C3`, with `#50C9C3` as the solid wherever a surface takes one
+flat colour, on the site's own warm ivory ground (`--color-bg: #fbf8f4`), which
+the accent swap deliberately did not touch. The older variable names
+(`--brand`, `--surface`, `--ink`, `--line`, …) are aliased to those tokens at the
+bottom of the same block, which is what let the whole re-key off the previous
+coral/ivory experiment be an edit to one block rather than a find-and-replace
+across 2,900 lines. See DESIGN.md §4 for the ramp and the two rules that make it
+legible — the sweep fills but never writes, and white is not available on a
+brand fill.
 
 The site is light-first throughout. The only dark surface is the Formula
 workshop overlay, which is a full-screen mode change rather than another section
