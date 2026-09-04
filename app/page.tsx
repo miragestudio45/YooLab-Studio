@@ -1,4 +1,3 @@
-import { BrandLockup } from './components/BrandMark';
 import { BridgeSection } from './components/BridgeSection';
 import { EducationSection } from './components/EducationSection';
 import { ExploreStory } from './components/ExploreStory';
@@ -8,6 +7,7 @@ import { PracticeSection } from './components/PracticeSection';
 import { ProofSection } from './components/ProofSection';
 import { ScrollReveal } from './components/ScrollReveal';
 import { SectionSnap } from './components/SectionSnap';
+import { SiteFooter } from './components/SiteFooter';
 import { SiteHeader } from './components/SiteHeader';
 import { StartWithYooLabButton } from './components/StartWithYooLabButton';
 import { StudioDemo } from './components/StudioDemo';
@@ -142,37 +142,7 @@ export default function Home() {
           </div>
         </section>
 
-        <footer className="site-footer">
-          <div className="footer-brand">
-            <BrandLockup height={26} />
-            <p>Không gian học tập 3D/XR<br />cho một thế hệ tò mò.</p>
-          </div>
-          <div className="footer-links">
-            <div>
-              <b>Sản phẩm</b>
-              <a href="#kham-pha">Khám phá</a>
-              <a href="#cong-cu">YooLab</a>
-              <a href="#thu-vien">Thư viện</a>
-              <a href="#thuc-hanh">Thực hành &amp; STEM</a>
-            </div>
-            <div>
-              <b>Giáo dục</b>
-              <a href="#giao-duc">Giáo viên</a>
-              <a href="#giao-duc">Học sinh</a>
-              <a href="#giao-duc">Nhà trường</a>
-              <a href="#bai-hoc-mau">Bài học mẫu</a>
-            </div>
-            <div>
-              <b>Kết nối</b>
-              <a href="#bat-dau-voi-yoolab">Bắt đầu với YooLab</a>
-              <a href="mailto:hello@yoolab.vn">hello@yoolab.vn</a>
-            </div>
-          </div>
-          <div className="footer-bottom">
-            <span>© 2026 YooLab. Made for curious minds.</span>
-            <span>Quyền riêng tư · Điều khoản</span>
-          </div>
-        </footer>
+        <SiteFooter />
       </FormulaGate>
     </main>
   );
