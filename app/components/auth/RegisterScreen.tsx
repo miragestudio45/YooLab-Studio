@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useState, type FormEvent } from 'react';
 import authService from '../../lib/auth/auth-service';
@@ -187,7 +186,13 @@ function RegisterForm() {
 
             <p className="auth-register">
               Đã có tài khoản?
-              <Link href="/login">Đăng nhập</Link>
+              {/* A plain next/link here silently fails to navigate on the
+                  production vinext build (its client Link chunk throws on
+                  click) even though it works in local dev — router.push,
+                  same as the header CTA, is confirmed working in production. */}
+              <button type="button" className="auth-register-link" onClick={() => router.push('/login')}>
+                Đăng nhập
+              </button>
             </p>
           </div>
 

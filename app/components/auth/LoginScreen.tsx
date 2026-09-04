@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, type FormEvent } from 'react';
 import authService from '../../lib/auth/auth-service';
@@ -198,7 +197,12 @@ export function LoginScreen() {
 
             <p className="auth-register">
               Bạn chưa có tài khoản?
-              <Link href="/register">Đăng ký</Link>
+              {/* See RegisterScreen.tsx: next/link's client chunk throws on
+                  click in the production vinext build, so this uses
+                  router.push instead. */}
+              <button type="button" className="auth-register-link" onClick={() => router.push('/register')}>
+                Đăng ký
+              </button>
             </p>
 
             <div className="auth-divider">hoặc</div>
