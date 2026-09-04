@@ -1,6 +1,8 @@
+
 import { BridgeSection } from './components/BridgeSection';
 import { EducationSection } from './components/EducationSection';
 import { ExploreStory } from './components/ExploreStory';
+import { FaqSection, FaqStructuredData } from './components/FaqSection';
 import { FormulaGate } from './components/FormulaGate';
 import { GfxHud } from './components/GfxHud';
 import { LibraryWorkspace } from './components/library/LibraryWorkspace';
@@ -11,8 +13,11 @@ import { SectionSnap } from './components/SectionSnap';
 import { SiteFooter } from './components/SiteFooter';
 import { SiteHeader } from './components/SiteHeader';
 import { StartWithYooLabButton } from './components/StartWithYooLabButton';
-import { StudioDemo } from './components/StudioDemo';
-import { IconQuiz, IconSpace, IconSteps, IconText } from './components/studio/EditorIcons';
+import { StudioDemoGate } from './components/StudioDemoGate';
+/* From the shared module, not the full set: these four are the editor's own
+   glyphs, but importing them out of `EditorIcons` drags all sixty-five into the
+   first request wave and undoes `StudioDemoGate`. */
+import { IconQuiz, IconSpace, IconSteps, IconText } from './components/studio/EditorIconsShared';
 
 /**
  * The page is one journey, and each stop answers exactly one question:
@@ -92,7 +97,7 @@ export default function Home() {
                 as the narrative column beside it — so the row is two panes, not
                 a framed device next to a card. */}
             <div className="shell tool-workspace" data-reveal>
-              <StudioDemo />
+              <StudioDemoGate />
             </div>
 
             <div className="shell tool-feature-shell" data-reveal>
@@ -127,6 +132,8 @@ export default function Home() {
         <PracticeSection />
         <EducationSection />
         <ProofSection />
+        <FaqSection />
+        <FaqStructuredData />
 
         <section className="final-cta" id="bat-dau-voi-yoolab" aria-labelledby="cta-title">
           <div className="cta-orb cta-orb--one" /><div className="cta-orb cta-orb--two" />

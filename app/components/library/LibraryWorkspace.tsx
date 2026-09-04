@@ -15,7 +15,7 @@ import {
   experiencesForSubject,
   readyCountForSubject,
 } from '../../lib/library/manifest';
-import { subscribeToLibraryOpen } from '../../lib/library/openExperience';
+import { openLibraryExperience, subscribeToLibraryOpen } from '../../lib/library/openExperience';
 import type { ExperienceManifest, SubjectId } from '../../lib/library/types';
 
 /**
@@ -164,6 +164,30 @@ export function LibraryWorkspace() {
     setActiveId(id);
     setSheetOpen(false);
   }), []);
+
+  /*
+   * `#thu-vien/<id>` opens that specimen, the way `#thuc-hanh/<lab>` already
+   * opens a practice room.
+   *
+   * The library's own pages link back here with exactly this shape — a teacher
+   * who arrives at `/thu-vien/sinh-hoc/ong-mat` from search and presses "Mở mô
+   * hình tương tác" expects the bee, not whatever the rail happened to be
+   * showing. Without this the fragment matched no element and the link simply
+   * landed at the top of the homepage.
+   *
+   * It also makes the deep link shareable in the other direction: paste
+   * `#thu-vien/tim` into a class chat and it opens the heart.
+   */
+  useEffect(() => {
+    const fromHash = () => {
+      const match = /^#thu-vien\/(.+)$/.exec(window.location.hash);
+      if (!match) return;
+      openLibraryExperience(decodeURIComponent(match[1]));
+    };
+    fromHash();
+    window.addEventListener('hashchange', fromHash);
+    return () => window.removeEventListener('hashchange', fromHash);
+  }, []);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {

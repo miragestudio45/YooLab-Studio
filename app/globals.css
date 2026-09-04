@@ -29,6 +29,8 @@
 @import './styles/exp-physics.css';
 @import './styles/exp-earth.css';
 @import './styles/exp-toolkit.css';
+@import './styles/faq.css';
+@import './styles/library-page.css';
 @import './styles/auth.css';
 @import './styles/toast.css';
 
@@ -3095,14 +3097,32 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
    * The sheet hangs off the bottom of the bar and is shell-aligned like the bar
    * itself, so opening the menu does not introduce a fifth left edge.
    */
+  /*
+   * The sheet opens by animating its grid row, not its height.
+   *
+   * This used to run `max-height: 0` to `560px`, which meant two things. The
+   * browser relaid the sheet's subtree on every frame of the open — with a
+   * `backdrop-filter` over it, so the blur resolved again each time — and the
+   * `560px` was a guess that had to stay comfortably larger than the real
+   * content, so the easing curve never matched the distance actually travelled.
+   *
+   * `grid-template-rows: 0fr -> 1fr` measures the content instead of guessing at
+   * it, and interpolates a track size rather than a box height. The padding
+   * moved to `.mobile-nav__inner` for the same reason: it was the second layout
+   * property being animated here, and on the inner element it is simply
+   * constant and clipped.
+   *
+   * Browsers without `0fr` interpolation (pre-2023) snap open instead of
+   * sliding, which is the correct degradation — the menu works, it just does not
+   * animate.
+   */
   .mobile-nav {
     position: absolute;
     top: calc(100% + 8px);
     right: 0;
     left: 0;
-    display: flex;
-    max-height: 0;
-    flex-direction: column;
+    display: grid;
+    grid-template-rows: 0fr;
     overflow: hidden;
     border: 1px solid transparent;
     border-radius: 15px;
@@ -3112,7 +3132,18 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
     box-shadow: 0 24px 55px rgba(87, 62, 43, 0.16);
     backdrop-filter: blur(20px) saturate(1.12);
     -webkit-backdrop-filter: blur(20px) saturate(1.12);
-    transition: max-height 300ms ease, opacity 200ms ease, background-color 300ms ease, color 300ms ease;
+    transition: grid-template-rows 300ms ease, opacity 200ms ease, background-color 300ms ease, color 300ms ease;
+  }
+
+  /* `min-height: 0` is what lets the track actually collapse: a grid item's
+     automatic minimum size would otherwise hold the row open at content height
+     and nothing would animate. */
+  .mobile-nav__inner {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 10px 14px 14px;
   }
   .site-header[data-theme='dark'] .mobile-nav {
     color: #fff;
@@ -3120,15 +3151,14 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
     background: rgba(4, 16, 39, 0.72);
   }
   .site-header.is-open .mobile-nav {
-    max-height: 560px;
-    padding: 10px 14px 14px;
+    grid-template-rows: 1fr;
     border-color: var(--color-border-hair);
     opacity: 1;
   }
   .site-header.is-open[data-theme='dark'] .mobile-nav {
     border-color: rgba(255, 255, 255, 0.16);
   }
-  .mobile-nav > a {
+  .mobile-nav__inner > a {
     display: flex;
     align-items: center;
     gap: 15px;
@@ -3137,7 +3167,7 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
     font-size: 14px;
     font-weight: 540;
   }
-  .mobile-nav > a span { color: color-mix(in srgb, currentColor 55%, transparent); font-size: 9px; }
+  .mobile-nav__inner > a span { color: color-mix(in srgb, currentColor 55%, transparent); font-size: 9px; }
   .mobile-nav .mobile-nav-cta {
     justify-content: center;
     margin-top: 10px;

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { StructuredData } from './components/StructuredData';
 import { ToastHost } from './components/ToastHost';
 
 const TITLE = 'YooLab — Biến kiến thức thành trải nghiệm 3D/XR';
@@ -10,6 +11,28 @@ export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? 'https://yoolab.vn'),
   title: TITLE,
   description: DESCRIPTION,
+  /*
+   * The homepage is one page carrying nine anchored sections, and every nav
+   * link, footer link and shareable deep link is a fragment on it —
+   * `#thu-vien`, `#thuc-hanh/robot`, `#bai-hoc-mau`. Fragments do not create
+   * URLs, but they are pasted, shared and linked, and some of them arrive back
+   * with tracking parameters attached. A canonical is what keeps all of that
+   * consolidated onto one indexable address instead of splitting its signals.
+   */
+  alternates: { canonical: '/' },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      /* The Library and the practice rooms are the product; a text-only snippet
+         cannot represent them, and a preview frame can. */
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+      'max-video-preview': -1,
+    },
+  },
   icons: {
     icon: [{ url: '/brand/yoolab-icon.svg', type: 'image/svg+xml' }],
     shortcut: '/brand/yoolab-icon.svg',
@@ -110,6 +133,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap"
         />
         <script dangerouslySetInnerHTML={{ __html: REVEAL_BOOTSTRAP }} />
+        <StructuredData />
       </head>
       <body>
         {children}

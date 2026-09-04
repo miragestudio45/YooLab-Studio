@@ -255,6 +255,7 @@
 }
 
 .studio,
+.studio-gate,
 .tool-story {
   position: relative;
   border-radius: var(--glass-radius);
@@ -275,6 +276,39 @@
 /* The specular sweep. It sits over the tint and under the content, and is masked
    to the top third so it reads as a highlight on a curved edge rather than as a
    gradient poured over the whole pane. */
+/*
+ * The editor's pane before the editor's code has arrived.
+ *
+ * `StudioDemoGate` holds `StudioDemo` back until the visitor is two viewports
+ * away, so this fills the same grid cell in the meantime. It carries the glass
+ * above rather than a placeholder colour, because the swap should be the
+ * instrument appearing *on* the pane — the pane itself was never the thing
+ * being waited for. With two viewports of runway it is normally never seen.
+ */
+.studio-gate {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 0;
+}
+
+.studio-gate .studio-loader {
+  position: static;
+  color: rgba(24, 62, 61, 0.5);
+  font-size: clamp(12px, 0.85vw, 14px);
+  gap: 9px;
+  transform: none;
+}
+
+.studio-gate .studio-loader i {
+  width: 15px;
+  height: 15px;
+  border-color: rgba(24, 62, 61, 0.18);
+  border-top-color: var(--color-accent-strong, #00aaab);
+}
+
 .studio::before,
 .tool-story::before {
   position: absolute;
@@ -293,6 +327,7 @@
 
 @supports not (backdrop-filter: blur(2px)) {
   .studio,
+  .studio-gate,
   .tool-story { background: linear-gradient(178deg, rgba(255, 255, 255, 0.9), rgba(226, 240, 238, 0.75)); }
 }
 

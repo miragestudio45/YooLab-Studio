@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { createFlowerValley } from '../lib/flowerValley/renderer';
-import { usePrefersReducedMotion } from '../lib/usePrefersReducedMotion';
+import { createFlowerValley, type FlowerValley } from '../lib/flowerValley/renderer';
+import { prefersReducedMotion, usePrefersReducedMotion } from '../lib/usePrefersReducedMotion';
 
 type FlowerValleyLayerProps = {
   /**
@@ -38,15 +38,39 @@ type FlowerValleyLayerProps = {
  */
 export function FlowerValleyLayer({ progressRef }: FlowerValleyLayerProps) {
   const hostRef = useRef<HTMLDivElement>(null);
+  const valleyRef = useRef<FlowerValley | null>(null);
   const reduceMotion = usePrefersReducedMotion();
 
+  /*
+   * Mount once.
+   *
+   * `reduceMotion` used to be in this dep array, and because
+   * `usePrefersReducedMotion` answers `true` on the server and the truth on the
+   * client, hydration always changed it — so the valley was built, disposed and
+   * built again, refetching `pool_summer.png` (243 KB) and re-slicing every
+   * tile through `createImageBitmap` while the hero was still loading. The
+   * second effect pushes the value in instead.
+   *
+   * The initial value is read from the query rather than taken from the hook,
+   * so it is the truth at mount without becoming a dependency.
+   */
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
-    const valley = createFlowerValley(host, { progress: progressRef, reduceMotion });
-    return () => valley.dispose();
-    // `progressRef` is a stable ref object; `reduceMotion` is the only real key.
-  }, [progressRef, reduceMotion]);
+    const valley = createFlowerValley(host, {
+      progress: progressRef,
+      reduceMotion: prefersReducedMotion(),
+    });
+    valleyRef.current = valley;
+    return () => {
+      valleyRef.current = null;
+      valley.dispose();
+    };
+  }, [progressRef]);
+
+  useEffect(() => {
+    valleyRef.current?.setReduceMotion(reduceMotion);
+  }, [reduceMotion]);
 
   return <div className="flower-valley" ref={hostRef} aria-hidden="true" />;
 }

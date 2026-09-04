@@ -134,9 +134,23 @@ export function ExploreStory() {
               <a className="primary-button" href="#thu-vien">
                 Khám phá bài học <span aria-hidden="true">→</span>
               </a>
+              {/*
+                "Xem", not "Mở".
+
+                This read "Mở YooLab" beside a play glyph, which is the wording
+                the header's account button earns — that one resolves the
+                visitor's project and opens the real editor in a new tab. This
+                one scrolls to `#cong-cu`, the demo. Two buttons on the same
+                first screen promising the same thing and delivering different
+                things is the kind of small dishonesty a visitor notices once
+                and then discounts everything else by. The section calls itself
+                "Công cụ YooLab" directly above the fold it scrolls to, so the
+                name is not needed twice — and keeping the label short is what
+                keeps both hero actions on one row at 390 px.
+              */}
               <a className="text-button" href="#cong-cu">
                 <span className="play-icon" aria-hidden="true">▶</span>
-                Mở YooLab
+                Xem công cụ
               </a>
             </div>
           </div>

@@ -1,0 +1,29 @@
+# Cloudflare Pages / Workers static headers.
+#
+# This file REPLACES the one vinext generates rather than adding to it — a
+# `public/_headers` is copied over the build's own output, which is easy to
+# discover the hard way: the first version of this file shipped without the
+# `/_next/static/*` block below and silently dropped every hashed chunk from a
+# year of immutable caching to the platform default. If vinext's generated
+# header set ever grows, this file has to grow with it.
+#
+# Everything under `/_next/static/` is content-hashed, so it can be immutable.
+/_next/static/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Nothing covered the 47 MB under `/asset/**` — every GLB, KTX2 and texture the
+# 3D surfaces load — so it fell to the platform default and a returning visitor
+# revalidated the bee's 1.8 MB model on essentially every visit.
+#
+# These filenames are NOT content-hashed, so `immutable` would be wrong: a
+# re-exported model has to be able to replace itself. `stale-while-revalidate`
+# is the right shape instead — the second visit is served from cache instantly
+# while the refresh happens behind it, and a new export is picked up within a
+# day rather than never.
+/asset/*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=2592000
+
+# The brand marks and the OG image change on the same cadence as the design,
+# not as the content.
+/brand/*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=2592000

@@ -993,7 +993,56 @@ const SHOTS = [
     run: `[...document.querySelectorAll('.education-tabs button')][2].click();`,
   },
   { name: 'proof', at: '#bai-hoc-mau', settle: 2200 },
+  /* Closed is the state the section is first seen in, so it is the state that
+     has to be checked; `faq-open` then covers the row heights and the marker's
+     open state, which is the only thing opening a row changes. */
+  { name: 'faq', at: '#cau-hoi', settle: 900 },
+  {
+    name: 'faq-open',
+    at: '#cau-hoi',
+    settle: 900,
+    run: `document.querySelector('.faq-item').open = true;`,
+  },
   { name: 'cta', at: '#bat-dau-voi-yoolab' },
+
+  /*
+   * The library deep link, end to end. Run with the fragment in the URL:
+   *   node reference-audit/shots.mjs --url 'http://localhost:3000/#thu-vien/tim' deeplink-tim
+   * The failure it guards is silent: before `LibraryWorkspace` handled the
+   * fragment, this landed at the top of the homepage and the rail kept whatever
+   * specimen it already had, so the link looked like it worked.
+   */
+  { name: 'deeplink-tim', at: '#thu-vien', settle: 4200 },
+
+  /*
+   * The mobile sheet, open. Run at w390:
+   *   node reference-audit/shots.mjs --viewport w390 --url http://localhost:3000 mobile-nav
+   * It exists because the open/close animation was rewritten from `max-height`
+   * to `grid-template-rows`, and the failure mode of that technique is a sheet
+   * that stays collapsed — invisible in every desktop shot.
+   */
+  {
+    name: 'mobile-nav',
+    at: '#trang-chu',
+    settle: 900,
+    run: `document.querySelector('.menu-toggle').click();`,
+  },
+
+  /*
+   * The standalone library pages, which are separate routes rather than
+   * sections — so these two need the harness pointed at the page itself:
+   *
+   *   node reference-audit/shots.mjs --url http://localhost:3000/thu-vien/sinh-hoc/ong-mat library-page
+   *   node reference-audit/shots.mjs --url http://localhost:3000/thu-vien library-index
+   *
+   * `clipOf` rather than an anchor because there is nothing to scroll to: the
+   * whole document is the subject, and clipping to the content column is what
+   * shows the part that is not already visible at the top.
+   */
+  { name: 'library-page', at: '#noi-dung', settle: 700, clipOf: { sel: '.lib-page__head', scale: 1.6 } },
+  { name: 'library-facts', at: '#noi-dung', settle: 700, run: `document.querySelector('.lib-page__facts').scrollIntoView({ block: 'center' });`, clipOf: { sel: '.lib-page__facts', scale: 1.8 } },
+  { name: 'library-note', at: '#noi-dung', settle: 700, run: `document.querySelector('.lib-page__note').scrollIntoView({ block: 'center' });`, clipOf: { sel: '.lib-page__note', scale: 1.8 } },
+  { name: 'library-index', at: '#noi-dung', settle: 700, clipOf: { sel: '.lib-hub__list', scale: 1.6 } },
 ];
 
 /* ---------------------------------------------------------------- CDP client --- */
