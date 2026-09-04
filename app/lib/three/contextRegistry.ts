@@ -50,6 +50,7 @@
  */
 
 import { isLeanDevice } from './deviceTier';
+import { presumeAppleSafePath } from './appleSafePath';
 
 export type ManagedContext = {
   /** Its position decides distance from the viewport. */
@@ -127,6 +128,18 @@ let budgetOverride: number | null = null;
 function budget(): number {
   if (budgetOverride !== null) return budgetOverride;
   const handheld = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+  /*
+   * The Explore hero holds one context outside this budget for the whole page,
+   * so every number here is one less than the page's real ceiling.
+   *
+   * On the Apple path that ceiling comes down to two: the hero, plus whichever
+   * single stage is on screen. Safari's per-page limit is low and undocumented,
+   * it is enforced by silently taking the OLDEST context away, and a canvas
+   * whose context has been taken composites as nothing — which is the same
+   * symptom as the corruption being chased, from a different cause. Two is the
+   * number that cannot get there.
+   */
+  if (presumeAppleSafePath().active) return handheld ? 1 : 2;
   if (handheld) return 2;
   return isLeanDevice() ? 3 : 4;
 }

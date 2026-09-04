@@ -3,6 +3,7 @@ import { BridgeSection } from './components/BridgeSection';
 import { EducationSection } from './components/EducationSection';
 import { ExploreStory } from './components/ExploreStory';
 import { FormulaGate } from './components/FormulaGate';
+import { GfxHud } from './components/GfxHud';
 import { LibraryWorkspace } from './components/library/LibraryWorkspace';
 import { PracticeSection } from './components/PracticeSection';
 import { ProofSection } from './components/ProofSection';
@@ -61,6 +62,7 @@ export default function Home() {
     <main id="trang-chu">
       <FormulaGate>
         <ScrollReveal />
+        <GfxHud />
         <SectionSnap />
         <SiteHeader />
         <ExploreStory />

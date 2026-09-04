@@ -1959,3 +1959,156 @@ button.lab-step.is-current:hover { color: var(--color-accent-deep); background: 
   .hmi-body { grid-template-columns: minmax(0, 1fr); }
   .hmi-group--joints { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ============================================== parked: practice overlay === */
+/*
+ * Styles for `practice/PracticeOverlay.tsx`, kept from local work.
+ *
+ * The shipping section opens its labs through `PracticeModal` instead, so
+ * nothing on the page matches these selectors today and none of them collide
+ * with the modal rules above. They stay because the overlay component stays:
+ * a full-bleed frame with an in-frame lab switcher, which the modal does not
+ * have. Delete both together, or neither.
+ */
+.practice-overlay {
+  position: fixed;
+  z-index: 120;
+  inset: 0;
+  padding: clamp(0px, 1.4vh, 18px) clamp(0px, 1.2vw, 22px);
+  background: rgba(38, 28, 24, 0.44);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: practice-overlay-in 220ms var(--ease-reveal);
+}
+
+@keyframes practice-overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.practice-overlay-frame {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+  border-radius: clamp(0px, 1vw, var(--radius-lg));
+  background: var(--color-surface);
+  box-shadow: 0 40px 120px rgba(38, 28, 24, 0.3);
+}
+/* In true fullscreen the frame *is* the screen: no radius, no shadow, nothing
+   to suggest there is a page behind it. */
+.practice-overlay-frame:fullscreen { border-radius: 0; box-shadow: none; }
+
+.practice-overlay-bar {
+  display: grid;
+  padding: 10px clamp(12px, 1.4vw, 20px);
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: clamp(10px, 1.6vw, 26px);
+  border-bottom: 1px solid var(--color-border-hair);
+  background: var(--color-surface-raised);
+}
+
+.practice-overlay-title {
+  display: flex;
+  margin: 0;
+  align-items: baseline;
+  gap: 9px;
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 660;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+.practice-overlay-title b {
+  color: var(--color-accent-deep);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.practice-overlay-tabs {
+  display: flex;
+  min-width: 0;
+  justify-content: center;
+  gap: 4px;
+}
+.practice-overlay-tabs button {
+  display: inline-flex;
+  min-height: 34px;
+  padding: 0 13px;
+  align-items: center;
+  gap: 7px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--color-muted);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: color 200ms ease, background-color 200ms ease;
+}
+.practice-overlay-tabs button b {
+  color: var(--color-muted-2);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+.practice-overlay-tabs button:hover { color: var(--color-ink-2); background: var(--color-surface-2); }
+.practice-overlay-tabs button.is-active { color: var(--color-accent-deep); background: var(--color-accent-wash); }
+.practice-overlay-tabs button.is-active b { color: var(--color-accent-deep); }
+
+.practice-overlay-actions { display: flex; align-items: center; gap: 7px; }
+
+.practice-overlay-button {
+  display: inline-flex;
+  min-height: 34px;
+  padding: 0 13px;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--color-ink-2);
+  background: var(--color-surface-2);
+  font-size: 11.5px;
+  font-weight: 620;
+  white-space: nowrap;
+  transition: color 200ms ease, background-color 200ms ease;
+}
+.practice-overlay-button svg { width: 15px; height: 15px; }
+.practice-overlay-button:hover { color: var(--color-accent-deep); background: var(--color-accent-wash); }
+
+.practice-overlay-close {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--color-muted);
+  background: var(--color-surface-2);
+  place-items: center;
+  transition: color 200ms ease, background-color 200ms ease;
+}
+.practice-overlay-close svg { width: 16px; height: 16px; }
+.practice-overlay-close:hover { color: #fff; background: var(--color-accent-strong); }
+
+.practice-overlay-stage {
+  position: relative;
+  min-height: 0;
+  background: var(--color-surface-2);
+}
+
+@media (max-width: 1000px) {
+  .practice-overlay-tabs button span { display: none; }
+  .practice-overlay-button span { display: none; }
+  .practice-overlay-button { padding: 0 10px; }
+}
+
+@media (max-width: 700px) {
+  .practice-overlay { padding: 0; }
+  .practice-overlay-frame { border-radius: 0; }
+  .practice-overlay-bar { grid-template-columns: minmax(0, 1fr) auto; row-gap: 8px; }
+  .practice-overlay-tabs { grid-column: 1 / -1; justify-content: flex-start; overflow-x: auto; }
+  .practice-overlay-tabs button span { display: inline; }
+}

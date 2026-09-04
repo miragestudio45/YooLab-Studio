@@ -101,10 +101,34 @@ const displayVertex = /* glsl */ `
   }
 `;
 
+/*
+ * `LIQUID_SIM` is a compile-time switch, not a strength of zero.
+ *
+ * When the simulation is off there is no state to read, and the version of this
+ * shader that read it anyway and multiplied by `uSimStrength = 0` was wrong in a
+ * way that only showed up on other people's hardware. Two reasons, and the
+ * second is the one that reached a screen:
+ *
+ *   - `0.0 * x` is not 0 for every x. It is NaN for NaN and for Inf, and a
+ *     half-float target that has never been rendered into holds undefined
+ *     memory, which decodes to both. The NaN then propagates through `field()`,
+ *     and `max(colour, 0.0)` does not remove it — GLSL leaves `max` with a NaN
+ *     operand implementation-defined. What arrived on an iPad was a flat
+ *     saturated green backdrop behind the entire hero.
+ *   - Even where the numbers behave, five texture fetches per pixel of a
+ *     full-screen plate is real fragment cost paid for a term that is known to
+ *     be zero — on exactly the devices that turned the simulation off to save
+ *     that cost.
+ *
+ * Compiling it out answers both, and means the sim targets do not have to exist
+ * at all in that mode.
+ */
 const displayFragment = /* glsl */ `
   precision highp float;
+  #ifdef LIQUID_SIM
   uniform sampler2D uSim;
   uniform vec2 uSimTexel;
+  #endif
   uniform vec2 uResolution;
   uniform float uTime;
   uniform float uSimStrength;
@@ -147,22 +171,46 @@ const displayFragment = /* glsl */ `
     float aspect = uResolution.x / max(uResolution.y, 1.0);
     vec2 p = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);
 
-    vec4 sim = texture2D(uSim, uv);
-    float left = texture2D(uSim, uv - vec2(uSimTexel.x, 0.0)).b;
-    float right = texture2D(uSim, uv + vec2(uSimTexel.x, 0.0)).b;
-    float down = texture2D(uSim, uv - vec2(0.0, uSimTexel.y)).b;
-    float up = texture2D(uSim, uv + vec2(0.0, uSimTexel.y)).b;
-    vec2 gradient = vec2(right - left, up - down) * uSimStrength;
-    vec2 flow = sim.rg * uSimStrength;
-    float height = sim.b * uSimStrength;
+    vec2 gradient = vec2(0.0);
+    vec2 flow = vec2(0.0);
+    float height = 0.0;
+    #ifdef LIQUID_SIM
+      vec4 sim = texture2D(uSim, uv);
+      float left = texture2D(uSim, uv - vec2(uSimTexel.x, 0.0)).b;
+      float right = texture2D(uSim, uv + vec2(uSimTexel.x, 0.0)).b;
+      float down = texture2D(uSim, uv - vec2(0.0, uSimTexel.y)).b;
+      float up = texture2D(uSim, uv + vec2(0.0, uSimTexel.y)).b;
+      gradient = vec2(right - left, up - down) * uSimStrength;
+      flow = sim.rg * uSimStrength;
+      height = sim.b * uSimStrength;
+    #endif
 
-    // Refraction through the surface, with a slight per-channel spread so the
-    // crests break into colour the way thin water does.
-    vec2 offset = gradient * 0.13 + flow * 0.006;
     vec3 color;
-    color.r = field(p + offset * 1.05, uTime).r;
-    color.g = field(p + offset, uTime).g;
-    color.b = field(p + offset * 0.95, uTime).b;
+    #ifdef LIQUID_SIM
+      // Refraction through the surface, with a slight per-channel spread so the
+      // crests break into colour the way thin water does. Three evaluations,
+      // because the three channels are sampled at three different points — that
+      // separation IS the dispersion.
+      vec2 offset = gradient * 0.13 + flow * 0.006;
+      color.r = field(p + offset * 1.05, uTime).r;
+      color.g = field(p + offset, uTime).g;
+      color.b = field(p + offset * 0.95, uTime).b;
+    #else
+      /*
+       * One evaluation, and it is not an approximation of the three above — it
+       * is the same answer.
+       *
+       * With no simulation there is no offset, so all three calls were being
+       * handed an identical p and their results thrown away down to one channel
+       * each. field() is twelve mass lobes over a two-octave sine warp, on a
+       * plate that covers the viewport and is drawn up to three times a frame
+       * (the canvas, the bee's refraction capture, and the same capture again in
+       * the foreground context). Paying for it three times per pixel to keep one
+       * channel of each was the largest avoidable fragment cost in the hero on
+       * the devices that turn the simulation off — which are the phones.
+       */
+      color = field(p, uTime);
+    #endif
 
     vec3 normal = normalize(vec3(-gradient * 6.0, 1.0));
     vec3 view = normalize(vec3(p * 0.35, 1.0));
@@ -232,28 +280,48 @@ export function createLiquidSurface(options: {
   simulate: boolean;
   planeWidth: number;
   planeHeight: number;
+  /**
+   * Colour type for the two simulation targets.
+   *
+   * Half-float by default, because the state is a signed velocity field that
+   * eight bits cannot carry. `lib/three/hdrTarget.ts` decides whether this GPU
+   * can be given one; where it cannot, the caller passes `UnsignedByteType` and
+   * the surface loses direction in its flow rather than the whole page losing
+   * its backdrop.
+   */
+  targetType?: THREE.TextureDataType;
 }): LiquidSurface {
   const { palette, simScale, simulate } = options;
 
   const targetOptions = {
     minFilter: THREE.LinearFilter,
     magFilter: THREE.LinearFilter,
-    type: THREE.HalfFloatType,
+    type: options.targetType ?? THREE.HalfFloatType,
     format: THREE.RGBAFormat,
     depthBuffer: false,
     stencilBuffer: false,
     wrapS: THREE.ClampToEdgeWrapping,
     wrapT: THREE.ClampToEdgeWrapping,
   } as const;
-  const targets = [
-    new THREE.WebGLRenderTarget(4, 4, targetOptions),
-    new THREE.WebGLRenderTarget(4, 4, targetOptions),
-  ];
+  /*
+   * Allocated only when they will be written.
+   *
+   * Nothing samples these unless `LIQUID_SIM` is defined on the display
+   * material, so in the still mode they would be two half-float buffers held
+   * for the life of the page and read by nobody — and, before the shader was
+   * given that switch, read by everybody. See `displayFragment`.
+   */
+  const targets = simulate
+    ? [
+        new THREE.WebGLRenderTarget(4, 4, targetOptions),
+        new THREE.WebGLRenderTarget(4, 4, targetOptions),
+      ]
+    : [];
   for (const target of targets) target.texture.colorSpace = THREE.NoColorSpace;
   let readIndex = 0;
 
   const simUniforms = {
-    uPrev: { value: targets[0].texture },
+    uPrev: { value: targets[0]?.texture ?? null },
     uTexel: { value: new THREE.Vector2(0.25, 0.25) },
     uPointer: { value: new THREE.Vector2(0.5, 0.5) },
     uPointerVelocity: { value: new THREE.Vector2() },
@@ -277,7 +345,7 @@ export function createLiquidSurface(options: {
   const simCamera = new THREE.Camera();
 
   const displayUniforms = {
-    uSim: { value: targets[0].texture },
+    uSim: { value: targets[0]?.texture ?? null },
     uSimTexel: { value: new THREE.Vector2(0.25, 0.25) },
     uResolution: { value: new THREE.Vector2(1, 1) },
     uTime: { value: 0 },
@@ -292,6 +360,7 @@ export function createLiquidSurface(options: {
   const mesh = new THREE.Mesh(
     new THREE.PlaneGeometry(options.planeWidth, options.planeHeight),
     new THREE.ShaderMaterial({
+      defines: simulate ? { LIQUID_SIM: '' } : {},
       vertexShader: displayVertex,
       fragmentShader: displayFragment,
       uniforms: displayUniforms,

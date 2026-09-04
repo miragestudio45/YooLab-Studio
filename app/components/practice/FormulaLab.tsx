@@ -69,7 +69,7 @@ const ROOM_SPAN = 26;
  */
 const NOTHING_TICKED = 0;
 
-export function FormulaLab({ onOpenFull }: { onOpenFull: () => void }) {
+export function FormulaLab({ onOpenFull }: { onOpenFull?: () => void }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<HTMLDivElement>(null);
   const modeRef = useRef<Mode>('STUDIO');
@@ -394,12 +394,12 @@ export function FormulaLab({ onOpenFull }: { onOpenFull: () => void }) {
                 <span>{index === 0 ? 'Xem xe hoàn thiện' : 'Lái thử'}</span>
                 <PracticeIcon name={index === 0 ? 'inspect' : 'drive'} />
               </button>
-            ) : (
+            ) : onOpenFull ? (
               <button type="button" className="lab-button is-primary" onClick={onOpenFull}>
                 <span>Toàn màn hình</span>
                 <PracticeIcon name="depth" />
               </button>
-            )
+            ) : null
           }
         >
           {mode === 'DRIVE' && (

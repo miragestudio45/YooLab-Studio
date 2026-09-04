@@ -61,37 +61,49 @@ const OPEN = (subject, row) => `
 `;
 
 /**
- * Selects one of the three practice labs by the start of its rail title, then
- * waits for its stage to exist.
+ * Selects one of the three practice cards by the start of its rail title.
  *
- * The two adapted labs are code-split, so selecting one is a chunk fetch, a
- * 320 ms crossfade and a mount — a fixed sleep raced all three and intermittently
- * handed the shot a Suspense fallback with no `.lab` in it at all.
+ * The section is a set of cards now: nothing 3D is mounted until a card is
+ * opened, so this is the cheap half — it only changes which poster, which brief
+ * and which highlighted rail row are on screen.
  */
-const PRACTICE = (title, selector) => `
+const CARD = (title) => `
   {
   const rail = [...document.querySelectorAll('.practice-rail-item')]
     .find((node) => node.textContent.includes(${JSON.stringify(title)}));
-  if (!rail) throw new Error('practice lab not found: ' + ${JSON.stringify(title)});
+  if (!rail) throw new Error('practice card not found: ' + ${JSON.stringify(title)});
   rail.click();
-  for (let attempt = 0; attempt < 60; attempt += 1) {
+  await new Promise((r) => setTimeout(r, 520));
+  }
+`;
+
+/**
+ * Opens a lab in its overlay and waits for the stage to exist, then resets it.
+ *
+ * Two waits, not one. The labs are code-split, so opening one is a chunk fetch,
+ * a mount and — for the Formula workshop and both aircraft — a few megabytes of
+ * glTF; a fixed sleep raced all of that and intermittently handed the shot a
+ * Suspense fallback with no `.lab` in it at all.
+ *
+ * The reset at the end matters just as much. The harness navigates once and
+ * runs every shot against that one document, so a lab is whatever the shot
+ * before it left behind — armed, mid-course, finished. Resetting through the
+ * visible control is also the honest way to do it: if "Làm lại" ever stops
+ * actually resetting a lab, every shot after it starts failing.
+ */
+const PRACTICE = (title, selector) => `
+  ${CARD(title)}
+  {
+  const open = document.querySelector('.practice-cta');
+  if (!open) throw new Error('practice: no "Mở trải nghiệm" button');
+  open.click();
+  for (let attempt = 0; attempt < 120; attempt += 1) {
     if (document.querySelector(${JSON.stringify(selector)})) break;
-    await new Promise((r) => setTimeout(r, 120));
+    await new Promise((r) => setTimeout(r, 150));
   }
   if (!document.querySelector(${JSON.stringify(selector)})) {
     throw new Error('practice lab never mounted: ' + ${JSON.stringify(selector)});
   }
-  /*
-   * Then press the lab's own "Làm lại".
-   *
-   * The harness navigates once and runs every shot against that one document,
-   * so a lab is whatever the shot before it left behind — armed, mid-course,
-   * finished, or a different lab entirely. Four shots that each passed alone
-   * failed as a suite for exactly that reason, and the failures looked like
-   * missing buttons rather than like stale state. Resetting through the visible
-   * control is also the honest way to do it: if "Làm lại" ever stops actually
-   * resetting a lab, every shot after it starts failing.
-   */
   const restart = [...document.querySelectorAll('.lab-actions .lab-button')]
     .find((node) => node.textContent.includes('Làm lại'));
   if (restart) restart.click();
@@ -99,12 +111,21 @@ const PRACTICE = (title, selector) => `
   }
 `;
 
+/** Closes whatever overlay is open, so the next shot starts from the section. */
+const CLOSE_LAB = `
+  {
+  const close = document.querySelector('.practice-overlay-close');
+  if (close) close.click();
+  await new Promise((r) => setTimeout(r, 420));
+  }
+`;
+
 /**
- * Waits for a lab action button to exist, then returns it.
+ * Waits for a lab action button to exist, then returns it as `action`.
  *
  * Every practice shot used to assume its lab was interactive by the time the
  * script ran, which held right up until the whole suite was run in one browser
- * session: eleven GLBs, three WebGL contexts and a dev server compiling on
+ * session: eleven glTF files, three WebGL contexts and a dev server compiling on
  * demand make "ready" a range rather than a moment, and four shots that each
  * passed alone failed together. Polling costs nothing when the button is
  * already there.
@@ -118,6 +139,22 @@ const ACTION = (text) => `
     if (!action) await new Promise((r) => setTimeout(r, 200));
   }
   if (!action) throw new Error('practice: no action ' + ${JSON.stringify(text)});
+`;
+
+/**
+ * Strips a lab down to its render, for baking a poster.
+ *
+ * The section's cards are photographs of the labs themselves rather than
+ * drawings of them, and they are taken here rather than in an art tool for one
+ * reason: they then cannot drift. Re-tune the robot's home pose or reframe the
+ * drone's chase camera and the picture on the card is one command away from
+ * being true again, instead of being a render somebody made once.
+ */
+const BARE = `
+  for (const node of document.querySelectorAll(
+    '.lab-badge, .lab-steps, .lab-brief, .lab-actions, .lab-readout, .lab-keys, .lab-craft, .lab-advanced, .lab-pad, .lab-flash, .lab-status',
+  )) node.style.display = 'none';
+  await new Promise((r) => setTimeout(r, 260));
 `;
 
 const SHOTS = [
@@ -473,8 +510,32 @@ const SHOTS = [
   {
     name: 'practice',
     at: '#thuc-hanh',
-    run: PRACTICE('Xưởng mô hình', '.lab--formula'),
-    settle: 4200,
+    run: `${CLOSE_LAB}${CARD('Xưởng mô hình')}`,
+    settle: 900,
+  },
+  {
+    /*
+     * The overlay, open on the robot.
+     *
+     * The one shot that proves the section's central claim: the cards are
+     * pictures, and behind them is the running thing. It also photographs the
+     * bar — lab tabs, fullscreen, close — which is the only chrome on this page
+     * that has to work while a WebGL scene owns the rest of the screen.
+     */
+    name: 'practice-overlay',
+    at: '#thuc-hanh',
+    run: `${CLOSE_LAB}${PRACTICE('Vận hành', '.lab--robot')}
+      await new Promise((r) => setTimeout(r, 1800));
+    `,
+    settle: 1200,
+  },
+  {
+    /* The card set, on the drone. Proves the poster, the brief and the rail all
+       track the selection rather than only the first one doing so. */
+    name: 'practice-card-drone',
+    at: '#thuc-hanh',
+    run: `${CLOSE_LAB}${CARD('Trải nghiệm')}`,
+    settle: 700,
   },
   {
     /*
@@ -490,7 +551,7 @@ const SHOTS = [
      */
     name: 'practice-cycle',
     at: '#thuc-hanh',
-    run: `${PRACTICE('Trải nghiệm', '.lab--drone')}
+    run: `${CLOSE_LAB}${PRACTICE('Trải nghiệm', '.lab--drone')}
       ${PRACTICE('Vận hành', '.lab--robot')}
       ${PRACTICE('Xưởng mô hình', '.lab--formula')}
       await new Promise((r) => setTimeout(r, 2600));
@@ -504,7 +565,7 @@ const SHOTS = [
        moved between two lighting rigs. */
     name: 'practice-formula-kit',
     at: '#thuc-hanh',
-    run: `${PRACTICE('Xưởng mô hình', '.lab--formula')}
+    run: `${CLOSE_LAB}${PRACTICE('Xưởng mô hình', '.lab--formula')}
       /* Waits on the action row, then clicks the step chip: both only exist
          once the workshop has finished loading. */
       ${ACTION('Lái thử')}
@@ -516,7 +577,7 @@ const SHOTS = [
   {
     name: 'practice-formula-drive',
     at: '#thuc-hanh',
-    run: `${PRACTICE('Xưởng mô hình', '.lab--formula')}
+    run: `${CLOSE_LAB}${PRACTICE('Xưởng mô hình', '.lab--formula')}
       ${ACTION('Lái thử')}
       action.click();
       await new Promise((r) => setTimeout(r, 900));
@@ -534,7 +595,7 @@ const SHOTS = [
        the step strip has moved off 01. */
     name: 'practice-drone',
     at: '#thuc-hanh',
-    run: `${PRACTICE('Trải nghiệm', '.lab--drone')}
+    run: `${CLOSE_LAB}${PRACTICE('Trải nghiệm', '.lab--drone')}
       ${ACTION('Khởi động')}
       action.click();
       const stage = document.querySelector('.lab--drone');
@@ -553,6 +614,38 @@ const SHOTS = [
   },
   {
     /*
+     * The second airframe.
+     *
+     * One flight model, two aircraft — which is upstream's decision and the
+     * interesting one for a student, but it is also the change most likely to
+     * break silently: the helicopter's rotors spin about axes the quadrotor's
+     * do not, and a wrong mount reads as a helicopter with a stationary disc
+     * rather than as an error.
+     */
+    name: 'practice-heli',
+    at: '#thuc-hanh',
+    run: `${CLOSE_LAB}${PRACTICE('Trải nghiệm', '.lab--drone')}
+      const stage = document.querySelector('.lab--drone');
+      const heli = [...document.querySelectorAll('.lab-craft button')]
+        .find((node) => node.textContent.includes('Trực thăng'));
+      if (!heli) throw new Error('drone: no craft switch');
+      heli.click();
+      for (let attempt = 0; attempt < 90; attempt += 1) {
+        if (!document.querySelector('.lab--drone .lab-status')) break;
+        await new Promise((r) => setTimeout(r, 200));
+      }
+      ${ACTION('Khởi động')}
+      action.click();
+      stage.focus();
+      await new Promise((r) => setTimeout(r, 400));
+      stage.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyR', bubbles: true }));
+      await new Promise((r) => setTimeout(r, 1400));
+      stage.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyR', bubbles: true }));
+    `,
+    settle: 1800,
+  },
+  {
+    /*
      * The drone's whole lesson, flown end to end.
      *
      * This is the shot that proves the guided flow *finishes*. A lab whose
@@ -562,7 +655,7 @@ const SHOTS = [
      */
     name: 'practice-drone-landed',
     at: '#thuc-hanh',
-    run: `${PRACTICE('Trải nghiệm', '.lab--drone')}
+    run: `${CLOSE_LAB}${PRACTICE('Trải nghiệm', '.lab--drone')}
       const stage = document.querySelector('.lab--drone');
       stage.focus();
       ${ACTION('Khởi động')}
@@ -667,18 +760,18 @@ const SHOTS = [
   },
   {
     /*
-     * The robot's whole lesson, run closed-loop.
+     * The robot's whole lesson, end to end.
      *
-     * Unlike the drone this one steers on feedback rather than on timings: the
-     * cell already shows the pilot when the tool is over its target — the ring
-     * goes green and the readout says "Đúng vị trí" — so the script watches for
-     * exactly the signal a student watches for. That makes it a test of the
-     * affordance as well as of the mechanism: if the snap indicator stops being
-     * truthful, this shot stops passing.
+     * Driven through the buttons rather than through the arrow keys, because
+     * that is the mechanism this lab is built on: "Tới khối hàng" and "Tới khay"
+     * command the *same point* the arrow keys move, so a script that uses them
+     * is testing the servo, the reach envelope and the pick/place tolerances —
+     * everything except a human's aim. The jog is still exercised first, since
+     * it is what unlocks step 03.
      */
     name: 'practice-robot-done',
     at: '#thuc-hanh',
-    run: `${PRACTICE('Vận hành', '.lab--robot')}
+    run: `${CLOSE_LAB}${PRACTICE('Vận hành', '.lab--robot')}
       const stage = document.querySelector('.lab--robot');
       stage.focus();
       ${ACTION('Bắt đầu điều khiển')}
@@ -692,52 +785,40 @@ const SHOTS = [
         stage.dispatchEvent(new KeyboardEvent('keydown', { code, bubbles: true }));
         setTimeout(() => {
           stage.dispatchEvent(new KeyboardEvent('keyup', { code, bubbles: true }));
-          setTimeout(done, 180);
+          setTimeout(done, 260);
         }, ms);
       });
+      /* The cell already shows the operator when the tool is over its target —
+         the ring goes green and the readout says "Đúng vị trí" — so the script
+         waits for exactly the signal a person waits for. */
       const onTarget = () => Boolean(document.querySelector('.lab-readout b.is-ok'));
-      /* Settle before trusting the ring: it goes green while the arm is still
-         travelling, and what matters is whether it is green once it stops. */
-      const settled = async () => {
-        if (!onTarget()) return false;
-        await new Promise((r) => setTimeout(r, 420));
+      const waitForTarget = async (budgetMs) => {
+        for (let waited = 0; waited < budgetMs; waited += 150) {
+          if (onTarget()) return true;
+          await new Promise((r) => setTimeout(r, 150));
+        }
         return onTarget();
       };
-      const nudgeUntilOnTarget = async (codes, budget) => {
-        for (let attempt = 0; attempt < budget; attempt += 1) {
-          if (await settled()) return true;
-          await hold(codes[attempt % codes.length], 200);
-        }
-        return settled();
-      };
-
-      /* The jog is a flat 0.42 m/s with no ramp, so metres convert straight to
-         milliseconds. Home is (0.46, 0.78, 0.50); the pick station is
-         (0.66, 0.35, 0.46) and tray slot 01 is (−0.66, 0.35, 0.34). */
-      const jogMs = (metres) => Math.round((metres / 0.42) * 1000);
-      const ALL_AXES = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'KeyR', 'KeyF'];
 
       click('Bắt đầu điều khiển');
       await new Promise((r) => setTimeout(r, 400));
-      await hold('ArrowRight', jogMs(0.2));
-      await hold('KeyF', jogMs(0.43));
-      await hold('ArrowDown', jogMs(0.04));
-      if (!await nudgeUntilOnTarget(ALL_AXES, 30)) {
-        throw new Error('robot: never reached the pick point');
-      }
-      click('Đóng kẹp');
+      // Unlock step 03: the lab wants to see the point actually driven.
+      await hold('ArrowRight', 700);
+      await hold('KeyF', 700);
+      await new Promise((r) => setTimeout(r, 600));
+
+      click('Tới khối hàng');
+      if (!await waitForTarget(9000)) throw new Error('robot: never reached the pick point');
+      click('Bật hút');
       await new Promise((r) => setTimeout(r, 900));
-      await hold('KeyR', jogMs(0.16));
-      await hold('ArrowLeft', jogMs(1.32));
-      await hold('ArrowDown', jogMs(0.12));
-      await hold('KeyF', jogMs(0.16));
-      if (!await nudgeUntilOnTarget(ALL_AXES, 36)) {
-        throw new Error('robot: never reached the tray slot');
-      }
-      click('Mở kẹp');
-      await new Promise((r) => setTimeout(r, 1000));
+
+      click('Tới khay');
+      if (!await waitForTarget(12000)) throw new Error('robot: never reached the tray slot');
+      click('Tắt hút');
+      await new Promise((r) => setTimeout(r, 1100));
+
       click('Chạy tự động');
-      await new Promise((r) => setTimeout(r, 22000));
+      await new Promise((r) => setTimeout(r, 26000));
     `,
     settle: 1800,
   },
@@ -753,7 +834,7 @@ const SHOTS = [
      */
     name: 'practice-hint',
     at: '#thuc-hanh',
-    run: `${PRACTICE('Trải nghiệm', '.lab--drone')}
+    run: `${CLOSE_LAB}${PRACTICE('Trải nghiệm', '.lab--drone')}
       ${ACTION('Khởi động')}
       action.click();
       await new Promise((r) => setTimeout(r, 900));
@@ -767,24 +848,119 @@ const SHOTS = [
     settle: 1200,
   },
   {
+    /*
+     * The arm, magnified.
+     *
+     * Its hierarchy is transcribed from a Godot scene rather than imported, and
+     * the failure mode of a wrong transform is not an error — it is a linkage
+     * hanging half a metre off the joint it belongs to, which at section scale
+     * looks like a shadow. This is the only shot that would catch that.
+     */
+    name: 'practice-robot-detail',
+    at: '#thuc-hanh',
+    run: `${CLOSE_LAB}${PRACTICE('Vận hành', '.lab--robot')}
+      await new Promise((r) => setTimeout(r, 2200));
+    `,
+    settle: 1400,
+    /* `clipOf`, not `clip`: a raw clip is in document coordinates and this
+       section is only ever photographed after a scroll, so a hand-written box
+       lands somewhere in the hero. */
+    clipOf: { sel: '.lab-view', inset: [70, 190, 60, 170], scale: 2.4 },
+  },
+  {
     /* Past the look step and jogging, so the target ring, the key legend and
        the gripper action are all showing at once. */
     name: 'practice-robot',
     at: '#thuc-hanh',
-    run: `${PRACTICE('Vận hành', '.lab--robot')}
+    run: `${CLOSE_LAB}${PRACTICE('Vận hành', '.lab--robot')}
       ${ACTION('Bắt đầu điều khiển')}
       action.click();
       const stage = document.querySelector('.lab--robot');
       stage.focus();
       await new Promise((r) => setTimeout(r, 500));
       stage.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowRight', bubbles: true }));
-      await new Promise((r) => setTimeout(r, 900));
+      await new Promise((r) => setTimeout(r, 1100));
       stage.dispatchEvent(new KeyboardEvent('keyup', { code: 'ArrowRight', bubbles: true }));
       stage.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyF', bubbles: true }));
-      await new Promise((r) => setTimeout(r, 900));
+      await new Promise((r) => setTimeout(r, 1100));
       stage.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyF', bubbles: true }));
     `,
     settle: 2200,
+  },
+  /* ---------------------------------------------------------- posters --- */
+  {
+    name: 'poster-formula',
+    at: '#thuc-hanh',
+    run: `${CLOSE_LAB}${PRACTICE('Xưởng mô hình', '.lab--formula')}
+      ${ACTION('Lái thử')}
+      await new Promise((r) => setTimeout(r, 2400));
+      ${BARE}
+    `,
+    settle: 900,
+    clipOf: { sel: '.lab-view', scale: 2 },
+  },
+  {
+    name: 'poster-drone',
+    at: '#thuc-hanh',
+    run: `${CLOSE_LAB}${PRACTICE('Trải nghiệm', '.lab--drone')}
+      const stage = document.querySelector('.lab--drone');
+      stage.focus();
+      ${ACTION('Khởi động')}
+      action.click();
+      await new Promise((r) => setTimeout(r, 400));
+      stage.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyR', bubbles: true }));
+      await new Promise((r) => setTimeout(r, 850));
+      stage.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyR', bubbles: true }));
+      await new Promise((r) => setTimeout(r, 700));
+      /* Close in. The chase camera sits where a pilot needs it, which is far
+         enough back to read the course — and far too far back for a card that
+         has to say "this is a real aircraft" at a glance. Two wheel notches. */
+      stage.dispatchEvent(new WheelEvent('wheel', { deltaY: -420, bubbles: true, cancelable: true }));
+      stage.dispatchEvent(new WheelEvent('wheel', { deltaY: -240, bubbles: true, cancelable: true }));
+      await new Promise((r) => setTimeout(r, 2200));
+      ${BARE}
+    `,
+    settle: 900,
+    clipOf: { sel: '.lab-view', scale: 2 },
+  },
+  {
+    name: 'poster-robot',
+    at: '#thuc-hanh',
+    run: `${CLOSE_LAB}${PRACTICE('Vận hành', '.lab--robot')}
+      const stage = document.querySelector('.lab--robot');
+      stage.focus();
+      ${ACTION('Bắt đầu điều khiển')}
+      action.click();
+      await new Promise((r) => setTimeout(r, 400));
+      /* "Tới khối hàng" only exists once the jog step is behind you, so the
+         poster has to earn its way to step 03 like anybody else. Skipping this
+         silently photographed the idle pose for three rounds. */
+      const hold = (code, ms) => new Promise((done) => {
+        stage.dispatchEvent(new KeyboardEvent('keydown', { code, bubbles: true }));
+        setTimeout(() => {
+          stage.dispatchEvent(new KeyboardEvent('keyup', { code, bubbles: true }));
+          setTimeout(done, 240);
+        }, ms);
+      });
+      await hold('ArrowRight', 700);
+      await hold('KeyF', 700);
+      let goPick = null;
+      for (let attempt = 0; attempt < 40 && !goPick; attempt += 1) {
+        goPick = [...document.querySelectorAll('.lab-actions .lab-button')]
+          .find((node) => node.textContent.includes('Tới khối hàng'));
+        if (!goPick) await new Promise((r) => setTimeout(r, 150));
+      }
+      if (!goPick) throw new Error('poster: robot never reached step 03');
+      goPick.click();
+      for (let waited = 0; waited < 9000; waited += 150) {
+        if (document.querySelector('.lab-readout b.is-ok')) break;
+        await new Promise((r) => setTimeout(r, 150));
+      }
+      await new Promise((r) => setTimeout(r, 700));
+      ${BARE}
+    `,
+    settle: 900,
+    clipOf: { sel: '.lab-view', scale: 2 },
   },
   { name: 'education', at: '#giao-duc', settle: 3600 },
   /*
