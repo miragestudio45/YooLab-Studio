@@ -1,0 +1,19 @@
+# YooLab — https://yoolab.vn
+#
+# A static file rather than `app/robots.ts`: vinext is a beta Next-on-Vite
+# runtime whose own build output warns that it cannot always classify routes by
+# static analysis, and the metadata-file conventions are the part of the App
+# Router most likely to be missing. A file in `public/` is served identically by
+# Cloudflare, Vercel and `vinext start`, which is what a robots policy needs to
+# be. Revisit if vinext gains verified support.
+
+User-agent: *
+Allow: /
+
+# The authentication pages are real routes and should stay crawlable — /register
+# is the conversion destination — but they carry no content worth ranking on
+# their own and must never be the result a teacher lands on from search.
+# `Disallow` would also drop them from the sitemap's credibility, so they are
+# left indexable and simply deprioritised in sitemap.xml.
+
+Sitemap: https://yoolab.vn/sitemap.xml

@@ -1,7 +1,9 @@
+import Link from 'next/link';
 import { BrandLockup } from './components/BrandMark';
 import { BridgeSection } from './components/BridgeSection';
 import { EducationSection } from './components/EducationSection';
 import { ExploreStory } from './components/ExploreStory';
+import { FaqSection, FaqStructuredData } from './components/FaqSection';
 import { FormulaGate } from './components/FormulaGate';
 import { GfxHud } from './components/GfxHud';
 import { LibraryWorkspace } from './components/library/LibraryWorkspace';
@@ -130,6 +132,8 @@ export default function Home() {
         <PracticeSection />
         <EducationSection />
         <ProofSection />
+        <FaqSection />
+        <FaqStructuredData />
 
         <section className="final-cta" id="bat-dau-voi-yoolab" aria-labelledby="cta-title">
           <div className="cta-orb cta-orb--one" /><div className="cta-orb cta-orb--two" />
@@ -157,7 +161,12 @@ export default function Home() {
               <b>Sản phẩm</b>
               <a href="#kham-pha">Khám phá</a>
               <a href="#cong-cu">YooLab</a>
-              <a href="#thu-vien">Thư viện</a>
+              {/* A URL, not a fragment: this is the only edge from the homepage
+                  into the library's own pages, and every specimen is two clicks
+                  behind it. The interactive rail is still one scroll away at
+                  `#thu-vien`. `Link` because it is a route — the neighbours here
+                  are fragments on this page and stay plain anchors. */}
+              <Link href="/thu-vien" prefetch={false}>Thư viện</Link>
               <a href="#thuc-hanh">Thực hành &amp; STEM</a>
             </div>
             <div>

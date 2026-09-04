@@ -993,7 +993,33 @@ const SHOTS = [
     run: `[...document.querySelectorAll('.education-tabs button')][2].click();`,
   },
   { name: 'proof', at: '#bai-hoc-mau', settle: 2200 },
+  /* Closed is the state the section is first seen in, so it is the state that
+     has to be checked; `faq-open` then covers the row heights and the marker's
+     open state, which is the only thing opening a row changes. */
+  { name: 'faq', at: '#cau-hoi', settle: 900 },
+  {
+    name: 'faq-open',
+    at: '#cau-hoi',
+    settle: 900,
+    run: `document.querySelector('.faq-item').open = true;`,
+  },
   { name: 'cta', at: '#bat-dau-voi-yoolab' },
+
+  /*
+   * The standalone library pages, which are separate routes rather than
+   * sections — so these two need the harness pointed at the page itself:
+   *
+   *   node reference-audit/shots.mjs --url http://localhost:3000/thu-vien/sinh-hoc/ong-mat library-page
+   *   node reference-audit/shots.mjs --url http://localhost:3000/thu-vien library-index
+   *
+   * `clipOf` rather than an anchor because there is nothing to scroll to: the
+   * whole document is the subject, and clipping to the content column is what
+   * shows the part that is not already visible at the top.
+   */
+  { name: 'library-page', at: '#noi-dung', settle: 700, clipOf: { sel: '.lib-page__head', scale: 1.6 } },
+  { name: 'library-facts', at: '#noi-dung', settle: 700, run: `document.querySelector('.lib-page__facts').scrollIntoView({ block: 'center' });`, clipOf: { sel: '.lib-page__facts', scale: 1.8 } },
+  { name: 'library-note', at: '#noi-dung', settle: 700, run: `document.querySelector('.lib-page__note').scrollIntoView({ block: 'center' });`, clipOf: { sel: '.lib-page__note', scale: 1.8 } },
+  { name: 'library-index', at: '#noi-dung', settle: 700, clipOf: { sel: '.lib-hub__list', scale: 1.6 } },
 ];
 
 /* ---------------------------------------------------------------- CDP client --- */

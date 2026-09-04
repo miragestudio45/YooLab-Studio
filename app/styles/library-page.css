@@ -1,0 +1,251 @@
+/*
+ * The standalone library pages — one specimen, and one subject hub.
+ *
+ * These are documents, not workspaces. Everything else on this site is a
+ * viewport-height composition built around a canvas; this is prose that has to
+ * be read on a phone by a teacher deciding whether to use a model on Monday, and
+ * found by a crawler before that. So it takes the site's type scale, colours and
+ * shell width and almost nothing else: one measured column, generous leading, no
+ * glass, no snap, no reveal.
+ *
+ * The hero of the page is the writing, because the writing is what was already
+ * there and had nowhere to live.
+ */
+
+.lib-page {
+  --lib-measure: 68ch;
+  width: min(100% - 2 * clamp(18px, 5vw, 40px), 1100px);
+  margin-inline: auto;
+  padding-top: calc(var(--header-h, 64px) + clamp(28px, 6vh, 64px));
+  padding-bottom: clamp(56px, 10vh, 120px);
+  color: var(--color-ink);
+}
+
+/* ------------------------------------------------------------- breadcrumbs --- */
+
+.lib-page__crumbs {
+  display: flex;
+  align-items: center;
+  margin-bottom: clamp(20px, 3.5vh, 34px);
+  gap: 9px;
+  color: var(--ink-2);
+  font-size: 13px;
+  flex-wrap: wrap;
+}
+
+.lib-page__crumbs a { color: var(--ink-2); text-decoration: none; }
+.lib-page__crumbs a:hover { color: var(--brand-ink); text-decoration: underline; text-underline-offset: 3px; }
+.lib-page__crumbs b { color: var(--color-ink); font-weight: 620; }
+.lib-page__crumbs span { opacity: 0.4; }
+
+/* -------------------------------------------------------------------- head --- */
+
+.lib-page__head { max-width: var(--lib-measure); }
+
+.lib-page__head h1 {
+  margin: 0;
+  font-size: clamp(30px, 4.4vw, 56px);
+  font-weight: 700;
+  letter-spacing: -0.045em;
+  line-height: 1.04;
+}
+
+/* The scientific name, in the same italic the Library panel gives it. */
+.lib-page__latin {
+  margin: 6px 0 0;
+  color: var(--ink-2);
+  font-size: clamp(13px, 1.1vw, 15px);
+  font-style: italic;
+  font-weight: 450;
+}
+
+/*
+ * The opening line, at display weight.
+ *
+ * `poetic` in the manifest is described as "the sentence a teacher can open a
+ * lesson with", so it is set as a statement rather than as a caption — it is the
+ * one place on this page the writing is allowed a voice.
+ */
+.lib-page__poetic {
+  max-width: 34ch;
+  margin: clamp(18px, 2.6vh, 26px) 0 0;
+  color: var(--brand-ink);
+  font-size: clamp(17px, 1.7vw, 23px);
+  font-style: italic;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.32;
+}
+
+.lib-page__lede {
+  margin: clamp(14px, 2vh, 20px) 0 0;
+  color: var(--ink-2);
+  font-size: clamp(15px, 1.2vw, 17px);
+  line-height: 1.72;
+}
+
+.lib-page__open {
+  display: inline-flex;
+  align-items: center;
+  margin-top: clamp(20px, 3vh, 30px);
+  padding: 11px 20px;
+  gap: 8px;
+  border-radius: 999px;
+  color: #fff;
+  background: var(--color-accent-strong, #00aaab);
+  font-size: 14px;
+  font-weight: 620;
+  text-decoration: none;
+}
+
+.lib-page__open:hover { filter: brightness(1.06); }
+
+/* -------------------------------------------------------------------- body --- */
+
+.lib-page__body {
+  display: grid;
+  max-width: var(--lib-measure);
+  margin-top: clamp(38px, 6vh, 66px);
+  gap: clamp(30px, 5vh, 52px);
+}
+
+.lib-page__body h2 {
+  margin: 0 0 clamp(12px, 1.8vh, 18px);
+  font-size: clamp(18px, 1.7vw, 24px);
+  font-weight: 660;
+  letter-spacing: -0.035em;
+}
+
+.lib-page__goals,
+.lib-page__context {
+  margin: 0;
+  padding-left: 1.15em;
+  color: var(--ink-2);
+  font-size: clamp(14px, 1.05vw, 16px);
+  line-height: 1.7;
+}
+
+.lib-page__goals li,
+.lib-page__context li { margin-bottom: 7px; }
+
+/*
+ * Parts and facts share a definition-list shape, which is what they are: a
+ * name and the thing said about it. `<dl>` rather than a table because there is
+ * one column of values, and rather than a list because the pairing is the
+ * content.
+ */
+.lib-page__parts > div,
+.lib-page__facts > div {
+  display: grid;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--color-border-hair);
+  gap: 3px 20px;
+}
+
+.lib-page__parts dt,
+.lib-page__facts dt {
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 620;
+}
+
+.lib-page__parts dd,
+.lib-page__facts dd {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+/* Facts are label/value, so they sit on one row where there is room for it. */
+@media (min-width: 620px) {
+  .lib-page__facts > div { grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; }
+  .lib-page__facts dd { font-variant-numeric: tabular-nums; text-align: right; }
+}
+
+.lib-page__note {
+  padding: clamp(14px, 2vh, 18px) clamp(16px, 2.2vw, 22px);
+  margin-bottom: 12px;
+  border-radius: 12px;
+  background: var(--color-surface);
+}
+
+.lib-page__note b {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--brand-ink);
+  font-size: 12.5px;
+  font-weight: 660;
+  letter-spacing: 0.02em;
+}
+
+.lib-page__note p {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.lib-page__foot {
+  max-width: var(--lib-measure);
+  margin-top: clamp(40px, 7vh, 76px);
+  padding-top: clamp(20px, 3vh, 28px);
+  border-top: 1px solid var(--color-border-hair);
+}
+
+.lib-page__foot a { color: var(--brand-ink); font-size: 14px; font-weight: 560; text-decoration: none; }
+.lib-page__foot a:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+/* --------------------------------------------------------------- the index --- */
+
+.lib-hub__list {
+  display: grid;
+  margin: clamp(34px, 5.5vh, 58px) 0 0;
+  padding: 0;
+  gap: clamp(10px, 1.4vw, 16px);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 270px), 1fr));
+  list-style: none;
+}
+
+.lib-hub__list a {
+  display: grid;
+  height: 100%;
+  padding: clamp(16px, 2.2vw, 22px);
+  align-content: start;
+  gap: 4px;
+  border: 1px solid var(--color-border-hair);
+  border-radius: 14px;
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 160ms ease, transform 160ms ease;
+}
+
+.lib-hub__list a:hover {
+  border-color: var(--color-accent-strong, #00aaab);
+  transform: translateY(-2px);
+}
+
+.lib-hub__list h2 {
+  margin: 0;
+  font-size: clamp(16px, 1.3vw, 19px);
+  font-weight: 660;
+  letter-spacing: -0.03em;
+}
+
+.lib-hub__list i { color: var(--ink-2); font-size: 12.5px; font-weight: 450; }
+
+.lib-hub__list p {
+  margin: 6px 0 0;
+  color: var(--ink-2);
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+
+.lib-hub__topic {
+  margin-top: 10px;
+  color: var(--brand-ink);
+  font-size: 11px;
+  font-weight: 640;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
