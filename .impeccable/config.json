@@ -37,12 +37,6 @@
         "reason": "incumbent committed world: the italic em in every display heading on this page carries the same accent-to-lavender gradient (globals.css:521-526, seven selectors). The Library heading matching it is page consistency, not a Library decision; de-gradienting this one heading alone would make it the odd band."
       },
       {
-        "rule": "layout-transition",
-        "value": "max-height 300ms ease, opacity 200ms ease, background-color 300ms ease, color 300ms ease",
-        "createdAt": "2026-08-29T01:45:39.752Z",
-        "reason": "Pre-existing mobile-nav accordion open/close transition, shipped since commit c44e73a, predates and is unrelated to this session's auth work"
-      },
-      {
         "rule": "codex-grid-background",
         "value": "*",
         "files": [

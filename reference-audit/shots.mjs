@@ -1006,6 +1006,29 @@ const SHOTS = [
   { name: 'cta', at: '#bat-dau-voi-yoolab' },
 
   /*
+   * The library deep link, end to end. Run with the fragment in the URL:
+   *   node reference-audit/shots.mjs --url 'http://localhost:3000/#thu-vien/tim' deeplink-tim
+   * The failure it guards is silent: before `LibraryWorkspace` handled the
+   * fragment, this landed at the top of the homepage and the rail kept whatever
+   * specimen it already had, so the link looked like it worked.
+   */
+  { name: 'deeplink-tim', at: '#thu-vien', settle: 4200 },
+
+  /*
+   * The mobile sheet, open. Run at w390:
+   *   node reference-audit/shots.mjs --viewport w390 --url http://localhost:3000 mobile-nav
+   * It exists because the open/close animation was rewritten from `max-height`
+   * to `grid-template-rows`, and the failure mode of that technique is a sheet
+   * that stays collapsed — invisible in every desktop shot.
+   */
+  {
+    name: 'mobile-nav',
+    at: '#trang-chu',
+    settle: 900,
+    run: `document.querySelector('.menu-toggle').click();`,
+  },
+
+  /*
    * The standalone library pages, which are separate routes rather than
    * sections — so these two need the harness pointed at the page itself:
    *

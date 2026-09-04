@@ -169,6 +169,29 @@ type Role = {
   };
 };
 
+/*
+ * The school enquiry, composed rather than hand-encoded.
+ *
+ * A `mailto:` with a Vietnamese subject and a multi-line body is most of a
+ * screen of percent-escapes if written out, and the half-escaped version is
+ * indistinguishable from the correct one by eye. `encodeURIComponent` is the
+ * only reader that gets it right every time.
+ *
+ * The body is four prompts, because the first reply to a bare enquiry is always
+ * the same four questions and asking them here saves a round trip.
+ */
+const SCHOOL_ENQUIRY = `mailto:hello@yoolab.vn?subject=${encodeURIComponent(
+  'Tư vấn triển khai YooLab cho nhà trường',
+)}&body=${encodeURIComponent(
+  [
+    'Tên trường:',
+    'Số lớp / tổ bộ môn:',
+    'Môn muốn triển khai trước:',
+    'Người liên hệ và số điện thoại:',
+    '',
+  ].join('\n'),
+)}`;
+
 const ROLES: Role[] = [
   {
     id: 'teacher',
@@ -240,7 +263,21 @@ const ROLES: Role[] = [
       { title: 'Năng lực số', body: 'Giáo viên và học sinh đều tạo được nội dung 3D.' },
       { title: 'Triển khai theo quy mô', body: 'Mở rộng theo từng trường, từng tổ bộ môn.' },
     ],
-    cta: { label: 'Nhận tư vấn triển khai', href: '#bat-dau-voi-yoolab' },
+    /*
+     * The one tab whose CTA must not land on the signup form.
+     *
+     * This pointed at `#bat-dau-voi-yoolab`, and the button waiting there
+     * creates a personal teacher account — so a principal who asked for a
+     * rollout consultation was handed a form for one seat. The other two tabs
+     * are correctly self-serve; this audience is not, and scrolling them into
+     * the wrong funnel loses the enquiry that the whole tab was written for.
+     *
+     * `mailto:` rather than a form because there is no lead endpoint on this
+     * API — it exposes auth and studio projects and nothing else — and a form
+     * posting nowhere is worse than a mail client that opens. The subject is
+     * pre-filled so the enquiry arrives already sorted from a teacher's.
+     */
+    cta: { label: 'Nhận tư vấn triển khai', href: SCHOOL_ENQUIRY },
     lesson: {
       thumb: CLOWNFISH_THUMBNAIL,
       clip: BEE_THUMBNAIL,

@@ -113,10 +113,19 @@ export function SiteHeader() {
         aria-hidden={!open}
         inert={!open}
       >
-        {links.map(([label, href], index) => (
-          <a href={href} key={href} onClick={() => setOpen(false)}><span>0{index + 1}</span>{label}</a>
-        ))}
-        <UserMenu variant="mobile" onNavigate={() => setOpen(false)} />
+        {/*
+          The wrapper exists for the open/close animation, not for layout.
+          `.mobile-nav` collapses by animating `grid-template-rows` from `0fr` to
+          `1fr`, and that technique needs exactly one child to clip — the sheet
+          measures its content instead of being told a `max-height` that has to
+          be guessed high enough. See `.mobile-nav__inner`.
+        */}
+        <div className="mobile-nav__inner">
+          {links.map(([label, href], index) => (
+            <a href={href} key={href} onClick={() => setOpen(false)}><span>0{index + 1}</span>{label}</a>
+          ))}
+          <UserMenu variant="mobile" onNavigate={() => setOpen(false)} />
+        </div>
       </nav>
     </header>
   );

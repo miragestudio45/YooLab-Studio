@@ -96,11 +96,12 @@ export default async function LibraryExperiencePage({ params }: Params) {
 
         {/*
           The interactive model lives in the workspace, and this is the link to
-          it. `#thu-vien/<id>` is the deep link the Library already answers, so
-          arriving here from search and pressing this lands on the specimen with
-          its stage open — the same entry point the homepage rail uses.
+          it. The fragment is the same slug this page is addressed by, and
+          `LibraryWorkspace` resolves it through `openLibraryExperience` — so
+          arriving here from search and pressing this lands on *this* specimen
+          with its stage open, not on whatever the rail was showing.
         */}
-        <Link prefetch={false} className="lib-page__open" href={`/#thu-vien/${experience.id}`}>
+        <Link prefetch={false} className="lib-page__open" href={`/#thu-vien/${slug}`}>
           Mở mô hình tương tác <span aria-hidden="true">↗</span>
         </Link>
       </header>
