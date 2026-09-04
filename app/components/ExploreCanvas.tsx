@@ -966,12 +966,94 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
            * while the visitor is still up in the meadow, and it means the first
            * frame they actually see has nothing left to allocate.
            */
-          renderer.compile(world.scene, world.camera);
+          /*
+           * `compileAsync`, and one warm pass per frame.
+           *
+           * The warm-up was right about WHAT to do and wrong about when. It ran
+           * as one synchronous block - a full shader compile of the reef, then
+           * six full-scene renders back to back - and a block is a frame.
+           * Measured on an emulated 390 x 844 at DPR 3: a single frame of
+           * 4,467 ms, ending on the tick that sets `oceanWarm`. Nothing else in
+           * a 26-second trace came close; every other frame was 16.7 ms. On a
+           * phone that is the whole complaint - the page paints, then freezes,
+           * and the freeze lands while the visitor is still reading the hero.
+           *
+           * The work is unchanged and still finishes before the crossing. Two
+           * things changed: `compileAsync` returns a promise and, where
+           * `KHR_parallel_shader_compile` exists, lets the driver build programs
+           * off-thread instead of blocking on each one; and every render pass
+           * gets its own frame through `warmStep`. Six passes over six frames is
+           * the same GPU work and no long task.
+           *
+           * Each step restores whatever it mutated before it yields. That is not
+           * tidiness: between two steps the page paints, and a frame that caught
+           * a half-applied `setPresence` would show a creature dissolving for no
+           * reason the visitor could explain.
+           */
+          /*
+           * The reef's shaders, a slice at a time.
+           *
+           * `compileAsync` was tried here first and does not help: three's
+           * implementation calls the synchronous `compile()` and only defers
+           * *resolution* until the driver reports the programs ready, so the
+           * translation cost still lands in one frame. Measured on the emulated
+           * phone, that one call was 2,943 ms of the 4,467 ms stall.
+           *
+           * `compile()` walks the scene with `traverseVisible`, so hiding the
+           * meshes it has already done is enough to make it compile a subset —
+           * no reparenting, no temporary scene, no lighting difference, because
+           * the lights stay visible and the scene it resolves them from is the
+           * same one. Six slices is six frames the browser can paint and answer
+           * a touch between, instead of three seconds where it can do neither.
+           *
+           * The ocean is not on screen while this runs (`dive` is 0 in the
+           * meadow, so the loop draws only the land), which is why toggling its
+           * visibility is free rather than a flicker.
+           */
+          const compilable: THREE.Object3D[] = [];
+          world.scene.traverse((node) => {
+            const mesh = node as THREE.Mesh;
+            if (mesh.isMesh || (node as THREE.InstancedMesh).isInstancedMesh) compilable.push(node);
+          });
+          const wasVisible = compilable.map((node) => node.visible);
+          for (const node of compilable) node.visible = false;
+          /* Six slices: enough that no frame carries more than a few hundred
+             milliseconds, few enough that the walk itself is not the cost. */
+          const sliceSize = Math.max(1, Math.ceil(compilable.length / 6));
+          for (let start = 0; start < compilable.length; start += sliceSize) {
+            if (disposed) break;
+            const slice = compilable.slice(start, start + sliceSize);
+            for (let i = 0; i < slice.length; i += 1) slice[i].visible = wasVisible[start + i];
+            renderer.compile(world.scene, world.camera);
+            for (const node of slice) node.visible = false;
+            await new Promise<void>((resolve) => { requestAnimationFrame(() => resolve()); });
+          }
+          for (let i = 0; i < compilable.length; i += 1) compilable[i].visible = wasVisible[i];
+          if (disposed) { world.dispose(); return; }
           ensureTargets();
           if (landTarget && oceanTarget) {
-            const previous = [fish.root.visible, jelly.root.visible] as const;
-            fish.root.visible = true;
-            jelly.root.visible = true;
+            const warmStep = async (run: () => void) => {
+              if (disposed) return;
+              run();
+              renderer.setRenderTarget(null);
+              await new Promise<void>((resolve) => { requestAnimationFrame(() => resolve()); });
+            };
+            /* Captured as `const` because the closures below outlive the
+               straight-line narrowing: `fish` and `jelly` are the effect's
+               `let` bindings, and TypeScript cannot know they are still
+               assigned by the time a callback runs. */
+            const warmFish = fish;
+            const warmJelly = jelly;
+            const warmLand = landTarget;
+            const warmOcean = oceanTarget;
+            const withCreaturesVisible = (run: () => void) => {
+              const previous = [warmFish.root.visible, warmJelly.root.visible] as const;
+              warmFish.root.visible = true;
+              warmJelly.root.visible = true;
+              run();
+              warmFish.root.visible = previous[0];
+              warmJelly.root.visible = previous[1];
+            };
             /*
              * Both presence states, because they are different PROGRAMS.
              *
@@ -983,23 +1065,29 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
              * the crossing.
              */
             for (const presence of [0.5, 1]) {
-              fish.setPresence(presence);
-              jelly.setPresence(presence);
-              renderer.setRenderTarget(oceanTarget);
-              renderer.render(world.scene, world.camera);
+              await warmStep(() => withCreaturesVisible(() => {
+                warmFish.setPresence(presence);
+                warmJelly.setPresence(presence);
+                renderer.setRenderTarget(oceanTarget);
+                renderer.render(world.scene, world.camera);
+              }));
             }
             /* Compile and allocate the HDR extract/blur/composite while the
                visitor is still in the meadow, exactly like the waterline pass. */
-            oceanBloom.render(renderer, oceanTarget.texture, 0.88, OCEAN_EXPOSURE, warmScratch);
+            await warmStep(() => {
+              oceanBloom.render(renderer, warmOcean.texture, 0.88, OCEAN_EXPOSURE, warmScratch);
+            });
             /* The land half, including the bee's own blended variant, so the way
                back up is warm too. */
             const beePresence = bee ? 1 : 0;
             for (const presence of [0.5, 1]) {
-              bee?.setPresence(presence);
-              renderer.setRenderTarget(landTarget);
-              renderer.render(landScene, landCamera);
+              await warmStep(() => {
+                bee?.setPresence(presence);
+                renderer.setRenderTarget(landTarget);
+                renderer.render(landScene, landCamera);
+                bee?.setPresence(beePresence);
+              });
             }
-            bee?.setPresence(beePresence);
 
             /*
              * And the composite itself. It is a `RawShaderMaterial` with its own
@@ -1007,16 +1095,16 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
              * on first draw — which would otherwise be the first frame of the
              * water surface appearing.
              */
-            waterline.uniforms.uLand.value = landTarget.texture;
-            waterline.uniforms.uOcean.value = oceanTarget.texture;
-            waterline.uniforms.uOceanBloom.value = oceanBloom.texture;
-            waterline.uniforms.uBloomStrength.value = 0.88;
-            renderer.setRenderTarget(warmScratch);
-            renderer.render(waterline.scene, waterline.camera);
+            await warmStep(() => {
+              waterline.uniforms.uLand.value = warmLand.texture;
+              waterline.uniforms.uOcean.value = warmOcean.texture;
+              waterline.uniforms.uOceanBloom.value = oceanBloom.texture;
+              waterline.uniforms.uBloomStrength.value = 0.88;
+              renderer.setRenderTarget(warmScratch);
+              renderer.render(waterline.scene, waterline.camera);
+            });
 
-            renderer.setRenderTarget(null);
-            fish.root.visible = previous[0];
-            jelly.root.visible = previous[1];
+            if (disposed) return;
             host.dataset.oceanWarm = 'true';
           }
         } catch (error) {

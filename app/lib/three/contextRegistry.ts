@@ -132,14 +132,19 @@ function budget(): number {
    * The Explore hero holds one context outside this budget for the whole page,
    * so every number here is one less than the page's real ceiling.
    *
-   * On the Apple path that ceiling comes down to two: the hero, plus whichever
-   * single stage is on screen. Safari's per-page limit is low and undocumented,
-   * it is enforced by silently taking the OLDEST context away, and a canvas
-   * whose context has been taken composites as nothing — which is the same
-   * symptom as the corruption being chased, from a different cause. Two is the
-   * number that cannot get there.
+   * On the Apple path that ceiling comes down to two, handheld included, for a
+   * page total of three. Safari's per-page limit is low and undocumented, it is
+   * enforced by silently taking the OLDEST context away, and a canvas whose
+   * context has been taken composites as nothing.
+   *
+   * Two rather than one on a tablet, and the one was a mistake worth recording:
+   * a budget of one means the Library and YooStudio cannot both be admitted, so
+   * scrolling between them evicts and rebuilds a stage every time — churn, on
+   * the platform this exists to protect from churn. Two holds the section being
+   * read and its neighbour, which is what the 1.6-viewport admit band was sized
+   * for.
    */
-  if (presumeAppleSafePath().active) return handheld ? 1 : 2;
+  if (presumeAppleSafePath().active) return 2;
   if (handheld) return 2;
   return isLeanDevice() ? 3 : 4;
 }

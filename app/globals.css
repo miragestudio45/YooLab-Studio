@@ -251,6 +251,30 @@
 html {
   scroll-behavior: smooth;
   background: var(--surface);
+  /*
+   * iOS decides how big small text is unless it is told not to.
+   *
+   * `-webkit-text-size-adjust` defaults to `auto` on iOS and iPadOS, and `auto`
+   * is text autosizing: Safari inflates small type per block, by a factor it
+   * derives from the block's width against the viewport. Nothing on a desktop
+   * does this, so nothing about it shows up in a Chrome capture at any of the
+   * widths this project tests.
+   *
+   * It is why this page looked broken on an iPad and correct everywhere else.
+   * The type scale here bottoms out at 9.5-11 px by design — kickers, readouts,
+   * the editor's rail labels — and those live in columns sized to fit them with
+   * single-digit slack. Measured at 1194: the editor's tool rail is 70 px wide
+   * and `Thanh phan` is 56 px at 10.44 px, so 14 px of room. A 20% autosize
+   * boost is 67 px and the label is in the canvas. Every rail label in both
+   * rails overflowing at once — which is exactly what the iPad screenshots show
+   * — is one global cause, not eleven local ones.
+   *
+   * `100%` means "render the size I asked for". It does not disable pinch zoom;
+   * that is `user-scalable=no` in the viewport meta, which this site does not
+   * set and must not.
+   */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -313,8 +337,25 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   position: fixed;
   z-index: 50;
   top: 8px;
-  right: clamp(24px, 2vw, 32px);
-  left: clamp(24px, 2vw, 32px);
+  /*
+   * The shell's own left edge, computed rather than approximated.
+   *
+   * This was `clamp(24px, 2vw, 32px)` — a fourth horizontal width, which
+   * DESIGN.md section 1 names as a bug outright, and the one `measure.mjs` has
+   * been reporting as an open regression. It disagreed with the page at every
+   * size and in both directions: 47 px inboard at 1920, 6 px at 1024, 2 px the
+   * other way at 768. On a tablet that is the glass rail and the kicker
+   * underneath it visibly failing to line up.
+   *
+   * `.shell` is `min(--page-max, 100% - gutter * 2)`, centred — so its left edge
+   * is the gutter until the page hits its 1760 px cap and the leftover margin
+   * takes over. That is exactly this expression, and because the header is
+   * `fixed`, the percentage resolves against the same viewport width the shell
+   * measures itself from. `.mobile-nav` is positioned against this box, so the
+   * open menu inherits the alignment instead of needing its own copy of it.
+   */
+  right: max(var(--page-gutter), calc((100% - var(--page-max)) / 2));
+  left: max(var(--page-gutter), calc((100% - var(--page-max)) / 2));
   height: 56px;
   color: var(--color-ink);
   border: 1px solid rgba(255, 255, 255, 0.48);
@@ -3051,10 +3092,15 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
 }
 
 @media (max-width: 700px) {
-  .site-header {
-    right: 12px;
-    left: 12px;
-  }
+  /*
+   * The bar keeps the shell here too.
+   *
+   * It used to break out to a 12 px inset to buy back width on a 390. The
+   * gutter floor is 20 px, so that was 8 px of extra bar in exchange for the
+   * header being the one band on the page that did not line up with anything —
+   * on the narrowest screen, where a misalignment is the largest fraction of
+   * the width. 350 px is more than the brand and the hamburger need.
+   */
   .site-header-inner { padding-inline: 14px 6px; }
 }
 

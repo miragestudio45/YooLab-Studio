@@ -1823,6 +1823,28 @@ button.lab-step.is-current:hover { color: var(--color-accent-deep); background: 
 @media (max-width: 1000px) {
   .practice-main { grid-template-columns: minmax(0, 1fr); }
   /*
+   * Give the rail's label the width its own line breaks assume.
+   *
+   * The three cells are a third of the shell here, and at 768 that is 234 px.
+   * Take the item's 28 px of padding, the 88 px thumbnail and the 10 px gap out
+   * of it and the label had 108 px — while the longest authored line, `robot
+   * cong nghiep`, needs about 112 at 12.5px. So the manifest's deliberate
+   * two-line break wrapped to three, that cell grew taller than the two beside
+   * it, and the chooser read as three misaligned fragments.
+   *
+   * The thumbnail gives the pixels back, because it is the part that still reads
+   * at any size: it is a 4:3 crop of a poster, not a diagram with detail to
+   * lose. Proportional rather than fixed so the margin holds all the way down to
+   * the single-column switch at 700.
+   */
+  .practice-rail-item {
+    padding: 9px;
+    grid-template-columns: clamp(58px, 32%, 84px) minmax(0, 1fr);
+    gap: 8px;
+  }
+  .practice-rail-item b { margin-bottom: 3px; font-size: 10px; }
+  .practice-rail-item em { font-size: 11.5px; }
+  /*
    * Stage over brief. The pager's cell moves with it, so nothing has to be
    * repositioned: it is still `1 / 1`, which is now the whole first row.
    */

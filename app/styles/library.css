@@ -291,6 +291,28 @@
 .library-rail,
 .library-viewer,
 .library-knowledge {
+  /*
+   * `relative` here, in the base rule, and not in a standalone one further down
+   * the file.
+   *
+   * It exists to anchor `.scroll-thumb`, which is absolute. It used to be its
+   * own `.library-knowledge { position: relative; }` about two hundred lines
+   * BELOW the `max-width: 1180px` block that turns this panel into a bottom
+   * sheet with `position: fixed` — same specificity, later in source, so
+   * `relative` won at every width and the sheet never left the flow.
+   *
+   * What that cost: `.library-body` is two columns and one explicit
+   * `minmax(0, 1fr)` row on a tablet, and an in-flow third child auto-places
+   * into an IMPLICIT second row. The implicit row is `auto`, so it took the
+   * panel's full 568 px of content, and the explicit `1fr` row — the one
+   * holding the asset rail and the viewer — collapsed to 0. The rail measured
+   * 2 px: its two borders. The panel itself is `visibility: hidden` and
+   * translated off-screen by the same block, so the section rendered as a
+   * heading, a subject switcher and 569 px of nothing between two hairlines.
+   *
+   * Order is the whole bug. Declared here, the media query is later and wins.
+   */
+  position: relative;
   min-width: 0;
   min-height: 0;
   border: 1px solid var(--color-border);
@@ -1859,9 +1881,17 @@
 .library-rail-list::-webkit-scrollbar,
 .library-knowledge-scroll::-webkit-scrollbar { display: none; }
 
-/* The two panels that host an indicator become its containing block. */
-.library-rail,
-.library-knowledge { position: relative; }
+/*
+ * The rail hosts an indicator and so becomes its containing block.
+ *
+ * The knowledge panel needs the same thing and used to be named here beside it.
+ * It cannot be: two hundred lines above, the tablet regime turns that panel into
+ * a `position: fixed` bottom sheet, and a rule this far down the file overrode
+ * it at equal specificity — which is the whole reason the section rendered as
+ * 569 px of nothing on an iPad. Its `relative` now lives in its own base rule so
+ * the media query is the later one and wins.
+ */
+.library-rail { position: relative; }
 
 .scroll-thumb {
   position: absolute;

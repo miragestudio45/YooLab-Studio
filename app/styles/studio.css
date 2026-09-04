@@ -597,6 +597,18 @@
   letter-spacing: -0.005em;
   line-height: 1.18;
   white-space: pre-line;
+  /*
+   * A word that does not fit breaks rather than leaves the rail.
+   *
+   * `pre-line` wraps at the authored newlines and at spaces, which is enough
+   * while the metrics are the ones this was measured against. It is not enough
+   * when they are not: the rail is 64-70 px, the longest label is 56 px, and
+   * any font substitution or platform text scaling eats that margin — at which
+   * point `Khong gian` is one 70 px line printed across the 3D canvas. This is
+   * the backstop under the `text-size-adjust` fix in `globals.css`, not a
+   * replacement for it: the label may look tight, but it stays in its column.
+   */
+  overflow-wrap: anywhere;
 }
 
 /* "Tạo mới Dự án" is the one primary action on the rail and reads as a button. */
@@ -1158,6 +1170,7 @@
   display: flex;
   flex-direction: column;
   align-items: stretch;
+  justify-content: flex-start;
   padding: calc(4 * var(--u)) 0;
   border-right: 1px solid var(--ed-line-soft);
   gap: calc(2 * var(--u));
@@ -1901,6 +1914,65 @@
 
   .tool-heading { grid-template-columns: minmax(0, 1fr) minmax(240px, 42%); }
   .tool-heading h2 { font-size: clamp(30px, 4.4vw, 46px); }
+
+  /*
+   * The timeline's tool column turns into a tool ROW.
+   *
+   * Once the section stacks, the editor is wide and short: on a 1024 tablet the
+   * timeline panel is 827 x 122. Eight buttons down the 122 cannot each have a
+   * box bigger than its own glyph; along the 827 they can have one four times
+   * over. So the strip uses the axis that has room, which is also the axis a
+   * toolbar normally uses.
+   *
+   * The collapse button goes to the far end rather than staying seventh in
+   * line: it is the only control here that is not an edit, and on one row that
+   * distinction has somewhere to live.
+   */
+  /*
+   * The timeline band's floor, in pixels rather than in `--u`.
+   *
+   * It was `max(calc(228 * var(--u)), ...)`, and the comment on it says the
+   * `max()` is "a floor so the four track rows stay usable". It is not, on a
+   * tablet: `--u` bottoms out at 0.60px on a narrow editor, so the floor
+   * evaluates to 137px — it shrinks in exactly the regime where the content it
+   * protects does not. Measured at 1024 x 768, the band took the 34% branch at
+   * 188px and the four lanes came out 11.8px each, with a bar and a label
+   * inside each one. That is the crushed strip in the report.
+   *
+   * 228 is the author's own number; this only stops it being scaled away. What
+   * the band has to hold is fixed in real pixels — a tool row, a command bar, a
+   * ruler and four lanes — so its floor has to be too. At 228 the panel is
+   * ~163px and the lanes land at ~22px, and the canvas gives up 40px it can
+   * afford.
+   */
+  .studio { --tl-row: max(228px, 34%); }
+
+  .studio-timeline-panel {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .studio-timeline-tools {
+    flex-direction: row;
+    align-items: center;
+    padding: calc(4 * var(--u)) calc(8 * var(--u));
+    border-right: 0;
+    border-bottom: 1px solid var(--ed-line-soft);
+    gap: calc(6 * var(--u));
+    overflow: auto hidden;
+  }
+  /*
+   * `1.7em`, and the unit is the point: `font-size` on this button IS the
+   * icon's size, so `em` means "1.7 glyphs" and the box cannot be smaller than
+   * what sits in it.
+   *
+   * This is the measurement that started the whole change. Down the column on a
+   * 1024 tablet the panel is 122 px, `flex: 1` gave each button 13.6 px, and
+   * the glyph is 15.1 px — every icon taller than its own box, bleeding into
+   * its neighbour, eight times. Across the row there is 827 px, so the box can
+   * be square and generous instead of divided.
+   */
+  .studio-timeline-tools button { flex: 0 0 auto; width: 1.7em; height: 1.7em; }
+  .studio-timeline-collapse { margin-left: auto; }
 
   .tool-story {
     height: auto;

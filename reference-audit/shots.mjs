@@ -42,6 +42,11 @@ const VIEWPORTS = {
   'w1512': { width: 1512, height: 982 },
   'w1440': { width: 1440, height: 900 },
   'w1366': { width: 1366, height: 768 },
+  /* iPad Pro / iPad Air in landscape. Between 1024 and 1366 the page had no
+     tested regime at all, and every iPad in that orientation lands here. */
+  'w1298': { width: 1298, height: 970 },
+  /* iPad Air / Pro 11" landscape, the most common school tablet. */
+  'w1194': { width: 1194, height: 834 },
   'w1024': { width: 1024, height: 768 },
   'w768': { width: 768, height: 1024 },
   'w390': { width: 390, height: 844 },

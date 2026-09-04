@@ -945,11 +945,21 @@
  */
 @media (max-width: 1180px) {
   /*
-   * Still two columns, but the copy column is now under 400 px wide, so the lede
-   * and the point rows wrap one line more than they do on a 1366 — which was
-   * exactly the pixels by which the panel overran its budget at 1024×768. The
-   * rhythm tightens; nothing is removed.
+   * The player stacks under the brief. This is the number KNOWN_LIMITATIONS has
+   * recorded for this section since the pass that raised it from 1000 — and the
+   * rule was never written, which is why the two-up survived all the way down to
+   * 390 and the section looked broken on every tablet.
+   *
+   * What it looked like: at 768 the 0.36 column is 240 px, and a point row is
+   * `24px | 132px | 1fr`, so the third cell — the sentence explaining the step —
+   * came out at about 60 px and set one word per line, five words tall. The
+   * `<=700` regime already moved that cell under the label to solve the same
+   * problem on a phone; the tablet never got either fix.
+   *
+   * Stacking solves it at the source rather than with a second reflow: the brief
+   * is the full shell wide, so `1fr` is ~550 px and the row reads as one line.
    */
+  .education-panel { grid-template-columns: minmax(0, 1fr); }
   .education-points li { padding: clamp(4px, 0.72vh, 9px) 0; }
   .education-points b { font-size: 12px; }
   .education-cta { margin-top: clamp(12px, 1.8vh, 26px); }
@@ -962,10 +972,10 @@
 }
 
 @media (max-width: 1000px) {
-  /* Stacked already — the switch is at 1180 now. This is where the PLAYER's own
-     three columns start to crowd, and the object column is the first thing it
-     can spare: a specimen is the one thing in the frame that cannot be made
-     smaller and still be evidence. */
+  /* Stacked since 1180. This is where the PLAYER's own three columns start to
+     crowd, and the object column is the first thing it can spare: a specimen is
+     the one thing in the frame that cannot be made smaller and still be
+     evidence. */
   .edu-viewer { grid-template-columns: minmax(0, 1fr) clamp(146px, 22%, 186px); }
   .edu-tool { width: 36px; }
   .edu-tool span { font-size: 8px; }
