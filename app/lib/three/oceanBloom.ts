@@ -20,6 +20,11 @@ export type OceanBloomPass = {
     strength: number,
     exposure: number,
     target: THREE.WebGLRenderTarget | null,
+    /* False skips the extract and both blur passes and composites with a
+       strength of zero — three half-float targets and three full-screen draws
+       that stop happening, which is what makes `?gfx=no-bloom` an elimination
+       step rather than a dimmer. */
+    enabled?: boolean,
   ): void;
   dispose(): void;
 };
@@ -47,9 +52,16 @@ function passMaterial(fragmentShader: string, uniforms: Record<string, THREE.IUn
   });
 }
 
-export function createOceanBloomPass(compact: boolean): OceanBloomPass {
+export function createOceanBloomPass(
+  compact: boolean,
+  /* Half-float unless `lib/three/hdrTarget.ts` found this GPU cannot render into
+     one. Bloom is the pass with the most to lose from eight bits — its whole job
+     is the range above white — so it takes the probe's answer rather than
+     assuming, and banded glow beats no glow. */
+  targetType: THREE.TextureDataType = THREE.HalfFloatType,
+): OceanBloomPass {
   const targetOptions = {
-    type: THREE.HalfFloatType,
+    type: targetType,
     minFilter: THREE.LinearFilter,
     magFilter: THREE.LinearFilter,
     generateMipmaps: false,
@@ -185,8 +197,8 @@ export function createOceanBloomPass(compact: boolean): OceanBloomPass {
       bloomB.setSize(width, height);
     },
     prepare,
-    render(renderer, source, strength, exposure, target) {
-      prepare(renderer, source);
+    render(renderer, source, strength, exposure, target, enabled = true) {
+      if (enabled) prepare(renderer, source);
       compositeUniforms.uSource.value = source;
       compositeUniforms.uBloom.value = bloomA.texture;
       compositeUniforms.uStrength.value = strength;

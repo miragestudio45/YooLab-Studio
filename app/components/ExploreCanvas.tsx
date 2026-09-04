@@ -22,6 +22,14 @@ import {
 } from '../lib/three/creatures';
 import { createVisibilityGate } from '../lib/three/visibility';
 import { isLeanDevice, pixelRatioCap } from '../lib/three/deviceTier';
+import {
+  hdrMipTargetType,
+  hdrTargetSupport,
+  hdrTargetType,
+  transmissionTargetSupport,
+} from '../lib/three/hdrTarget';
+import { gfxAllows, gfxRecord, trackRenderer } from '../lib/three/gfx';
+import { appleSafePath, presumeAppleSafePath } from '../lib/three/appleSafePath';
 import { createQualityLadder } from '../lib/three/qualityLadder';
 import { createOceanWorld, type OceanWorld } from '../lib/ocean/scene';
 import { OCEAN_CAMERA, oceanFovFor } from '../lib/ocean/camera';
@@ -326,20 +334,99 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
     landCamera.position.copy(LAND_SHOTS[0].position);
     landScene.add(landCamera);
 
+    /*
+     * The conservative path, decided before the context that would run it.
+     *
+     * `antialias` and whether a second context is opened are both fixed at
+     * construction, so this reads the GL renderer string from a throwaway 1x1
+     * context rather than waiting for a renderer to ask. Refined below once the
+     * real one exists and the probes can run.
+     */
+    const presumedSafe = presumeAppleSafePath();
+
     /* One place decides this now, for every canvas on the site. See
        `lib/three/deviceTier.ts` for why the retina ceiling came down. */
-    const maxPixelRatio = pixelRatioCap('cinema');
+    const maxPixelRatio = presumedSafe.active
+      /* Capped harder on the driver family that corrupts. Two full-viewport
+         targets at retina is the largest allocation on the page, and tile
+         memory pressure is the one thing every reported artefact here has in
+         common. 1.0 is one buffer pixel per CSS pixel — not soft, just not
+         supersampled. */
+      ? Math.min(pixelRatioCap('cinema'), 1)
+      : pixelRatioCap('cinema');
     const renderer = new THREE.WebGLRenderer({
       /* MSAA on a full-viewport buffer that is already resolution-governed pays
          twice for the same edge. A lean device spends that budget on resolution
          instead, which helps every pixel rather than only the silhouettes. */
-      antialias: !lean,
+      antialias: gfxAllows('msaa', !lean && !presumedSafe.active),
       alpha: false,
       powerPreference: 'high-performance',
     });
+    const untrackMain = trackRenderer(renderer.domElement, 'explore-main');
+
+    /*
+     * The refined decision, now that the probes can run against a real context.
+     *
+     * Everything below reads `safeTargetType` / `safeMipTargetType` rather than
+     * asking `hdrTarget` directly, so the conservative path reaches every
+     * surface on the page from one place: the land and ocean composites, the
+     * bee's two refraction captures, the bloom chain and the liquid simulation.
+     * On this path nothing on the page is a half-float target at all, which is
+     * the only statement strong enough to rule out the flat-green land frames —
+     * a format that is never allocated cannot be read back as undefined memory.
+     */
+    const safePath = appleSafePath(renderer);
+    const safeTargetType = safePath.active ? THREE.UnsignedByteType : hdrTargetType(renderer);
+    /* Eight-bit mip chains are supported everywhere without exception, which is
+       what the bee's `textureLod` refraction needs and what RGBA16F could not be
+       relied on to give it. */
+    const safeMipTargetType = safePath.active ? THREE.UnsignedByteType : hdrMipTargetType(renderer);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 0.9;
+    /*
+     * Whether the specimens may use `transmission` at all.
+     *
+     * `!lean` is the budget half of this and always was. The new half is the
+     * capability, and it is the same capability the bee's refraction capture
+     * needs: three's transmission target is a **mipmapped half-float** surface,
+     * resolved out of 4× MSAA and read back through a roughness LOD. A GPU that
+     * cannot be trusted with our own mipmapped half-float target cannot be
+     * trusted with three's either — and there, the failure is not a soft
+     * backdrop but the specimen itself rendering in torn blocks, because what
+     * the membranes show through themselves *is* that target.
+     *
+     * So the probe answers both, and the fallback is a path this project
+     * already designed and tuned: `createJellyfishCreature` and
+     * `createFishCreature` both carry a blended, non-transmissive variant with
+     * its own opacities.
+     */
+    /*
+     * Three conditions, and only the last one is new.
+     *
+     * The budget (`!lean`) and our own mipmapped-half-float probe were both
+     * already true on the Apple laptop that keeps reporting torn black tiles
+     * across the specimens — which is what said the answer was not in the
+     * targets this file creates. `transmissionTargetSupport` tests the buffer
+     * three builds for the transmission pass instead: 4x MSAA on RGBA16F,
+     * resolved and mip-generated every frame, and read back through a roughness
+     * LOD. That is the surface the membranes actually sample, and it is the
+     * only one on the page with that combination.
+     */
+    const transmissionProbe = transmissionTargetSupport(renderer);
+    const transmissionSafe = gfxAllows(
+      'transmission',
+      !lean
+      /* The veto that matters. `transmission` is the only thing on this page
+         that builds a multisampled half-float target, resolves it and rebuilds
+         its mip chain every frame, and it is the surface the torn black tiles
+         appear on. On the Apple path it is not used — the creatures fall back to
+         the blended, non-transmissive variants they already carry. */
+      && !safePath.active
+      && hdrTargetSupport(renderer).mipmappable
+      && transmissionProbe.resolve
+      && transmissionProbe.mips,
+    );
     let pixelRatio = maxPixelRatio;
     renderer.setPixelRatio(pixelRatio);
     renderer.domElement.setAttribute('aria-hidden', 'true');
@@ -372,6 +459,7 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
      * be scrubbed back and forth without rebuilding anything.
      */
     let foregroundRenderer: THREE.WebGLRenderer | null = null;
+    let untrackForeground: (() => void) | null = null;
     let foregroundSceneCapture: THREE.WebGLRenderTarget | null = null;
     /*
      * Last opacity written to the DOM. An inline style assignment invalidates
@@ -410,10 +498,28 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
     const FOREGROUND_LINGER_MS = 2500;
     let foregroundIdleSince = -1;
 
+    /*
+     * Whether the bee gets a SECOND WebGL context at all.
+     *
+     * Off on every lean device now, and that is a stability decision rather than
+     * a budget one. Two contexts on one page is two of everything iOS Safari
+     * counts — and it counts a low, undocumented number, past which it does not
+     * fail loudly, it takes the oldest context away and leaves whatever was
+     * drawing into it composited as nothing.
+     *
+     * What is lost is smaller than it looks. The bee is on layers 0 AND 1, so it
+     * is *already* drawn by the main land pass; this context exists only to draw
+     * it a second time into a transparent sibling canvas that sits above the
+     * flower field. Without it the bee is still there, still refracting the same
+     * capture, still animated — it simply passes behind the foreground flowers
+     * instead of in front of them.
+     */
+    const wantForeground = gfxAllows('foreground', !lean && !presumedSafe.active);
+
     const ensureForeground = () => {
       if (foregroundRenderer) return foregroundRenderer;
       const created = new THREE.WebGLRenderer({
-        antialias: !lean,
+        antialias: gfxAllows('msaa', !lean && !presumedSafe.active),
         alpha: true,
         premultipliedAlpha: true,
         powerPreference: 'high-performance',
@@ -429,6 +535,7 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
       created.domElement.setAttribute('aria-hidden', 'true');
       foregroundHost.appendChild(created.domElement);
       foregroundRenderer = created;
+      untrackForeground = trackRenderer(created.domElement, 'explore-bee-foreground');
 
       /* Render targets are context-local. Giving the foreground renderer its own
          mipmapped scene capture preserves the exact ruby refraction instead of
@@ -437,7 +544,9 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
         minFilter: THREE.LinearMipmapLinearFilter,
         magFilter: THREE.LinearFilter,
         generateMipmaps: true,
-        type: THREE.HalfFloatType,
+        /* Probed on `created`, not on the main renderer: this is a second
+           context, and capability answers do not travel between them. */
+        type: safeMipTargetType,
         depthBuffer: true,
       });
       foregroundSceneCapture.texture.colorSpace = THREE.LinearSRGBColorSpace;
@@ -463,6 +572,8 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
          the composite is a layer the browser still has to blend. */
       foregroundRenderer.domElement.remove();
       foregroundRenderer = null;
+      untrackForeground?.();
+      untrackForeground = null;
       foregroundIdleSince = -1;
       paintedForegroundOpacity = -1;
     };
@@ -485,9 +596,14 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
     const liquid = createLiquidSurface({
       palette: LAND_PALETTES[0],
       simScale: lean ? 0.16 : 0.24,
-      simulate: !reduceMotion,
+      /* Off on lean as well as on reduce-motion. It is a half-float feedback
+         loop ping-ponged every frame and a five-tap read over a full-screen
+         plate — two of the exact things being eliminated as corruption
+         suspects, for a backdrop that breathes. */
+      simulate: gfxAllows('liquid', !reduceMotion && !lean && !safePath.active),
       planeWidth: 2,
       planeHeight: 2,
+      targetType: safeTargetType,
     });
     // Parented to the camera: the choreography moves the camera constantly, and
     // the environment has to stay a full-frame backdrop through all of it.
@@ -510,13 +626,23 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
     };
     const keyColorTarget = new THREE.Color();
 
-    // Mipmapped on purpose: the bee shell reads its refraction with an explicit
-    // LOD so surface roughness blurs what is behind the glass.
+    /*
+     * Mipmapped on purpose: the bee shell reads its refraction with an explicit
+     * LOD so surface roughness blurs what is behind the glass.
+     *
+     * And 8-bit rather than half-float wherever the GPU cannot be trusted to
+     * build that mip chain. `textureLod` past level 0 on a texture whose levels
+     * were never generated is undefined, not blurry — the shell would refract
+     * whatever memory happened to be there — and `generateMipmap` on RGBA16F is
+     * the single most driver-dependent call this page makes. The capture is a
+     * blurred backdrop seen through a ruby, so eight bits costs it nothing that
+     * the roughness blur was not going to take anyway.
+     */
     const sceneCapture = new THREE.WebGLRenderTarget(1, 1, {
       minFilter: THREE.LinearMipmapLinearFilter,
       magFilter: THREE.LinearFilter,
       generateMipmaps: true,
-      type: THREE.HalfFloatType,
+      type: safeMipTargetType,
       depthBuffer: true,
     });
     sceneCapture.texture.colorSpace = THREE.LinearSRGBColorSpace;
@@ -544,9 +670,29 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
 
     /* ------------------------------------------------------------ transition --- */
     const waterline = createWaterlinePass();
-    const oceanBloom = createOceanBloomPass(lean);
+    const bloomEnabled = gfxAllows('bloom', true);
+    /* Everything the page decided, in one place a phone can read back. See
+       `lib/three/gfx.ts` — this is what `window.__gfx.report()` returns and what
+       the `?gfx=hud` overlay prints. */
+    gfxRecord('explore', {
+      lean,
+      compact,
+      reduceMotion,
+      maxPixelRatio,
+      startRung,
+      transmission: transmissionSafe,
+      transmissionProbe,
+      appleSafe: safePath.active,
+      appleSafeReasons: safePath.reasons,
+      hdrTargets: safeTargetType === THREE.UnsignedByteType ? '8bit' : 'half-float',
+      foreground: wantForeground,
+      bloom: bloomEnabled,
+      msaa: gfxAllows('msaa', !lean && !presumedSafe.active),
+      liquidSim: gfxAllows('liquid', !reduceMotion && !lean && !safePath.active),
+    });
+    const oceanBloom = createOceanBloomPass(lean, safeTargetType);
     const targetOptions = {
-      type: THREE.HalfFloatType,
+      type: safeTargetType,
       minFilter: THREE.LinearFilter,
       magFilter: THREE.LinearFilter,
       generateMipmaps: false,
@@ -690,8 +836,8 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
       /* The bee has just arrived, so the foreground context is wanted now — and
          building it here rather than on the first visible frame is the whole
          point of pre-compiling. */
-      const foreground = ensureForeground();
-      if (opticals && foregroundSceneCapture) {
+      const foreground = wantForeground ? ensureForeground() : null;
+      if (foreground && opticals && foregroundSceneCapture) {
         const sceneTexture = opticals.uScene.value;
         opticals.uScene.value = foregroundSceneCapture.texture;
         landCamera.layers.set(1);
@@ -776,7 +922,7 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
             finish: 'ocean',
             /* See the option's own note: one transmissive material anywhere in
                the scene costs a second render of the whole reef every frame. */
-            transmissive: !lean,
+            transmissive: transmissionSafe,
             maxAnisotropy,
             environment: specimenEnvironment.texture,
           });
@@ -788,7 +934,7 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
             // This is why the jellyfish chapter measured 37 fps against the fish
             // chapter's 60 on identical geometry — three membranes with
             // `transmission` make the renderer draw the reef twice per frame.
-            transmissive: !lean,
+            transmissive: transmissionSafe,
             finish: 'ocean',
             maxAnisotropy,
             environment: specimenEnvironment.texture,
@@ -1045,9 +1191,13 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
          crossing, so "slow" starts earlier here than on a panel canvas. */
       budgetMs: 21,
       comfortMs: 13.4,
-      apply: (rung) => {
+      apply: (rung, level) => {
         pixelRatio = rung.dpr;
         renderer.setPixelRatio(rung.dpr);
+        /* Published for the HUD and `window.__gfx.report()`. A tier that is
+           being reported from a device is worth more than one only a dev build
+           can print. */
+        gfxRecord('quality', { level, label: rung.label, dpr: rung.dpr });
         /* The bee pass tracks a step under the main one — when it exists at
            all. `ensureForeground` reads `pixelRatio` for the same sum, so a
            context built after a rung change is born at the right size. */
@@ -1361,7 +1511,10 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
       waterline.uniforms.uLine.value = waterlineFor(dive);
       waterline.uniforms.uBand.value = waterbandFor(dive);
       waterline.uniforms.uExposure.value = renderer.toneMappingExposure;
-      const bloomStrength = 0.22 + jellyPresence * 0.66;
+      /* Zero, not skipped, when bloom is eliminated: the waterline composite
+         still samples `uOceanBloom`, so the strength is what has to go to nothing
+         — and the extract/blur chain below is then never run at all. */
+      const bloomStrength = bloomEnabled ? 0.22 + jellyPresence * 0.66 : 0;
       waterline.uniforms.uBloomStrength.value = bloomStrength;
 
       if (composite) {
@@ -1369,7 +1522,7 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
         drawLand(landTarget);
         renderer.setRenderTarget(oceanTarget);
         renderer.render(ocean!.scene, ocean!.camera);
-        oceanBloom.prepare(renderer, oceanTarget!.texture);
+        if (bloomEnabled) oceanBloom.prepare(renderer, oceanTarget!.texture);
         renderer.setRenderTarget(null);
         waterline.uniforms.uLand.value = landTarget!.texture;
         waterline.uniforms.uOcean.value = oceanTarget!.texture;
@@ -1385,6 +1538,7 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
           bloomStrength,
           renderer.toneMappingExposure,
           null,
+          bloomEnabled,
         );
       } else {
         drawLand(null);
@@ -1445,7 +1599,8 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
      */
     function drawBeeForeground(dive: number, nowMs: number) {
       const visibility = 1 - smoothstep(0.04, 0.3, dive);
-      const wanted = !!bee && !!beeMaterialSet && beePresence >= 0.006 && visibility >= 0.006;
+      const wanted = wantForeground
+        && !!bee && !!beeMaterialSet && beePresence >= 0.006 && visibility >= 0.006;
 
       /*
        * The context's whole lifecycle, decided here.
@@ -1629,6 +1784,7 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
       sceneCapture.dispose();
       dropForeground();
       loader.dispose();
+      untrackMain();
       renderer.dispose();
       renderer.domElement.remove();
       story?.style.removeProperty('--dive');

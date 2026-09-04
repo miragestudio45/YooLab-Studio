@@ -40,6 +40,17 @@ type Rotor = {
   spin: 1 | -1;
 };
 
+/**
+ * Arm length of the 5-inch racer the upstream sandbox was calibrated against.
+ *
+ * Every absolute number in `craft.ts` — the propeller diameter, the skid height,
+ * the camera-pod offset — was measured against that airframe, and each one is
+ * carried to whatever `ARM_LENGTH` currently says by the ratio of the two. It
+ * lives here rather than there so there is one statement of "how big the drone
+ * is" instead of a second hardcoded copy waiting to go stale.
+ */
+export const REFERENCE_ARM_LENGTH = 0.125;
+
 /** Motor-to-centre distance, metres. A ~7-inch trainer class. */
 export const ARM_LENGTH = 0.19;
 /** X-configuration: each motor sits on a diagonal, so this is its X and Z leg. */

@@ -6,7 +6,7 @@
     "node": ">=22.13.0"
   },
   "scripts": {
-    "dev": "vinext dev",
+    "dev": "vite dev --host",
     "build": "vinext build",
     "build:vercel": "node ./scripts/build-vercel.mjs",
     "start": "vinext start",
