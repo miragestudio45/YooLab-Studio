@@ -12,38 +12,37 @@
       {
         "rule": "gradient-text",
         "value": "*",
-        "files": [
-          "app/globals.css"
-        ],
+        "files": ["app/globals.css"],
         "createdAt": "2026-08-27T02:22:29.912Z",
         "reason": "Committed visual world, predates this pass: the italic <em> ramp is the display role in DESIGN.md section 3 and runs on the hero h1 and every section h2. Out of scope for a YooStudio-section review."
       },
       {
         "rule": "side-tab",
         "value": "*",
-        "files": [
-          "app/globals.css"
-        ],
+        "files": ["app/globals.css"],
         "createdAt": "2026-08-27T02:30:04.694Z",
         "reason": "False positive: .bridge-arrow i::after is the zero-box CSS triangle idiom (width:0;height:0 with transparent top/bottom borders), so border-left draws the arrowhead on a 1px hairline. There is no card and no accent stripe."
       },
       {
         "rule": "gradient-text",
         "value": "*",
-        "files": [
-          "app/styles/library.css"
-        ],
+        "files": ["app/styles/library.css"],
         "createdAt": "2026-08-28T02:14:50.221Z",
         "reason": "incumbent committed world: the italic em in every display heading on this page carries the same accent-to-lavender gradient (globals.css:521-526, seven selectors). The Library heading matching it is page consistency, not a Library decision; de-gradienting this one heading alone would make it the odd band."
       },
       {
         "rule": "codex-grid-background",
         "value": "*",
-        "files": [
-          "app/styles/sections.css"
-        ],
+        "files": ["app/styles/sections.css"],
         "createdAt": "2026-09-02T17:20:36.400Z",
         "reason": "Claude: .edu-viewer-floor is the ground plane of the lesson player's 3D viewport (inside .edu-viewer-stage), which is the canvas/measurement case the rule exempts, not page decoration. It is bottom-masked (linear 34-78% intersected with a radial pool at 52%/96%) so no line is visible beside the specimen's bell, and a contact-shadow ellipse on the same surface aligns with it so the model reads as standing on it. The user's reference image for this section shows this exact grid in this exact place."
+      },
+      {
+        "rule": "layout-transition",
+        "value": "max-height 300ms ease, opacity 200ms ease, background-color 300ms ease, color 300ms ease",
+        "files": ["app/globals.css"],
+        "createdAt": "2026-09-04T07:09:35.213Z",
+        "reason": "pre-existing mobile-nav accordion reveal predating this session's work; max-height transition is the standard technique for an unknown-height dropdown, not something introduced or touched here"
       },
       {
         "rule": "overused-font",
