@@ -1664,7 +1664,11 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
  */
 .site-footer {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  /*
+   * Contact column carries the longest content (wrapping address line), so
+   * it gets a larger share of the row; the other three stay equal.
+   */
+  grid-template-columns: 1.5fr repeat(3, 1fr);
   gap: clamp(18px, 2.4vw, 36px);
   /*
    * Full-bleed ground, shell-aligned content, and no extra wrapper element.
