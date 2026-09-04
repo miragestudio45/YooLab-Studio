@@ -10,8 +10,11 @@ import { ScrollReveal } from './components/ScrollReveal';
 import { SectionSnap } from './components/SectionSnap';
 import { SiteHeader } from './components/SiteHeader';
 import { StartWithYooLabButton } from './components/StartWithYooLabButton';
-import { StudioDemo } from './components/StudioDemo';
-import { IconQuiz, IconSpace, IconSteps, IconText } from './components/studio/EditorIcons';
+import { StudioDemoGate } from './components/StudioDemoGate';
+/* From the shared module, not the full set: these four are the editor's own
+   glyphs, but importing them out of `EditorIcons` drags all sixty-five into the
+   first request wave and undoes `StudioDemoGate`. */
+import { IconQuiz, IconSpace, IconSteps, IconText } from './components/studio/EditorIconsShared';
 
 /**
  * The page is one journey, and each stop answers exactly one question:
@@ -90,7 +93,7 @@ export default function Home() {
                 as the narrative column beside it — so the row is two panes, not
                 a framed device next to a card. */}
             <div className="shell tool-workspace" data-reveal>
-              <StudioDemo />
+              <StudioDemoGate />
             </div>
 
             <div className="shell tool-feature-shell" data-reveal>

@@ -23,10 +23,26 @@ function subscribe(onChange: () => void) {
   return () => query.removeEventListener('change', onChange);
 }
 
+/**
+ * The same answer, for code that is already past render.
+ *
+ * An effect that mounts a long-lived renderer needs the current value once, at
+ * mount, and must not take it as a dependency — passing the hook's value in
+ * would make hydration's `true` -> `false` correction a remount key, which is
+ * exactly the bug that made `FlowerValleyLayer` fetch its atlas twice. Reading
+ * the query here instead keeps one definition of the question.
+ *
+ * Client only: there is no media query to read on the server, and no effect
+ * runs there to ask.
+ */
+export function prefersReducedMotion(): boolean {
+  return window.matchMedia(QUERY).matches;
+}
+
 export function usePrefersReducedMotion() {
   return useSyncExternalStore(
     subscribe,
-    () => window.matchMedia(QUERY).matches,
+    prefersReducedMotion,
     () => true,
   );
 }

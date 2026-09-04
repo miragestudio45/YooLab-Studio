@@ -19,7 +19,10 @@ import {
   IconTrackText,
   IconViewpoint,
   IconVr,
-} from './studio/EditorIcons';
+/* The shared module, not the full set — this section is not the editor, and
+   importing from `EditorIcons` would pull all forty-nine of its glyphs into the
+   first request wave. See `EditorIconsShared.tsx`. */
+} from './studio/EditorIconsShared';
 
 /**
  * One platform, three ways to use it.

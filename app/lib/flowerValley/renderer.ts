@@ -152,6 +152,18 @@ export type FlowerValleyOptions = {
 };
 
 export type FlowerValley = {
+  /**
+   * Retunes the motion budget in place.
+   *
+   * `prefers-reduced-motion` cannot be known on the server, so the hook that
+   * reads it answers `true` for the first render and the truth immediately
+   * after — which used to make this value a remount key. Rebuilding the valley
+   * meant refetching the 243 KB atlas and re-slicing every tile through
+   * `createImageBitmap` a second time, on the main thread, while the hero was
+   * still loading. The frame loop reads the flag every frame anyway, so handing
+   * it a new value is all the change ever needed to be.
+   */
+  setReduceMotion(value: boolean): void;
   dispose(): void;
 };
 
@@ -172,13 +184,16 @@ export function createFlowerValley(host: HTMLElement, options: FlowerValleyOptio
   canvas.setAttribute('aria-hidden', 'true');
   canvas.style.opacity = '0';
   const context = canvas.getContext('2d', { alpha: true, desynchronized: true });
-  if (!context) return { dispose() {} };
+  if (!context) return { setReduceMotion() {}, dispose() {} };
   /* Re-bound so the narrowing survives into the closures below, which is the one
      place TypeScript will not carry it for a `const`. */
   const ctx = context;
   host.appendChild(canvas);
 
-  const { progress, reduceMotion } = options;
+  const { progress } = options;
+  /* `let`, not a destructured const: `setReduceMotion` below rebinds it and the
+     frame loop reads it fresh on every tick. See `FlowerValley`. */
+  let reduceMotion = options.reduceMotion;
   const atlasUrl = options.atlasUrl ?? '/asset/valley/flowers/pool_summer.png';
 
   let disposed = false;
@@ -1045,6 +1060,9 @@ export function createFlowerValley(host: HTMLElement, options: FlowerValleyOptio
     });
 
   return {
+    setReduceMotion(value: boolean) {
+      reduceMotion = value;
+    },
     dispose() {
       disposed = true;
       if (frameHandle) cancelAnimationFrame(frameHandle);

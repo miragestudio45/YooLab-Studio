@@ -21,7 +21,7 @@ import {
   type CreatureHandle,
 } from '../lib/three/creatures';
 import { createVisibilityGate } from '../lib/three/visibility';
-import { isLeanDevice, pixelRatioCap } from '../lib/three/deviceTier';
+import { isLeanDevice, pixelRatioCap, prefersLightPayload } from '../lib/three/deviceTier';
 import { createQualityLadder } from '../lib/three/qualityLadder';
 import { createOceanWorld, type OceanWorld } from '../lib/ocean/scene';
 import { OCEAN_CAMERA, oceanFovFor } from '../lib/ocean/camera';
@@ -891,6 +891,19 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
       })
       .finally(() => {
         if (disposed) return;
+        /*
+         * The warm-up is speculative, so a constrained connection opts out.
+         *
+         * Everything above still holds: a reef that appears because it finished
+         * downloading is the bug. But the warm-up spends ~4 MB before the
+         * visitor has asked for the ocean at all, and on a 3G link that is
+         * bandwidth taken directly from the bee — the model the hero *is*
+         * waiting for. Skipping it does not disable the ocean: the frame loop
+         * calls `startOcean` itself the moment `progress` passes 0.25, so the
+         * reef then loads on approach, one chapter of scrolling ahead of the
+         * water. Slower to resolve out of the haze, and still never absent.
+         */
+        if (prefersLightPayload()) return;
         if ('requestIdleCallback' in window) {
           deferredIdle = window.requestIdleCallback(startOcean, { timeout: 900 });
         } else {

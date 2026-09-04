@@ -1,5 +1,19 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-  "buildCommand": "npm run build:vercel"
+  "buildCommand": "npm run build:vercel",
+  "headers": [
+    {
+      "source": "/asset/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=86400, stale-while-revalidate=2592000" }
+      ]
+    },
+    {
+      "source": "/brand/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=86400, stale-while-revalidate=2592000" }
+      ]
+    }
+  ]
 }
