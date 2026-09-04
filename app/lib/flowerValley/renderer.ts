@@ -32,9 +32,13 @@
  *     budget rather than to match `devicePixelRatio`, so a 4K frame costs about
  *     what a 1080 one does.
  *
- *   FPS-driven quality.  Two slow windows step the tier down, four fast ones step
- *     it back up. The tier changes density, reach and render scale — never the
- *     layout, so the composition a viewport was designed for survives a slow GPU.
+ *   Adaptive quality — driven by this layer's own draw time, not by achieved FPS.
+ *     Two expensive windows step the tier down, four cheap ones step it back up.
+ *     The tier changes density, reach and render scale — never the layout, so the
+ *     composition a viewport was designed for survives a slow GPU. The reference
+ *     used frame rate; that is wrong on a page where a WebGL canvas next door can
+ *     starve this loop, because thinning the meadow returns nothing when the
+ *     meadow was never what was slow. See `costTotal`.
  *
  *   Pause when hidden.  Document visibility *and* a measured-rect visibility gate,
  *     because an IntersectionObserver alone has been observed on this page to
@@ -244,6 +248,38 @@ export function createFlowerValley(host: HTMLElement, options: FlowerValleyOptio
   let fpsMark = performance.now();
   let slowSamples = 0;
   let fastSamples = 0;
+  /*
+   * This layer's own drawing time, which is what the quality tier is allowed to
+   * react to.
+   *
+   * Achieved frame rate is not the same question. The hero runs a full-viewport
+   * WebGL canvas beside this one, and when that canvas is busy — the ocean's
+   * first frame compiles 25 shader programs and uploads 57 textures, measured at
+   * ~18 s on a 2014 GPU — this loop simply is not given time to run. The old
+   * ladder read the resulting 2 FPS as evidence that *this* field was too
+   * expensive, dropped High -> Balanced -> Low, and called `rebuildField()` for
+   * each step: two visible repopulations of the meadow caused entirely by
+   * somebody else's work. Recovery then needed four consecutive windows above
+   * 57 FPS, which never arrived, so a transient load-time stall degraded the
+   * field permanently.
+   *
+   * Measuring the cost of the draw itself separates the two: expensive-for-me is
+   * actionable, not-given-time is not.
+   */
+  let costTotal = 0;
+  let costFrames = 0;
+
+  /*
+   * The budget, in milliseconds of this layer's own draw.
+   *
+   * A 60 Hz frame is 16.7 ms and this canvas is not the only thing in it — the
+   * bee's WebGL pass and the compositor need the rest — so roughly half the
+   * frame is the most this field may claim before it is genuinely too dense.
+   * The gap between the two numbers is hysteresis in the cost domain, on top of
+   * the sample counts below.
+   */
+  const COST_DOWNGRADE_MS = 9;
+  const COST_UPGRADE_MS = 5;
 
   let documentVisible = document.visibilityState !== 'hidden';
   /** Reduced motion draws on demand; this is what "on demand" means. */
@@ -695,6 +731,11 @@ export function createFlowerValley(host: HTMLElement, options: FlowerValleyOptio
     const valley = field;
     if (!sheet || !valley) return;
 
+    /* Everything from here to the quality block at the end of this function is
+       this layer's own work, and its duration is the only cost signal the tier
+       is allowed to read. See `COST_DOWNGRADE_MS`. */
+    const drawStart = performance.now();
+
     const cam = camera();
     const grow = reduceMotion ? 1 : smooth(0, GROW_SECONDS, clock);
     const t = clock * 0.72;
@@ -838,11 +879,19 @@ export function createFlowerValley(host: HTMLElement, options: FlowerValleyOptio
      */
     if (reduceMotion) return;
     fpsFrames += 1;
+    costTotal += performance.now() - drawStart;
+    costFrames += 1;
     if (now - fpsMark >= 900) {
       const fps = (fpsFrames * 1000) / (now - fpsMark);
+      const cost = costFrames > 0 ? costTotal / costFrames : 0;
       fpsFrames = 0;
+      costTotal = 0;
+      costFrames = 0;
       fpsMark = now;
       canvas.dataset.fps = String(Math.round(fps));
+      /* The number the tier actually decides on, so a future "why is it Low"
+         can be answered without re-deriving it. */
+      canvas.dataset.cost = cost.toFixed(2);
       canvas.dataset.visible = String(visible);
       canvas.dataset.quality = quality;
       canvas.dataset.scale = renderScale.toFixed(2);
@@ -855,8 +904,17 @@ export function createFlowerValley(host: HTMLElement, options: FlowerValleyOptio
       canvas.dataset.camh = cam.y.toFixed(2);
       canvas.dataset.count = String(field?.flowers.length ?? 0);
 
-      if (fps < 48) { slowSamples += 1; fastSamples = 0; }
-      else if (fps > 57) { fastSamples += 1; slowSamples = 0; }
+      /*
+       * The tier reacts to `cost`, never to `fps`.
+       *
+       * `fps` stays in the readout above because it is the useful number when
+       * something is wrong; it is simply not evidence about this field. A window
+       * at 2 FPS whose draws each took 3 ms means the loop was starved, and
+       * thinning the meadow would not have returned a single frame — see the
+       * note on `costTotal`.
+       */
+      if (cost > COST_DOWNGRADE_MS) { slowSamples += 1; fastSamples = 0; }
+      else if (cost < COST_UPGRADE_MS) { fastSamples += 1; slowSamples = 0; }
       else { slowSamples = 0; fastSamples = 0; }
 
       if (slowSamples >= 2) {

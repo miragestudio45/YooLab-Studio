@@ -183,7 +183,22 @@ const [width, height] = VIEWPORTS[key];
 
 const chrome = CHROME_CANDIDATES.find((path) => existsSync(path));
 if (!chrome) { console.error('No Chrome or Edge found.'); process.exit(1); }
-const profile = join(tmpdir(), `yoolab-probe-${process.pid}`);
+/*
+ * `--profile <name>` keeps Chrome's user-data directory across runs, and the
+ * only reason to want that is the GPU shader cache.
+ *
+ * Every measurement this harness took before the flag existed used a fresh
+ * profile, which means every one of them was a COLD shader cache — and the
+ * question that changes what the ocean's 16-second bring-up actually costs a
+ * visitor is whether their second visit pays it again. Without this flag the
+ * harness could only ever answer "first visit", and answered it as if it were
+ * the whole story.
+ *
+ * Default stays per-pid so runs are isolated unless isolation is given up
+ * deliberately.
+ */
+const profileName = flag('--profile', null);
+const profile = join(tmpdir(), profileName ? `yoolab-probe-${profileName}` : `yoolab-probe-${process.pid}`);
 mkdirSync(profile, { recursive: true });
 const port = 9600 + (process.pid % 150);
 const child = spawn(chrome, [
@@ -290,5 +305,9 @@ try {
 } finally {
   child.kill();
   await wait(300);
-  try { rmSync(profile, { recursive: true, force: true }); } catch { /* windows lock */ }
+  /* A named profile is being kept on purpose — deleting it would throw away the
+     shader cache that is the whole point of asking for it. */
+  if (!profileName) {
+    try { rmSync(profile, { recursive: true, force: true }); } catch { /* windows lock */ }
+  }
 }
