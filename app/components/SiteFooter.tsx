@@ -66,6 +66,7 @@ export function SiteFooter() {
     <footer className="site-footer">
       <div className="footer-top">
         <BrandLockup height={26} />
+        <p>Không gian học tập 3D/XR<br />cho một thế hệ tò mò.</p>
       </div>
 
       <div className="footer-col">
@@ -148,7 +149,7 @@ export function SiteFooter() {
       </div>
 
       <div className="footer-bottom">
-        <span>© 2026 YooLab. YooTek Holdings All</span>
+        <span>© 2026 YooLab. Made for curious minds.</span>
         <span className="footer-bottom-links">
           <a href="#">Chính sách bảo mật</a>
           <a href="#">Điều khoản dịch vụ</a>
