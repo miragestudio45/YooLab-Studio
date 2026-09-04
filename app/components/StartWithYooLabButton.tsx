@@ -34,7 +34,7 @@ export function StartWithYooLabButton({
       void openDeeplinkProject();
       return;
     }
-    router.push('/register');
+    router.push('/login');
   };
 
   return (
