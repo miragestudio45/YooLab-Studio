@@ -1,0 +1,366 @@
+/*
+ * Pricing, the consultation dialog and the trial invitation.
+ *
+ * Three surfaces added for the MKT round, kept in one file because they share a
+ * vocabulary — the same ivory ground, the same 1px strokes, the same teal, the
+ * same rounded corners — and nothing else on the page needs it.
+ *
+ * Everything here is DOM and CSS. The page already runs a full-viewport WebGL
+ * hero, an editor and a Library stage, and the other headline report from the
+ * same round was that the machine gets hot, so a pricing table that costs a
+ * canvas would be answering one complaint by worsening the other.
+ */
+
+/* Pricing moved to its own file when it was rebuilt from Figma. See pricing.css. */
+
+/* ============================================== shared modal chrome === */
+
+.modal-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(24, 32, 34, 0.38);
+  backdrop-filter: blur(3px);
+  animation: modal-scrim-in 180ms ease both;
+  /* The dialog can be taller than a phone; scroll the scrim, not the page. */
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.modal-panel {
+  position: relative;
+  width: min(560px, 100%);
+  margin: auto;
+  padding: 30px clamp(20px, 4vw, 34px) 26px;
+  border: 1px solid var(--color-border, rgba(24, 32, 34, 0.1));
+  border-radius: var(--radius-lg, 18px);
+  background: var(--color-surface, #fffdf9);
+  box-shadow: 0 30px 80px -40px rgba(24, 32, 34, 0.55);
+  animation: modal-panel-in 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.modal-panel:focus { outline: none; }
+
+.modal-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink-2);
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 160ms ease;
+}
+.modal-close:hover { background: rgba(24, 32, 34, 0.06); }
+
+@keyframes modal-scrim-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes modal-panel-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .modal-scrim, .modal-panel { animation: none; }
+  .pricing-cta, .modal-close { transition: none; }
+}
+
+/* ================================================ consultation form === */
+
+.consult-eyebrow {
+  margin: 0 0 8px;
+  color: var(--color-accent-readable, #00aaab);
+  font-size: 11.5px;
+  font-weight: 620;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+.consult-modal h2, .trial-modal h2 {
+  margin: 0;
+  font-size: clamp(21px, 3vw, 26px);
+  letter-spacing: -0.015em;
+}
+.consult-lede, .trial-lede {
+  margin: 10px 0 0;
+  color: var(--ink-2);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.consult-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 16px;
+  min-width: 0;
+}
+.consult-field > span, .consult-audience legend {
+  color: var(--color-ink);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.consult-field input[type='text'],
+.consult-field input[type='email'],
+.consult-field input[type='tel'],
+.consult-field textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: 11px 13px;
+  border: 1px solid var(--color-border-strong, rgba(24, 32, 34, 0.18));
+  border-radius: var(--radius-md, 12px);
+  background: #fff;
+  color: var(--color-ink);
+  font: inherit;
+  font-size: 14px;
+  /* 16px on phones would be the anti-zoom rule, but the field is already 14px
+     with a 44px box; iOS only zooms below 16px, so this is set explicitly at
+     the media query below rather than everywhere. */
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+.consult-field textarea { resize: vertical; line-height: 1.55; }
+.consult-field input:focus, .consult-field textarea:focus {
+  outline: none;
+  border-color: var(--color-accent-strong, #00aaab);
+  box-shadow: 0 0 0 3px var(--color-accent-wash, rgba(0, 170, 171, 0.11));
+}
+.consult-field input[aria-invalid='true'], .consult-field textarea[aria-invalid='true'] {
+  border-color: #c8483c;
+}
+.consult-field em {
+  color: #c8483c;
+  font-size: 12px;
+  font-style: normal;
+}
+
+.consult-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 14px; }
+
+.consult-audience { margin: 16px 0 0; padding: 0; border: none; }
+.consult-audience > div { display: flex; gap: 8px; margin-top: 6px; }
+.consult-audience label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--color-border-strong, rgba(24, 32, 34, 0.18));
+  border-radius: 999px;
+  color: var(--ink-2);
+  font-size: 13.5px;
+  cursor: pointer;
+  transition: border-color 160ms ease, color 160ms ease, background-color 160ms ease;
+}
+.consult-audience label.is-on {
+  border-color: var(--color-accent-strong, #00aaab);
+  background: var(--color-accent-wash, rgba(0, 170, 171, 0.11));
+  color: var(--color-accent-readable, #00aaab);
+  font-weight: 600;
+}
+.consult-audience input { accent-color: var(--color-accent-strong, #00aaab); }
+
+.consult-failure {
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(200, 72, 60, 0.35);
+  border-radius: var(--radius-md, 12px);
+  background: rgba(200, 72, 60, 0.07);
+  color: #a8382e;
+  font-size: 13px;
+}
+
+.consult-submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 46px;
+  margin-top: 20px;
+  padding: 0 18px;
+  border: none;
+  border-radius: var(--radius-md, 12px);
+  background: var(--color-accent-strong, #00aaab);
+  color: #fff;
+  font: inherit;
+  font-size: 14.5px;
+  font-weight: 620;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 160ms ease;
+}
+.consult-submit:hover:not(:disabled) { background: var(--color-accent-hover, #018e8f); }
+.consult-submit:disabled { opacity: 0.62; cursor: progress; }
+
+.consult-secondary {
+  display: block;
+  width: 100%;
+  min-height: 40px;
+  margin-top: 10px;
+  border: none;
+  background: none;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+
+.consult-note { margin: 12px 0 0; color: var(--ink-3, var(--ink-2)); font-size: 12.5px; text-align: center; }
+.consult-note a { color: var(--color-accent-readable, #00aaab); }
+.consult-done p { margin: 12px 0 0; color: var(--ink-2); font-size: 14px; line-height: 1.6; }
+
+/* ==================================================== trial invite === */
+
+.trial-modal { width: min(520px, 100%); }
+.trial-modal h2 em { font-style: italic; color: var(--color-accent-readable, #00aaab); }
+
+.trial-roles {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 20px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.trial-roles li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'name cta' 'copy cta';
+  align-items: center;
+  gap: 2px 14px;
+  padding: 13px 15px;
+  border: 1px solid var(--color-border, rgba(24, 32, 34, 0.1));
+  border-radius: var(--radius-md, 12px);
+  background: #fff;
+}
+.trial-roles b { grid-area: name; font-size: 14px; font-weight: 640; }
+.trial-roles p { grid-area: copy; margin: 0; color: var(--ink-2); font-size: 12.8px; line-height: 1.45; }
+
+.trial-cta {
+  grid-area: cta;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--color-accent-line, rgba(0, 170, 171, 0.42));
+  border-radius: var(--radius-md, 12px);
+  background: transparent;
+  color: var(--color-accent-readable, #00aaab);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 620;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 160ms ease;
+}
+.trial-cta:hover { background: var(--color-accent-wash, rgba(0, 170, 171, 0.11)); }
+.trial-cta--solid { border-color: transparent; background: var(--color-accent-strong, #00aaab); color: #fff; }
+.trial-cta--solid:hover { background: var(--color-accent-hover, #018e8f); }
+
+.trial-dismiss {
+  display: block;
+  width: 100%;
+  min-height: 40px;
+  margin-top: 12px;
+  border: none;
+  background: none;
+  color: var(--ink-3, var(--ink-2));
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* The final CTA secondary action is styled in closing.css, which rebuilt it as
+   a real button. The rule that used to live here made it a text link and, being
+   imported later, silently won. */
+
+@media (max-width: 560px) {
+  .modal-scrim { padding: 12px; align-items: flex-start; }
+  .modal-panel { padding: 26px 18px 22px; }
+  .consult-row { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  /*
+   * 16px, or iOS zooms the page on focus.
+   *
+   * Written with the same attribute selectors as the base rule rather than the
+   * shorter `.consult-field input`: the base is `.consult-field input[type=...]`
+   * which outranks a bare element selector, so the short version lost inside its
+   * own media query and the fields measured 14px on a phone.
+   */
+  .consult-field input[type='text'],
+  .consult-field input[type='email'],
+  .consult-field input[type='tel'],
+  .consult-field textarea { font-size: 16px; }
+  /* 44px is the floor for a thumb. */
+  .trial-cta, .consult-audience label { min-height: 44px; }
+  .trial-roles li { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'name' 'copy' 'cta'; gap: 3px; }
+  .trial-cta { justify-content: center; width: 100%; margin-top: 9px; }
+}
+
+/* ======================================== honest media labels (P3) === */
+/*
+ * Two small marks that say what a picture actually is.
+ *
+ * The Education lesson mock's media slot used to wear a play triangle over a
+ * baked still, and the Proof wall mixes live model bakes with one photograph.
+ * Both are subtle by design — a large badge would be worse than the confusion
+ * it fixes.
+ */
+.edu-media-kind {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: rgba(24, 32, 34, 0.62);
+  color: #fff;
+  font-size: 9.5px;
+  font-weight: 640;
+  letter-spacing: 0.06em;
+  line-height: 1;
+}
+.edu-media-kind svg { width: 9px; height: 9px; }
+
+.proof-visual { position: relative; }
+.proof-still {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(255, 253, 249, 0.86);
+  color: var(--ink-2);
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
+  backdrop-filter: blur(4px);
+}
+
+/* ================================= object → content affordance (P5) === */
+/*
+ * The proof card's visual is a control now. It has to look like one on hover
+ * without becoming a button at rest — these are specimens, not tiles.
+ */
+button.proof-visual {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: none;
+  font: inherit;
+  cursor: pointer;
+  background: none;
+  transition: transform 260ms var(--ease-reveal, cubic-bezier(0.22, 1, 0.36, 1));
+}
+.proof-card:hover button.proof-visual.is-openable { transform: translateY(-2px) scale(1.012); }
+@media (prefers-reduced-motion: reduce) {
+  button.proof-visual { transition: none; }
+  .proof-card:hover button.proof-visual.is-openable { transform: none; }
+}

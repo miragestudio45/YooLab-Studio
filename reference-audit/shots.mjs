@@ -500,6 +500,39 @@ const SHOTS = [
       tool.click();`,
     settle: 2400,
   },
+  /* Dismiss the trial invitation before shooting anything else. It fires six
+     seconds in, which is inside every settle on this list, so without this it
+     lands on top of whatever is being photographed. */
+  /* The MKT round: new hero positioning, pricing, the consultation dialog and
+     the trial invitation. All DOM, so these are cheap and worth having pinned. */
+  { name: 'hero-copy', at: '#trang-chu', settle: 2600, run: `try { sessionStorage.setItem('yoolab.trial-invite.seen', '1'); } catch {} const t = document.querySelector('.trial-modal .modal-close'); if (t) t.click(); await new Promise((r) => setTimeout(r, 260));`, clipOf: { sel: '.hero-copy', scale: 1.5 } },
+  { name: 'hero-full', at: '#trang-chu', settle: 2800, run: `try { sessionStorage.setItem('yoolab.trial-invite.seen', '1'); } catch {} const t = document.querySelector('.trial-modal .modal-close'); if (t) t.click(); await new Promise((r) => setTimeout(r, 260));` },
+  { name: 'pricing', at: '#bang-gia', settle: 900, run: `try { sessionStorage.setItem('yoolab.trial-invite.seen', '1'); } catch {} const t = document.querySelector('.trial-modal .modal-close'); if (t) t.click(); await new Promise((r) => setTimeout(r, 260));` },
+  { name: 'final-cta', at: '#bat-dau-voi-yoolab', settle: 700, run: `try { sessionStorage.setItem('yoolab.trial-invite.seen', '1'); } catch {} const t = document.querySelector('.trial-modal .modal-close'); if (t) t.click(); await new Promise((r) => setTimeout(r, 260));` },
+  {
+    name: 'consult-modal',
+    at: '#bat-dau-voi-yoolab',
+    settle: 700,
+    run: `
+      try { sessionStorage.setItem('yoolab.trial-invite.seen', '1'); } catch {} const t = document.querySelector('.trial-modal .modal-close'); if (t) t.click(); await new Promise((r) => setTimeout(r, 260));
+      const btn = document.querySelector('.cta-secondary');
+      if (!btn) throw new Error('no "Trao doi them" button');
+      btn.click();
+      await new Promise((r) => setTimeout(r, 420));
+    `,
+  },
+  {
+    name: 'consult-errors',
+    at: '#bat-dau-voi-yoolab',
+    settle: 700,
+    run: `
+      try { sessionStorage.setItem('yoolab.trial-invite.seen', '1'); } catch {} const t = document.querySelector('.trial-modal .modal-close'); if (t) t.click(); await new Promise((r) => setTimeout(r, 260));
+      document.querySelector('.cta-secondary').click();
+      await new Promise((r) => setTimeout(r, 380));
+      document.querySelector('.consult-submit').click();
+      await new Promise((r) => setTimeout(r, 320));
+    `,
+  },
   { name: 'library-empty', at: '#thu-vien', run: OPEN('Khoa học vũ trụ'), settle: 900 },
   /*
    * The practice hub, three labs deep.
@@ -998,7 +1031,74 @@ const SHOTS = [
     run: `[...document.querySelectorAll('.education-tabs button')][2].click();`,
   },
   { name: 'proof', at: '#bai-hoc-mau', settle: 2200 },
+  /* Closed is the state the section is first seen in, so it is the state that
+     has to be checked; `faq-open` then covers the row heights and the marker's
+     open state, which is the only thing opening a row changes. */
+  { name: 'faq', at: '#cau-hoi', settle: 900 },
+  {
+    name: 'faq-open',
+    at: '#cau-hoi',
+    settle: 900,
+    run: `document.querySelector('.faq-item').open = true;`,
+  },
   { name: 'cta', at: '#bat-dau-voi-yoolab' },
+  /*
+   * The footer, whole.
+   *
+   * `#bat-dau-voi-yoolab` lands the closing band's top edge at viewport 0 and
+   * the footer is 600 px further down, so every previous shot of "the end of the
+   * page" stopped at the pledge strip. Scrolled to the document's end rather
+   * than clipped to the element: `clipOf` captures out of the composited frame,
+   * so the part of the footer below the fold comes back blank.
+   */
+  {
+    name: 'footer',
+    at: '#bat-dau-voi-yoolab',
+    run: `
+      window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'auto' });
+      await new Promise((r) => setTimeout(r, 400));
+    `,
+    settle: 700,
+  },
+
+  /*
+   * The library deep link, end to end. Run with the fragment in the URL:
+   *   node reference-audit/shots.mjs --url 'http://localhost:3000/#thu-vien/tim' deeplink-tim
+   * The failure it guards is silent: before `LibraryWorkspace` handled the
+   * fragment, this landed at the top of the homepage and the rail kept whatever
+   * specimen it already had, so the link looked like it worked.
+   */
+  { name: 'deeplink-tim', at: '#thu-vien', settle: 4200 },
+
+  /*
+   * The mobile sheet, open. Run at w390:
+   *   node reference-audit/shots.mjs --viewport w390 --url http://localhost:3000 mobile-nav
+   * It exists because the open/close animation was rewritten from `max-height`
+   * to `grid-template-rows`, and the failure mode of that technique is a sheet
+   * that stays collapsed — invisible in every desktop shot.
+   */
+  {
+    name: 'mobile-nav',
+    at: '#trang-chu',
+    settle: 900,
+    run: `document.querySelector('.menu-toggle').click();`,
+  },
+
+  /*
+   * The standalone library pages, which are separate routes rather than
+   * sections — so these two need the harness pointed at the page itself:
+   *
+   *   node reference-audit/shots.mjs --url http://localhost:3000/thu-vien/sinh-hoc/ong-mat library-page
+   *   node reference-audit/shots.mjs --url http://localhost:3000/thu-vien library-index
+   *
+   * `clipOf` rather than an anchor because there is nothing to scroll to: the
+   * whole document is the subject, and clipping to the content column is what
+   * shows the part that is not already visible at the top.
+   */
+  { name: 'library-page', at: '#noi-dung', settle: 700, clipOf: { sel: '.lib-page__head', scale: 1.6 } },
+  { name: 'library-facts', at: '#noi-dung', settle: 700, run: `document.querySelector('.lib-page__facts').scrollIntoView({ block: 'center' });`, clipOf: { sel: '.lib-page__facts', scale: 1.8 } },
+  { name: 'library-note', at: '#noi-dung', settle: 700, run: `document.querySelector('.lib-page__note').scrollIntoView({ block: 'center' });`, clipOf: { sel: '.lib-page__note', scale: 1.8 } },
+  { name: 'library-index', at: '#noi-dung', settle: 700, clipOf: { sel: '.lib-hub__list', scale: 1.6 } },
 ];
 
 /* ---------------------------------------------------------------- CDP client --- */
@@ -1298,6 +1398,14 @@ try {
         target.scrollIntoView({ block: 'start', behavior: 'auto' });
         document.documentElement.style.scrollBehavior = previous;
         await new Promise((r) => setTimeout(r, 400));
+      `);
+      /* The trial dialog fires six seconds in and lands on top of whatever is
+         being photographed. Suppressed for every shot, not per shot: it has its
+         own entry when it is the subject. */
+      await evaluate(`
+        try { sessionStorage.setItem('yoolab.trial-invite.seen', '1'); } catch {}
+        const invite = document.querySelector('.trial-modal .modal-close');
+        if (invite) invite.click();
       `);
       if (shot.run) await evaluate(shot.run);
 

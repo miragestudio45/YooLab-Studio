@@ -1,8 +1,6 @@
 'use client';
 
 import { Suspense, lazy } from 'react';
-import { CreatureStage } from './CreatureStage';
-import { ModelStage } from './ModelStage';
 import type { BuiltExperienceKey, ExperienceManifest } from '../../lib/library/types';
 
 /**
@@ -19,6 +17,21 @@ import type { BuiltExperienceKey, ExperienceManifest } from '../../lib/library/t
  * still shows six specimens, because the manifest is the unit of content, not
  * the module.
  */
+
+/*
+ * The two shared stages are split for the same reason the experiences are.
+ *
+ * They were the exception that undid the rule above: ten experiences behind
+ * `lazy` while `CreatureStage` and `ModelStage` — and through them the library
+ * environment and the creature pipeline — were imported statically, so the
+ * Library still shipped a stage's worth of code to a visitor who never scrolled
+ * to it. They are what the *first* rail selection needs, never what the page
+ * needs, and the fallback below is the one the rail already shows.
+ */
+const CreatureStage = lazy(() =>
+  import('./CreatureStage').then((module) => ({ default: module.CreatureStage })));
+const ModelStage = lazy(() =>
+  import('./ModelStage').then((module) => ({ default: module.ModelStage })));
 
 /** Every built experience takes the same one prop. */
 export type ExperienceProps = { params?: Record<string, string> };
@@ -83,22 +96,28 @@ export function LibraryViewer({
    * as flat red plastic with opaque wings. Same pipeline, different camera.
    */
   if (view.type === 'creature') {
-    return <CreatureStage creature={view.creature} framing={view.framing} label={item.title} />;
+    return (
+      <Suspense fallback={<div className="stage-status"><i />Đang mở trải nghiệm…</div>}>
+        <CreatureStage creature={view.creature} framing={view.framing} label={item.title} />
+      </Suspense>
+    );
   }
 
   if (view.type === 'model') {
     return (
-      <ModelStage
-        url={view.url}
-        preset={view.preset}
-        framing={view.framing}
-        clips={view.clips}
-        defaultClip={view.defaultClip}
-        lockRoot={view.lockRoot}
-        shell={view.shell}
-        anchors={view.anchors}
-        label={item.title}
-      />
+      <Suspense fallback={<div className="stage-status"><i />Đang mở trải nghiệm…</div>}>
+        <ModelStage
+          url={view.url}
+          preset={view.preset}
+          framing={view.framing}
+          clips={view.clips}
+          defaultClip={view.defaultClip}
+          lockRoot={view.lockRoot}
+          shell={view.shell}
+          anchors={view.anchors}
+          label={item.title}
+        />
+      </Suspense>
     );
   }
 

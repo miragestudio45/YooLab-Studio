@@ -4,14 +4,14 @@
     {
       "name": "yoolab-qa",
       "runtimeExecutable": "npm",
-      "runtimeArgs": [
-        "run",
-        "dev",
-        "--",
-        "--port",
-        "3210"
-      ],
+      "runtimeArgs": ["run", "dev", "--", "--port", "3210"],
       "port": 3210
+    },
+    {
+      "name": "yoolab-prod",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "start", "--", "--port", "3211"],
+      "port": 3211
     }
   ]
 }

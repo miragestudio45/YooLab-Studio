@@ -276,7 +276,21 @@ export type RailVisual =
   | { kind: 'thumbnail'; thumb: ThumbnailKey }
   | { kind: 'mark'; mark: MarkId };
 
-export type ThumbnailKey = 'bee' | 'fish' | 'jellyfish' | 'trex' | 'gram-wall' | 'toolkit' | 'formula';
+export type ThumbnailKey =
+  | 'bee'
+  | 'fish'
+  | 'jellyfish'
+  | 'trex'
+  | 'gram-wall'
+  | 'toolkit'
+  | 'formula'
+  /* The three robotics models. They are not in the Library's own rail — see
+     `lib/education/showcase.ts` for why — but they are addressed through the
+     same manifest shape, so they need keys here for `rail` to typecheck and for
+     the education panel's media shelf to resolve a bake. */
+  | 'work-drone'
+  | 'spider-drone'
+  | 'mech-whale';
 
 export type MarkId =
   | 'cell'

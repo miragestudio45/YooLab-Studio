@@ -214,6 +214,41 @@ function evaluate() {
   }
 }
 
+/*
+ * How fast the page is moving, and why acquisition waits for it to slow down.
+ *
+ * Acquiring a surface is not a cheap bookkeeping step: it mounts a scene, parses
+ * a GLB and compiles its shaders, all synchronously on the main thread. Measured
+ * on a fast scroll through the whole page, that showed up as frames of 1.1 s and
+ * one of 3.9 s against a 32 ms median — which is exactly the "giật giật" a
+ * visitor reports. The work is not avoidable, but *when* it happens is: a
+ * visitor travelling at two viewports a second is not looking at the section
+ * being built for them, and a visitor who has stopped is.
+ *
+ * So distance decides *what* to hold and this decides *when* to start holding
+ * it. Releases are deliberately not gated — giving memory back during a flick is
+ * free, and holding onto it is what causes the context loss this file exists to
+ * prevent.
+ */
+const FAST_SCROLL_PX_PER_S = 2200;
+let lastScrollY = 0;
+let lastScrollAt = 0;
+
+function scrollVelocity(): number {
+  const now = performance.now();
+  const y = window.scrollY;
+  const dt = now - lastScrollAt;
+  if (lastScrollAt === 0 || dt <= 0) {
+    lastScrollAt = now;
+    lastScrollY = y;
+    return 0;
+  }
+  const velocity = (Math.abs(y - lastScrollY) / dt) * 1000;
+  lastScrollAt = now;
+  lastScrollY = y;
+  return velocity;
+}
+
 function schedule() {
   if (scheduled) return;
   scheduled = true;
@@ -222,7 +257,16 @@ function schedule() {
     scheduled = false;
     /* One rAF so the measurement happens after the scroll has been applied,
        rather than mid-gesture against a stale layout. */
-    requestAnimationFrame(() => evaluate());
+    requestAnimationFrame(() => {
+      if (scrollVelocity() > FAST_SCROLL_PX_PER_S) {
+        /* Still moving fast. Re-arm rather than evaluate: the interval sweep
+           would catch this anyway, but a re-arm settles within one throttle of
+           the visitor stopping instead of within one sweep. */
+        schedule();
+        return;
+      }
+      evaluate();
+    });
   }, wait);
 }
 

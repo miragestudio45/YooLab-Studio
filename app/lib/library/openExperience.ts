@@ -37,9 +37,43 @@ export function subscribeToLibraryOpen(listener: Listener) {
   return () => { listeners.delete(listener); };
 }
 
-/** Opens an experience by manifest id. Unknown ids are ignored, not guessed. */
+/**
+ * Resolves a reference from a URL to a manifest entry.
+ *
+ * Two spellings arrive here and both have to work. `bee` is the manifest id and
+ * what the in-page publishers pass. `ong-mat` is the slug the library's own
+ * pages are addressed by (`/thu-vien/sinh-hoc/ong-mat`), and it is what anyone
+ * shortening that URL by hand would reach for. Accepting only one of them means
+ * a link that looks obviously correct silently does nothing.
+ */
+export function resolveExperienceRef(ref: string) {
+  const wanted = ref.trim().toLowerCase();
+  if (!wanted) return null;
+  return (
+    EXPERIENCES.find((entry) => entry.id.toLowerCase() === wanted)
+    ?? EXPERIENCES.find((entry) => slugifyTitle(entry.title) === wanted)
+    ?? null
+  );
+}
+
+/* Kept here rather than imported from `slugs.ts` so this module stays free of
+   that file's build-time collision guard, which has no business running as part
+   of a click handler. The two must agree; they are four lines apart in intent
+   and both derive from `title`. */
+function slugifyTitle(title: string): string {
+  return title
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase();
+}
+
+/** Opens an experience by manifest id or by title slug. Unknown refs are ignored, not guessed. */
 export function openLibraryExperience(id: string) {
-  const item = EXPERIENCES.find((entry) => entry.id === id);
+  const item = resolveExperienceRef(id);
   if (!item) {
     console.warn(`openLibraryExperience: no manifest entry "${id}"`);
     return;

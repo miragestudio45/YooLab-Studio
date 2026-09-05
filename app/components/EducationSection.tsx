@@ -2,27 +2,33 @@
 
 import { useState } from 'react';
 import { ModelThumbnail } from './ModelThumbnail';
-import { BEE_THUMBNAIL, CLOWNFISH_THUMBNAIL, JELLYFISH_THUMBNAIL } from '../lib/three/thumbnailRequests';
+import { LibraryViewer } from './library/LibraryViewer';
+import { showcaseById } from '../lib/education/showcase';
+import { useConsult } from './ConsultModal';
+import { StartWithYooLabButton } from './StartWithYooLabButton';
+import {
+  MECH_WHALE_THUMBNAIL,
+  SPIDER_DRONE_THUMBNAIL,
+  WORK_DRONE_THUMBNAIL,
+} from '../lib/three/thumbnailRequests';
 import type { ThumbnailRequest } from '../lib/three/thumbnails';
 import {
-  IconChevronDown,
   IconCube3d,
-  IconFullscreen,
   IconHotspot,
   IconLabels,
-  IconMenu,
   IconModel,
   IconPencil,
-  IconPlay,
-  IconReset,
   IconShareNodes,
   IconTrackText,
   IconViewpoint,
   IconVr,
-} from './studio/EditorIcons';
+/* The shared module, not the full set — this section is not the editor, and
+   importing from `EditorIcons` would pull all forty-nine of its glyphs into the
+   first request wave. See `EditorIconsShared.tsx`. */
+} from './studio/EditorIconsShared';
 
 /**
- * One platform, three ways to use it.
+ * One platform, three roles.
  *
  * Three SaaS cards side by side is the wrong shape for this: it asks a visitor
  * to read all three to find the one that is theirs, and it forces every role to
@@ -50,11 +56,11 @@ import {
  * where the lesson is in its five steps. The frame never resizes, so the tabs
  * swap a lesson rather than rebuilding the section.
  *
- * Every visual is a real render of an asset that ships in this repository,
- * baked through the shared thumbnail renderer, and every part name, note and
- * subtitle below is the same string the Library's own manifest publishes for
- * that specimen. Nothing here is an illustration of a product that does not
- * exist, and nothing here is anatomy invented to fill a label.
+ * Every visual is a real render of an asset that ships in this repository, baked
+ * through the shared thumbnail renderer, and every part name and note below is
+ * the same string the showcase manifest publishes for that specimen. Nothing
+ * here is an illustration of a product that does not exist, and no part is named
+ * that the mesh does not have.
  */
 
 type RoleId = 'teacher' | 'student' | 'school';
@@ -145,16 +151,45 @@ type Role = {
   headline: string;
   lede: string;
   points: { title: string; body: string }[];
-  cta: { label: string; href: string };
+  /* `href` navigates; `action: 'product' | 'consult'` runs the real thing.
+     The teacher row used to be labelled "Xem YooStudio" and merely scrolled to
+     the demo — a product name that is not this product, on a button that does
+     not do what it says. */
+  cta: { label: string; href: string } | { label: string; action: 'product' | 'consult' };
   /** What the player is showing while this role's tab is selected. */
   lesson: {
     /** The specimen on the stage, and the still in the media shelf. */
+    /*
+     * A manifest id, so the panel runs a real mesh through the real viewer —
+     * same loader, same framing, same material preset the Library uses —
+     * instead of showing a baked still of one. That is the point: the section
+     * claims the platform is real, and a photograph of it is the weakest
+     * possible way to make that claim.
+     *
+     * The ids resolve against `lib/education/showcase.ts`, not against the
+     * Library's own manifest. The panel used to run the T-rex, the bee and the
+     * clownfish — the same three assets the hero, the bridge, the proof layer
+     * and the Library rail all already show — so by the time a visitor reached
+     * this section it was the fourth appearance of the site's best-looking
+     * animals rather than evidence that the platform takes whatever a teacher
+     * brings it. The three robotics models are engineering subjects, which is
+     * the argument this section is actually making.
+     */
+    specimenId: string;
     thumb: ThumbnailRequest;
-    /** A second piece of media on the lesson — carries the play badge. */
+    /** A second piece of media on the lesson — carries the 3D badge. */
     clip: ThumbnailRequest;
-    /** The specimen, exactly as the Library manifest names it. */
+    /** The specimen, exactly as the showcase manifest names it. */
     specimen: string;
-    latin: string;
+    /*
+     * The line under the name.
+     *
+     * Called `latin` while the three specimens were animals, which is what it
+     * held: `Tyrannosaurus rex`, `Apis mellifera`. A binomial is one kind of
+     * subtitle, not the only kind, and a machine does not have one — so the
+     * field is named for its slot rather than for what used to sit in it.
+     */
+    caption: string;
     /** The object outline. The first row is always the overview. */
     parts: string[];
     /** Which of `parts` get a pin on the stage, by index. */
@@ -162,9 +197,19 @@ type Role = {
     note: string;
     step: { index: number; total: number; title: string };
     tool: ToolId;
-    spin: boolean;
   };
 };
+
+/*
+ * The school enquiry used to be a composed `mailto:` here.
+ *
+ * It is gone because the enquiry now goes through the shared consultation
+ * form — see `ConsultModal`. The reasoning that put a `mailto:` here was
+ * sound at the time (there is still no lead endpoint) but it made the visitor
+ * write the message themselves, which is the gap MKT reported. The four
+ * prompts this body used to carry are now fields in that form, and the same
+ * message is composed for them by `lib/contact/consult.ts`.
+ */
 
 const ROLES: Role[] = [
   {
@@ -181,18 +226,18 @@ const ROLES: Role[] = [
       { title: 'Giao bài', body: 'Chia sẻ để mở trên web, màn hình lớp học hoặc XR.' },
       { title: 'Tổ chức hoạt động', body: 'Thêm hotspot và câu hỏi trả lời ngay trên mô hình.' },
     ],
-    cta: { label: 'Xem YooStudio', href: '#cong-cu' },
+    cta: { label: 'Mở YooLab ngay', action: 'product' },
     lesson: {
-      thumb: JELLYFISH_THUMBNAIL,
-      clip: CLOWNFISH_THUMBNAIL,
-      specimen: 'Sứa biển',
-      latin: 'Ba lớp cơ thể trong suốt',
-      parts: ['Màng ngoài', 'Tầng giữa', 'Khoang giữa', 'Xúc tu'],
+      specimenId: 'work-drone',
+      thumb: WORK_DRONE_THUMBNAIL,
+      clip: MECH_WHALE_THUMBNAIL,
+      specimen: 'Drone quan trắc Dv2',
+      caption: 'Công nghệ 8 · Cơ cấu bay',
+      parts: ['Ống đẩy', 'Cánh cân bằng', 'Khoang quan sát', 'Vỏ thân'],
       pins: [0, 1, 3],
-      note: 'Ngành Ruột khoang. Di chuyển bằng cách co bóp màng, đẩy nước ra sau.',
-      step: { index: 2, total: 5, title: 'Ba lớp cơ thể sứa' },
+      note: 'Bốn ống đẩy đặt đối xứng quanh trọng tâm. Đổi lực đẩy giữa chúng là đổi hướng bay — không có bánh lái nào cả.',
+      step: { index: 2, total: 5, title: 'Không bánh lái thì rẽ bằng gì' },
       tool: 'note',
-      spin: true,
     },
   },
   {
@@ -209,18 +254,18 @@ const ROLES: Role[] = [
       { title: 'Tạo scene', body: 'Chọn học liệu, sắp đặt không gian, chọn góc nhìn.' },
       { title: 'Trình bày', body: 'Dẫn người xem theo mạch của mình, kể cả trong XR.' },
     ],
-    cta: { label: 'Mở thư viện học liệu', href: '#thu-vien' },
+    cta: { label: 'Khám phá bài học', href: '#thu-vien' },
     lesson: {
-      thumb: BEE_THUMBNAIL,
-      clip: JELLYFISH_THUMBNAIL,
-      specimen: 'Ong mật',
-      latin: 'Apis mellifera',
-      parts: ['Đầu', 'Ngực', 'Cánh', 'Bụng'],
+      specimenId: 'walker-drone',
+      thumb: SPIDER_DRONE_THUMBNAIL,
+      clip: WORK_DRONE_THUMBNAIL,
+      specimen: 'Robot nhện thăm dò',
+      caption: 'STEM · Robot đi bộ',
+      parts: ['Thân trung tâm', 'Chân ba đoạn', 'Cụm cảm biến', 'Vành dẫn hướng'],
       pins: [1, 2, 3],
-      note: 'Cả hai đôi cánh và cả sáu chân đều gắn vào ngực. Nhịp cánh khoảng 230 lần mỗi giây.',
-      step: { index: 3, total: 5, title: 'Cánh gắn vào đâu' },
+      note: 'Bốn chân hạ và nâng lệch pha nhau nên luôn còn điểm tựa. Thân ở giữa xoay độc lập với chân.',
+      step: { index: 3, total: 5, title: 'Chân giữ thăng bằng thế nào' },
       tool: 'view',
-      spin: true,
     },
   },
   {
@@ -237,18 +282,32 @@ const ROLES: Role[] = [
       { title: 'Năng lực số', body: 'Giáo viên và học sinh đều tạo được nội dung 3D.' },
       { title: 'Triển khai theo quy mô', body: 'Mở rộng theo từng trường, từng tổ bộ môn.' },
     ],
-    cta: { label: 'Nhận tư vấn triển khai', href: '#bat-dau-voi-yoolab' },
+    /*
+     * The one tab whose CTA must not land on the signup form.
+     *
+     * This pointed at `#bat-dau-voi-yoolab`, and the button waiting there
+     * creates a personal teacher account — so a principal who asked for a
+     * rollout consultation was handed a form for one seat. The other two tabs
+     * are correctly self-serve; this audience is not, and scrolling them into
+     * the wrong funnel loses the enquiry that the whole tab was written for.
+     *
+     * `mailto:` rather than a form because there is no lead endpoint on this
+     * API — it exposes auth and studio projects and nothing else — and a form
+     * posting nowhere is worse than a mail client that opens. The subject is
+     * pre-filled so the enquiry arrives already sorted from a teacher's.
+     */
+    cta: { label: 'Trao đổi thêm', action: 'consult' },
     lesson: {
-      thumb: CLOWNFISH_THUMBNAIL,
-      clip: BEE_THUMBNAIL,
-      specimen: 'Cá cảnh biển',
-      latin: 'Hệ vây và chuyển động',
-      parts: ['Thân', 'Vây lưng', 'Vây ngực', 'Vây đuôi'],
+      specimenId: 'bionic-whale',
+      thumb: MECH_WHALE_THUMBNAIL,
+      clip: SPIDER_DRONE_THUMBNAIL,
+      specimen: 'Cá voi cơ khí',
+      caption: 'Liên môn · Mô phỏng sinh học',
+      parts: ['Thân đốt', 'Vây chính', 'Vây đuôi', 'Ăng-ten'],
       pins: [1, 2, 3],
-      note: 'Năm nhóm vây — lưng, ngực, bụng, hậu môn, đuôi. Thân dẹp hai bên để len qua khe hẹp.',
-      step: { index: 1, total: 5, title: 'Bộ vây và chuyển động' },
+      note: 'Sóng uốn chạy dọc các đốt thân là nguyên lý đẩy mượn từ cá voi thật. Vây đuôi nằm ngang, đập lên xuống.',
+      step: { index: 1, total: 5, title: 'Máy học được gì từ sinh vật' },
       tool: 'select',
-      spin: false,
     },
   },
 ];
@@ -299,14 +358,20 @@ const FEATURES: { title: string; body: string; Icon: React.ComponentType<{ class
  * walking sixteen unusable buttons would be worse than walking none. The claim
  * the section is making is already written in the column beside it.
  */
+const NOOP = () => {};
+
 function LessonViewer({ lesson }: { lesson: Role['lesson'] }) {
   const { step } = lesson;
+  const specimen = showcaseById(lesson.specimenId);
 
   return (
     <div className="edu-viewer" aria-hidden="true">
       <div className="edu-viewer-stage">
         <div className="edu-viewer-floor" />
-        <ModelThumbnail request={lesson.thumb} alt="" />
+        {/* The real Library viewer, not a picture of one. Its own caption and
+            chrome are suppressed by `.edu-viewer-stage` in sections.css, because
+            this frame draws its own step strip under it. */}
+        {specimen ? <LibraryViewer item={specimen} onOpenWorkshop={NOOP} /> : null}
 
         {/* The tool rail floats over the stage, as it does in the product: the
             grid runs under it, which is what says "this is one canvas with a
@@ -323,38 +388,46 @@ function LessonViewer({ lesson }: { lesson: Role['lesson'] }) {
           ))}
         </div>
 
-        <div className="edu-stage-controls">
-          <div className="edu-stage-control"><IconReset /></div>
-          <div className="edu-stage-control"><IconFullscreen /></div>
-          <div className="edu-stage-control"><IconMenu /></div>
-        </div>
+        {/*
+          Three round icon buttons used to float in this corner — reset, full
+          screen, menu — and they are gone for the same reason the transport's
+          play button is. See the note on `.edu-transport`.
+        */}
 
-        {/* Three pins, on three real parts of the specimen on the stage. The
-            middle one leads the other way so the set reads as anchors on a
-            subject rather than as a stack of labels down one edge. */}
-        {lesson.pins.map((partIndex, order) => (
-          <div
-            key={partIndex}
-            className={`edu-pin edu-pin--${order + 1}${order === 2 ? ' edu-pin--flip' : ''}`}
-          >
-            <span className="edu-pin-label">{lesson.parts[partIndex]}</span>
-            <span className="edu-pin-dot"><i /></span>
-            <span className="edu-pin-lead" />
-          </div>
-        ))}
+        {/*
+          The mock used to draw its own three pins here, at fixed CSS positions.
+          That was right when the stage was a baked still of one specimen and
+          wrong the moment it became a live viewer: the positions were authored
+          against the jellyfish composition, so on a T-rex they pointed at empty
+          air, and the specimen now rotates underneath them anyway.
+
+          The real viewer already carries better ones — `ModelStage` binds its
+          anchors to actual joints, so a label on the skull stays on the skull
+          through the animation. Deleting the decorative set is what lets those
+          be seen.
+        */}
       </div>
 
-      <div className="edu-transport">
-        <div className="edu-transport-play"><IconPlay /></div>
+      {/*
+        A caption, not a transport.
+        This strip used to carry a play button, an auto-rotate switch and a
+        previous/next pair, and every one of them was a `div` that did nothing —
+        the section is a picture of the product, so there was no lesson for a
+        play button to start. A control a visitor can prove is dead in one click
+        costs more trust than the realism it was buying, and the review found all
+        four in the first pass over the section.
 
+        What is left states where the lesson is, which is the only thing this
+        strip was ever telling the reader. The five nodes are a dot per step
+        rather than a percentage bar, because the lesson has five discrete beats
+        and a smooth bar would claim it has a duration.
+      */}
+      <div className="edu-transport">
         <div className="edu-transport-step">
           <small>Bước {String(step.index).padStart(2, '0')} / {String(step.total).padStart(2, '0')}</small>
           <b>{step.title}</b>
         </div>
 
-        {/* Five nodes on one rail, filled to the live step. A dot per step
-            rather than a percentage bar: the lesson has five discrete beats and
-            a smooth bar would claim it has a duration. */}
         <div className="edu-transport-track">
           <span className="edu-track-rail" />
           <span
@@ -369,16 +442,6 @@ function LessonViewer({ lesson }: { lesson: Role['lesson'] }) {
             />
           ))}
         </div>
-
-        <div className="edu-transport-spin">
-          <span>Tự động xoay</span>
-          <span className={`edu-switch${lesson.spin ? ' is-on' : ''}`}><i /></span>
-        </div>
-
-        <div className="edu-transport-steps">
-          <div className="edu-transport-arrow edu-transport-arrow--back"><IconChevronDown /></div>
-          <div className="edu-transport-arrow edu-transport-arrow--next"><IconChevronDown /></div>
-        </div>
       </div>
 
       <div className="edu-object">
@@ -386,7 +449,7 @@ function LessonViewer({ lesson }: { lesson: Role['lesson'] }) {
         <div className="edu-object-name">
           <i />
           <b>{lesson.specimen}</b>
-          <small>{lesson.latin}</small>
+          <small>{lesson.caption}</small>
         </div>
 
         <div className="edu-object-list">
@@ -406,20 +469,69 @@ function LessonViewer({ lesson }: { lesson: Role['lesson'] }) {
             <div className="edu-media-slot">
               <ModelThumbnail request={lesson.thumb} alt="" />
             </div>
+            {/*
+              A 3D model, marked as one.
+              This slot carried a play triangle over a baked still of the
+              clownfish, which is the exact confusion MKT reported: nothing here
+              is video, and a play glyph is a promise that pressing it will start
+              something. The media in a YooLab lesson is a model, so the badge
+              says so.
+            */}
             <div className="edu-media-slot edu-media-slot--clip">
               <ModelThumbnail request={lesson.clip} alt="" />
-              <span><IconPlay /></span>
+              <span className="edu-media-kind"><IconCube3d /> 3D</span>
             </div>
           </div>
         </div>
 
-        <div className="edu-object-add">+ Thêm ghi chú</div>
+        {/* "+ Thêm ghi chú" sat here as a full-width dashed button. Removed with
+            the transport's controls: it was the most button-shaped thing in the
+            panel and the least able to do anything. */}
       </div>
     </div>
   );
 }
 
 /* ------------------------------------------------------------ the section --- */
+
+/**
+ * The role CTA, which is three different kinds of action wearing one style.
+ *
+ * Teacher opens the real product, school opens the shared consultation form,
+ * student scrolls to the Library. Keeping them behind one component is what
+ * lets the manifest above describe intent (`action: 'product'`) instead of
+ * hard-coding a destination that later turns out to be wrong — which is exactly
+ * how the teacher row ended up labelled with another product's name.
+ */
+function EducationCta({
+  cta,
+  roleId,
+}: {
+  cta: { label: string; href: string } | { label: string; action: 'product' | 'consult' };
+  roleId: string;
+}) {
+  const consult = useConsult();
+  const arrow = <span aria-hidden="true">→</span>;
+
+  if ('action' in cta && cta.action === 'product') {
+    return (
+      <StartWithYooLabButton className="education-cta">
+        {cta.label} {arrow}
+      </StartWithYooLabButton>
+    );
+  }
+  if ('action' in cta && cta.action === 'consult') {
+    return (
+      <button type="button" className="education-cta" onClick={() => consult.open(`education:${roleId}`)}>
+        {cta.label} {arrow}
+      </button>
+    );
+  }
+  /* Narrowed by exclusion: the two `action` branches returned above, so what
+     is left is the navigating shape. */
+  const href = 'href' in cta ? cta.href : '#';
+  return <a className="education-cta" href={href}>{cta.label} {arrow}</a>;
+}
 
 export function EducationSection() {
   const [role, setRole] = useState<RoleId>('teacher');
@@ -445,8 +557,27 @@ export function EducationSection() {
                 both. Dropping it here would give this section its own display
                 type, which is the one thing DESIGN.md §3 forbids. */}
             <div className="section-heading education-head">
+              {/*
+                Two rejected headings, and why this one.
+
+                "Ba cách sử dụng" promised three features, which is the reading
+                the next screen spends its whole time contradicting: the three
+                tabs are three *people*. "Ba vai trò" fixed that and stopped
+                there — it counts the audiences without saying anything about
+                them, and a heading whose only content is a number is a label on
+                a filing cabinet.
+
+                What the section actually claims is that a teacher, a student and
+                a school all open the same thing, which is the sentence below. It
+                is also the one a principal reads and recognises as their own
+                problem, and that audience is the one this section exists for.
+
+                One sentence over two lines, not two sentences: "Cả trường cùng
+                dùng." was tried and ran to a third line in this column, which
+                pushes the tab strip and the whole brief card down with it.
+              */}
               <p className="section-kicker">Dành cho giáo dục</p>
-              <h2 id="education-title">Một nền tảng.<br /><em>Ba cách sử dụng.</em></h2>
+              <h2 id="education-title">Một nền tảng<br /><em>cho cả trường.</em></h2>
             </div>
 
             <div className="education-tabs" role="tablist" aria-label="Vai trò">
@@ -478,9 +609,7 @@ export function EducationSection() {
                   </li>
                 ))}
               </ol>
-              <a className="education-cta" href={active.cta.href}>
-                {active.cta.label} <span aria-hidden="true">→</span>
-              </a>
+              <EducationCta cta={active.cta} roleId={active.id} />
             </div>
           </div>
 
@@ -489,7 +618,7 @@ export function EducationSection() {
                 was hard-coded and hidden on phones, which left
                 `phục vụba việc` with no space where the tag had been. */}
             <p className="education-showcase-lede">
-              Cùng một mô hình phục vụ ba việc khác nhau. Chọn phần của bạn.
+              Cùng một trình chiếu bài học, ba người mở nó vì ba lý do khác nhau.
             </p>
             <LessonViewer lesson={active.lesson} />
           </div>

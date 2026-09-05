@@ -11,7 +11,7 @@
  *
  *     node scripts/build-editor-icons.mjs
  *
- * Four normalisations happen on the way in, and only four:
+ * Five normalisations happen on the way in, and only five:
  *
  *   0. A node export's ancestry rects are stripped — see `stripAncestry`.
  *
@@ -24,8 +24,10 @@
  *      brand gradient, the two-tone folder, the close button — keep their fills.
  *   3. Stroke widths are scaled by `STROKE_SCALE` — an optical correction for
  *      rendering a 24 px icon at ~15 px, explained where the constant is defined.
+ *   4. Sub-pixel subpaths are dropped from unstroked paths — Figma's outlined
+ *      stroke endpoints, verified invisible. See `simplifyPaths`.
  *
- * Everything else — path data, caps, joins, masks — is verbatim.
+ * Everything else — coordinates, caps, joins, masks — is verbatim.
  */
 
 import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
@@ -52,10 +54,24 @@ const INK = ['#5D7E81', '#1C1C1C', '#515151', '#AAAAAA', '#949494', '#195658', '
  *                  mark and rendered at half the size of their neighbours. The
  *                  numbers come from the insets in each node's design context.
  * tint          -> false keeps the source fills (gradients, two-tone marks)
+ * recolour      -> { from: to } applied to this icon's literal colours, for the
+ *                  one case where the shipped mark is ahead of its export
  */
 const ICONS = [
   /* ------------------------------------------------------------- main rail */
-  { name: 'IconCreate', file: 'rail-create.svg', tint: false },
+  /*
+   * The brand gradient is pinned, because the shipped mark is ahead of the
+   * export it came from.
+   *
+   * `rail-create.svg` still carries the frame's original `#96DEDA -> #50C9C3`,
+   * but the generated file in the repository has run `#8CD9D9 -> #00AAAB` since
+   * commit 5dfc367 ("color") — `#00AAAB` being the house accent, the same value
+   * `INK` recognises everywhere else. That edit was made directly in the
+   * generated file, so regenerating silently reverted it; this is the same
+   * decision expressed where the generator can honour it. If the export is
+   * ever refreshed with the accent baked in, delete this and nothing changes.
+   */
+  { name: 'IconCreate', file: 'rail-create.svg', tint: false, recolour: { '#96DEDA': '#8CD9D9', '#50C9C3': '#00AAAB' } },
   { name: 'IconTemplates', file: 'rail-templates.svg' },
   { name: 'IconComponents', file: 'rail-components.svg' },
   { name: 'IconProjectInfo', file: 'rail-project-info.svg' },
@@ -234,6 +250,157 @@ function thinStrokes(body) {
   });
 }
 
+/*
+ * Sub-pixel geometry, dropped — the fifth normalisation, and the only one that
+ * touches `d`.
+ *
+ * When a node's stroke was outlined on export, Figma emits the vector network's
+ * endpoint markers as real closed subpaths. `canvas-vr.svg` is the worst case:
+ * one `fill="white"` path of 9,959 bytes across 102 subpaths, 45 of which
+ * measure under 0.35 units in a 22-unit box. A filled shape 0.1 units across is
+ * about 0.07 device pixels at the size this rail draws — it cannot put ink on
+ * the screen at any DPR.
+ *
+ * Subpaths whose bounding box is under 1% of the icon's visible side are
+ * dropped, and only on paths with no stroke: a stroked subpath of zero length
+ * still paints a dot the width of its stroke when the cap is round, so those are
+ * left exactly as they are. The bounding box is measured from control points
+ * rather than from the curve, which over-estimates a subpath's extent — the test
+ * errs toward keeping geometry, never toward dropping it.
+ *
+ * Surviving coordinates are emitted verbatim, and that is a measured decision
+ * rather than caution. Rounding to two decimals saved a further 29 KB, but
+ * `scripts/verify-icon-diff.mjs` showed it changing pixels: several marks carry
+ * degenerate near-horizontal segments (`0.833333` to `0.833334` across ten
+ * units), and collapsing those to exactly horizontal redistributes a hairline
+ * stroke's antialiasing across two pixel rows — 43 pixels on `IconMenu` alone,
+ * at up to 63/255. Dropping the slivers costs 0 changed pixels at render size
+ * and 34 of 1.66 M at ten times render size, so the two operations are not in
+ * the same category and only one of them ships.
+ *
+ * `PATH_PRECISION` stays as the seam for re-running that experiment; `null`
+ * means verbatim, which is what the header promises.
+ */
+const PATH_PRECISION = null;
+const MIN_SPAN_RATIO = 0.01;
+
+const ARITY = { M: 2, L: 2, H: 1, V: 1, C: 6, S: 4, Q: 4, T: 2, A: 7, Z: 0 };
+
+/** `d` -> [{ cmd, args }], absolute and relative commands both preserved. */
+function parsePath(d) {
+  const tokens = d.match(/[MLHVCSQTAZmlhvcsqtaz]|-?\d*\.?\d+(?:e[-+]?\d+)?/gi) ?? [];
+  const segments = [];
+  let cmd = null;
+  let index = 0;
+  while (index < tokens.length) {
+    if (/[a-z]/i.test(tokens[index])) {
+      cmd = tokens[index];
+      index += 1;
+      if (cmd.toUpperCase() === 'Z') {
+        segments.push({ cmd, args: [] });
+        continue;
+      }
+    }
+    if (cmd === null) return null;
+    const arity = ARITY[cmd.toUpperCase()];
+    if (!arity) return null;
+    const args = tokens.slice(index, index + arity).map(Number);
+    if (args.length < arity || args.some(Number.isNaN)) return null;
+    segments.push({ cmd, args });
+    index += arity;
+    /* An implicit repeat after an explicit `M` is a `L`, per the spec. */
+    if (cmd === 'M') cmd = 'L';
+    else if (cmd === 'm') cmd = 'l';
+  }
+  return segments;
+}
+
+/** Splits at every `M`/`m`, so each group is one subpath with its terminator. */
+function splitSubpaths(segments) {
+  const groups = [];
+  for (const segment of segments) {
+    if (segment.cmd === 'M' || segment.cmd === 'm' || groups.length === 0) groups.push([]);
+    groups[groups.length - 1].push(segment);
+  }
+  return groups;
+}
+
+/** Widest of the two axis extents, walking the pen so `H`/`V` stay honest. */
+function subpathSpan(group, start) {
+  let [x, y] = start;
+  const xs = [];
+  const ys = [];
+  const mark = () => { xs.push(x); ys.push(y); };
+  for (const { cmd, args } of group) {
+    const upper = cmd.toUpperCase();
+    const relative = cmd !== upper;
+    if (upper === 'Z') continue;
+    if (upper === 'H') { x = relative ? x + args[0] : args[0]; mark(); continue; }
+    if (upper === 'V') { y = relative ? y + args[0] : args[0]; mark(); continue; }
+    if (upper === 'A') {
+      x = relative ? x + args[5] : args[5];
+      y = relative ? y + args[6] : args[6];
+      mark();
+      continue;
+    }
+    /* Every remaining command is a run of x/y pairs, control points included. */
+    for (let i = 0; i + 1 < args.length; i += 2) {
+      const px = relative ? x + args[i] : args[i];
+      const py = relative ? y + args[i + 1] : args[i + 1];
+      xs.push(px);
+      ys.push(py);
+      if (i + 2 >= args.length) { x = px; y = py; }
+    }
+  }
+  if (xs.length === 0) return { span: 0, end: [x, y] };
+  return {
+    span: Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)),
+    end: [x, y],
+  };
+}
+
+function serialize(segments) {
+  let out = '';
+  let previous = null;
+  for (const { cmd, args } of segments) {
+    /* A repeated command letter is implicit, which is most of the saving on the
+       long fill paths: 102 `L` runs become one. */
+    if (cmd !== previous) { out += cmd; previous = cmd; }
+    else if (args.length) out += ' ';
+    out += args.map((n) => (PATH_PRECISION === null ? String(n) : String(Number(n.toFixed(PATH_PRECISION))))).join(' ');
+  }
+  return out;
+}
+
+function simplifyPaths(body, side) {
+  const minSpan = side * MIN_SPAN_RATIO;
+  return body.replace(/<path\b[^>]*>/g, (element) => {
+    const match = element.match(/\bd="([^"]+)"/);
+    if (!match) return element;
+    const segments = parsePath(match[1]);
+    if (!segments) return element;
+
+    const strokeMatch = element.match(/\bstroke="([^"]+)"/);
+    const stroked = Boolean(strokeMatch) && strokeMatch[1] !== 'none';
+
+    let kept = segments;
+    if (!stroked) {
+      let pen = [0, 0];
+      kept = [];
+      for (const group of splitSubpaths(segments)) {
+        const { span, end } = subpathSpan(group, pen);
+        if (span >= minSpan) kept.push(...group);
+        pen = end;
+      }
+      /* Never hand back an empty path: if every subpath measured small the
+         reading is wrong, not the artwork. Keep the original. */
+      if (kept.length === 0) kept = segments;
+    }
+
+    return element.replace(/\bd="[^"]+"/, `d="${serialize(kept)}"`);
+  });
+}
+
 /* SVG is XML, JSX is not: hyphenated presentation attributes need camelCase. */
 function toJsx(body) {
   return body.replace(/\s([a-z]+(?:-[a-z]+)+)="/g, (whole, attr) => {
@@ -249,8 +416,18 @@ function build(icon) {
   const box = icon.box ?? Math.max(...parts.map((p) => Math.max(p.width, p.height)));
   const prefix = icon.name.replace(/^Icon/, '').toLowerCase();
 
+  /* The side the glyph is actually *seen* at. A `crop` viewBox magnifies the
+     art, so sub-pixel geometry is judged against the smaller of the two. */
+  const visibleSide = Math.min(box, icon.crop?.[2] ?? box);
+
   const layers = parts.map((part, index) => {
     let body = namespaceIds(stripAncestry(part.body), files.length > 1 ? `${prefix}${index}` : prefix);
+    body = simplifyPaths(body, visibleSide);
+    if (icon.recolour) {
+      for (const [from, to] of Object.entries(icon.recolour)) {
+        body = body.replace(new RegExp(from, 'gi'), to);
+      }
+    }
     if (icon.tint !== false) body = thinStrokes(tintInk(body));
     body = toJsx(body);
 
@@ -290,6 +467,12 @@ const header = `/**
  * glyph to its slot instead of fitting it), namespacing the ids Figma reuses
  * across exports, and mapping flat house colours onto \`currentColor\` so state is
  * a colour change. Marks that are genuinely multi-colour keep their fills.
+ *
+ * Coordinates are the export's own. The one geometry edit is that closed
+ * subpaths measuring under 1% of an icon's visible side are dropped from
+ * unstroked paths — Figma's outlined stroke endpoints, which are under a tenth
+ * of a device pixel here. \`scripts/verify-icon-diff.mjs\` measures the result at
+ * 0 changed pixels at render size.
  */
 
 type IconProps = { className?: string };
@@ -312,5 +495,79 @@ export const IconPause = ({ className }: IconProps) => (
 );
 `;
 
-writeFileSync(OUT, `${header}\n${ICONS.map(build).join('\n')}${HAND}`, 'utf8');
-console.log(`wrote ${OUT} — ${ICONS.length + 1} icons`);
+/*
+ * Two files, split by consumer rather than by subject.
+ *
+ * `StudioDemo` uses most of the sixty-five and is behind `StudioDemoGate`. Two
+ * other places on the homepage draw the editor's glyphs without being the
+ * editor, and both are deliberate: `page.tsx` labels its four beats with the
+ * panel each is performed in, and `EducationSection` names fourteen tools a
+ * teacher gets. Pointing at a line and finding it in the editor is the whole
+ * idea.
+ *
+ * The bundling consequence is what forces this file. A module cannot be split,
+ * so those eighteen imports pinned all 132 KB of Figma geometry into the
+ * route's first request wave and made `StudioDemoGate` worth nothing —
+ * measured: the editor deferred and `EditorIcons:132` still arrived alongside
+ * `framework`.
+ *
+ * So the eighteen ship on their own and `EditorIcons` re-exports them, keeping
+ * one import surface for the editor. Anything the editor alone uses now travels
+ * with the editor. Add a consumer outside `StudioDemo` and its glyphs belong on
+ * this list — TypeScript will say so, because the full set no longer defines
+ * them.
+ */
+const SHARED = new Set([
+  /* app/page.tsx — the four beats */
+  'IconSpace', 'IconText', 'IconSteps', 'IconQuiz',
+  /* app/components/EducationSection.tsx — the teacher's fourteen tools */
+  'IconChevronDown', 'IconCube3d', 'IconFullscreen', 'IconHotspot', 'IconLabels', 'IconMenu',
+  'IconModel', 'IconPencil', 'IconPlay', 'IconReset', 'IconShareNodes', 'IconTrackText',
+  'IconViewpoint', 'IconVr',
+]);
+
+const sharedIcons = ICONS.filter((icon) => SHARED.has(icon.name));
+const editorIcons = ICONS.filter((icon) => !SHARED.has(icon.name));
+
+const missing = [...SHARED].filter((name) => !ICONS.some((icon) => icon.name === name));
+if (missing.length) throw new Error(`SHARED names not in ICONS: ${missing.join(', ')}`);
+
+const sharedHeader = `/**
+ * The editor glyphs drawn outside the editor — GENERATED, do not edit by hand.
+ *
+ * Written by \`scripts/build-editor-icons.mjs\` alongside \`EditorIcons.tsx\`, which
+ * re-exports everything here. Import from this module whenever the consumer is
+ * not \`StudioDemo\`: \`app/page.tsx\` labels its four beats with these and
+ * \`EducationSection\` names twelve teacher tools, and reaching into the full set
+ * for them puts all sixty-five icons — 132 KB of Figma geometry — into the first
+ * request wave of a page whose editor is deliberately deferred.
+ *
+ * Add a name to \`SHARED\` in the generator to move an icon here; the generator
+ * throws if a name in that list is not a real icon.
+ */
+
+type IconProps = { className?: string };
+
+const BASE = {
+  fill: 'none',
+  'aria-hidden': true,
+  focusable: 'false' as const,
+};
+`;
+
+const SHARED_OUT = join(ROOT, 'app/components/studio/EditorIconsShared.tsx');
+
+writeFileSync(
+  SHARED_OUT,
+  `${sharedHeader}\n${sharedIcons.map(build).join('\n')}`,
+  'utf8',
+);
+
+const reexport = `\n/* The four glyphs the homepage draws too. Re-exported so the editor has one
+   import surface; see \`EditorIconsShared.tsx\` for why they live apart. */
+export { ${[...SHARED].sort().join(', ')} } from './EditorIconsShared';\n`;
+
+writeFileSync(OUT, `${header}${reexport}\n${editorIcons.map(build).join('\n')}${HAND}`, 'utf8');
+console.log(
+  `wrote ${OUT} — ${editorIcons.length + 1} icons, and ${SHARED_OUT} — ${sharedIcons.length} shared`,
+);

@@ -99,6 +99,34 @@ export function isLeanDevice(): boolean {
   return false;
 }
 
+/**
+ * True when speculative downloading would take bandwidth the visitor needs.
+ *
+ * This is a *network* test and deliberately separate from `isLeanDevice`, which
+ * is about the GPU: a phone on office wifi should still prefetch, and a
+ * workstation tethered to a phone should not. It exists for the ocean warm-up,
+ * which fetches five GLBs, six KTX2 textures and the Basis transcoder — a little
+ * over 4 MB — while the visitor is still in the hero, on top of the 2.5 MB the
+ * bee itself is pulling.
+ *
+ * Only positive evidence of a constrained connection counts. `saveData` is an
+ * explicit request and is honoured outright; `effectiveType` is a measurement,
+ * and `3g` is included because that is where a 4 MB speculative fetch starts
+ * competing with the model the hero is actually waiting for. An absent
+ * `connection` (Safari, Firefox) reads as unconstrained, which keeps the
+ * designed behaviour everywhere the API cannot answer.
+ */
+type NetworkInformation = { saveData?: boolean; effectiveType?: string };
+
+export function prefersLightPayload(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const connection = (navigator as Navigator & { connection?: NetworkInformation }).connection;
+  if (!connection) return false;
+  if (connection.saveData) return true;
+  const type = connection.effectiveType;
+  return type === 'slow-2g' || type === '2g' || type === '3g';
+}
+
 /** The ceiling a surface of this kind should start at on this machine. */
 export function pixelRatioCap(kind: SurfaceKind): number {
   const { dpr, handheld } = read();

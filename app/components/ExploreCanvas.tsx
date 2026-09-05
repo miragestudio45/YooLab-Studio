@@ -21,7 +21,7 @@ import {
   type CreatureHandle,
 } from '../lib/three/creatures';
 import { createVisibilityGate } from '../lib/three/visibility';
-import { isLeanDevice, pixelRatioCap } from '../lib/three/deviceTier';
+import { isLeanDevice, pixelRatioCap, prefersLightPayload } from '../lib/three/deviceTier';
 import {
   hdrMipTargetType,
   hdrTargetSupport,
@@ -88,6 +88,50 @@ const place = (x: number, y: number, z: number, scale: number, yaw = 0, pitch = 
  * give it.
  */
 const CREATURE_SPAN: Record<CreatureKey, number> = { bee: 3.6, fish: 3.15, jelly: 3.42 };
+
+/**
+ * Has this browser already compiled the ocean's shaders once?
+ *
+ * A proxy, and deliberately a cheap one. There is no API for "is the GPU shader
+ * cache warm", but the cache is per-browser-profile and so is `localStorage`, so
+ * a flag written after the first successful warm-up is right for exactly the
+ * population it needs to be right for. It can be wrong in one direction — a
+ * cleared GPU cache with `localStorage` intact — and that costs one visit of the
+ * behaviour we already had.
+ *
+ * `try` because `localStorage` throws rather than returning null in a blocked
+ * third-party context, and a storage policy must not be able to break the hero.
+ */
+const OCEAN_WARM_KEY = 'yoolab.ocean.shaders-compiled';
+
+/**
+ * Panel position at which the reef starts building, by how much it will cost.
+ *
+ * Warm is the number this has always been: a full chapter of runway, which is
+ * what a sub-second warm-up wants. Cold buys the meadow instead — the valley
+ * holds full composition until it begins sinking at panel 1.42, so 1.0 is the
+ * last moment that is still ahead of the crossing and already past the part of
+ * the page a first-time visitor is reading.
+ */
+const OCEAN_TRIGGER_WARM = 0.25;
+const OCEAN_TRIGGER_COLD = 1;
+
+function oceanShadersLikelyCached(): boolean {
+  try {
+    return window.localStorage.getItem(OCEAN_WARM_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function markOceanShadersCached() {
+  try {
+    window.localStorage.setItem(OCEAN_WARM_KEY, '1');
+  } catch {
+    /* Storage blocked. The visitor simply gets the on-approach path every time,
+       which is the safe side of this bet. */
+  }
+}
 
 /* --------------------------------------------------------------------- land --- */
 
@@ -859,6 +903,9 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
      * that looks identical to it.
      */
     let oceanStarted = false;
+    /* Read once, at mount: the answer cannot change during a visit, and the
+       frame loop should not touch `localStorage` sixty times a second. */
+    const oceanTrigger = oceanShadersLikelyCached() ? OCEAN_TRIGGER_WARM : OCEAN_TRIGGER_COLD;
     const startOcean = () => {
       if (oceanStarted || disposed) return;
       oceanStarted = true;
@@ -1106,6 +1153,9 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
 
             if (disposed) return;
             host.dataset.oceanWarm = 'true';
+            /* The programs are in the driver's cache now, so the next visit can
+               afford to warm on idle. See `oceanShadersLikelyCached`. */
+            markOceanShadersCached();
           }
         } catch (error) {
           console.error('[ocean] world failed to load', error);
@@ -1125,6 +1175,40 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
       })
       .finally(() => {
         if (disposed) return;
+        /*
+         * The warm-up is speculative, so a constrained connection opts out.
+         *
+         * Everything above still holds: a reef that appears because it finished
+         * downloading is the bug. But the warm-up spends ~4 MB before the
+         * visitor has asked for the ocean at all, and on a 3G link that is
+         * bandwidth taken directly from the bee — the model the hero *is*
+         * waiting for. Skipping it does not disable the ocean: the frame loop
+         * calls `startOcean` itself the moment `progress` passes 0.25, so the
+         * reef then loads on approach, one chapter of scrolling ahead of the
+         * water. Slower to resolve out of the haze, and still never absent.
+         */
+        if (prefersLightPayload()) return;
+        /*
+         * The idle warm-up is a bet that warming is cheap, and on a first visit
+         * that bet is wrong by four orders of magnitude.
+         *
+         * Measured with `reference-audit/probe-valley.mjs` against one Chrome
+         * profile reused across three visits: the largest main-thread task was
+         * 21,976 ms on the first load and 662 ms on the second. The reef's
+         * assets were cached both times — what changed is the GPU *shader*
+         * cache. Bringing this scene up compiles 27 programs, seven of them
+         * `MeshPhysicalMaterial` with clearcoat, iridescence and skinning, and
+         * on a 2014 GPU that is twenty seconds of driver work the first time
+         * and almost nothing afterwards.
+         *
+         * Twenty seconds spent while the visitor is sitting in the meadow is
+         * what made the flower field stutter, and it bought a smooth crossing
+         * they had not reached yet. So the idle warm-up now runs only once
+         * there is evidence the compile will be cheap. Without that evidence the
+         * frame loop's own trigger takes over and the cost lands on approach,
+         * with the dive already moving.
+         */
+        if (!oceanShadersLikelyCached()) return;
         if ('requestIdleCallback' in window) {
           deferredIdle = window.requestIdleCallback(startOcean, { timeout: 900 });
         } else {
@@ -1322,7 +1406,18 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
         ? target
         : smoothProgress + (target - smoothProgress) * (1 - Math.pow(0.0025, delta));
       const progress = smoothProgress;
-      if (!oceanStarted && progress > 0.25) startOcean();
+      /*
+       * On approach, and how early depends on what the approach costs.
+       *
+       * With the shaders cached, warming is sub-second and 0.25 is a generous
+       * head start. On a first visit it is twenty seconds, and starting it a
+       * quarter of the way into chapter 01 means it runs through the whole of
+       * the meadow the visitor is currently looking at. `OCEAN_TRIGGER_COLD`
+       * waits until the dive itself is nearly under way — the valley starts
+       * sinking at panel 1.42 — so the compile lands against a moving frame
+       * instead of a still one, and the hero is never the thing that stutters.
+       */
+      if (!oceanStarted && progress > oceanTrigger) startOcean();
 
       const dive = diveFor(progress);
       const weights = creatureWeights(progress);

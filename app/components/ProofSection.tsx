@@ -107,21 +107,47 @@ export function ProofSection() {
             const actionId = sample.action.kind === 'library' ? sample.action.id : '';
             return (
             <article className="proof-card" key={sample.id} data-reveal>
-              <div
-                className={`proof-visual${sample.visual.kind === 'mark' ? ' proof-visual--mark' : ''}`}
+              {/*
+                The object itself opens the lesson (MKT: "cho phép click vào vật
+                thể dẫn ra sector tương ứng").
+
+                It is a `button` so a pointer gets a real control with a real
+                cursor, and it is `aria-hidden` with `tabIndex={-1}` so it does
+                *not* become a second tab stop: the labelled CTA below already
+                reaches the same destination, and an unlabelled duplicate in the
+                tab order would make the card worse for a keyboard than it was.
+                Mouse gains a shortcut; assistive technology loses nothing.
+              */}
+              <button
+                type="button"
+                aria-hidden="true"
+                tabIndex={-1}
+                onClick={() => {
+                  if (sample.action.kind === 'formula') openFormula();
+                  else if (sample.action.kind === 'library') openLibraryExperience(actionId);
+                  else if (sample.action.kind === 'link') window.location.hash = sample.action.href.replace(/^#/, '');
+                }}
+                className={`proof-visual is-openable${sample.visual.kind === 'mark' ? ' proof-visual--mark' : ''}`}
                 style={sample.tint ? ({ '--proof-tint': sample.tint } as React.CSSProperties) : undefined}
               >
                 {sample.visual.kind === 'thumbnail' && (
                   <ModelThumbnail request={sample.visual.request} alt={sample.title} />
                 )}
                 {sample.visual.kind === 'poster' && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={sample.visual.src} alt={sample.title} loading="lazy" decoding="async" />
+                  <>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={sample.visual.src} alt={sample.title} loading="lazy" decoding="async" />
+                    {/* The only still photograph among these cards. Its
+                        neighbours are live bakes of real meshes, so without this
+                        it is the one card that quietly claims to be a render of
+                        something the visitor can open. */}
+                    <span className="proof-still">Ảnh minh họa</span>
+                  </>
                 )}
                 {sample.visual.kind === 'mark' && (
                   <span className="proof-mark" aria-hidden="true"><LibraryMark mark={sample.visual.mark} /></span>
                 )}
-              </div>
+              </button>
               <span className="proof-subject">{sample.subject}</span>
               <h3>{sample.title}</h3>
               <p>{sample.task}</p>

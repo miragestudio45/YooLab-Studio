@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { ExploreCanvas } from './ExploreCanvas';
+import { StartWithYooLabButton } from './StartWithYooLabButton';
 import { FlowerValleyLayer } from './FlowerValleyLayer';
 import { EXPLORE_SCENES } from '../lib/exploreScenes';
 
@@ -121,23 +122,58 @@ export function ExploreStory() {
       <section className="hero story-panel" data-snap data-scene="bee-hero" data-header-theme="light" aria-labelledby="hero-title">
         <div className="story-grid">
           <div className="hero-copy story-content">
+            {/*
+              The opening had to answer "what is this" before it answered
+              "isn't this beautiful". It used to open on "Biến kiến thức thành
+              trải nghiệm 3D/XR" — a promise, not a product — and testers came
+              away from the first screen unable to say what YooLab actually is.
+              The brand sits in the eyebrow and the plain sentence sits in the
+              h1, so the two read as one line without printing the word twice.
+            */}
+            <p className="hero-eyebrow">YooLab</p>
             <h1 id="hero-title">
-              Biến kiến thức
+              Kiến tạo
               <br />
-              <em>thành trải nghiệm 3D/XR.</em>
+              <em>không gian học tập số.</em>
             </h1>
             <p className="hero-lede">
-              YooLab giúp giáo viên xây dựng bài học với mô hình 3D, học sinh khám
-              phá, tương tác và sáng tạo nội dung số trên cùng một nền tảng.
+              Công cụ giúp giáo viên thiết kế bài giảng 3D/XR, mở không gian để
+              học sinh thực hành và trải nghiệm.
             </p>
-            <div className="hero-actions">
-              <a className="primary-button" href="#thu-vien">
-                Khám phá bài học <span aria-hidden="true">→</span>
-              </a>
-              <a className="text-button" href="#cong-cu">
-                <span className="play-icon" aria-hidden="true">▶</span>
-                Mở YooLab
-              </a>
+            <p className="hero-capability" aria-label="Bài giảng, Thí nghiệm, Thực hành">
+              <span>Bài giảng</span>
+              <span>Thí nghiệm</span>
+              <span>Thực hành</span>
+            </p>
+
+            {/*
+              Two roles, not two buttons.
+
+              The first screen was carrying "Khám phá bài học" and "Xem công cụ"
+              side by side, which tells a visitor what the *page* can do and
+              nothing about who the product is for. Naming the reader — teacher
+              or student — is what makes the next click obvious, and it is the
+              same split the Education section and the trial dialog use, so the
+              site says "một nền tảng, ba cách dùng" once and keeps saying it.
+              Rendered as two short rows rather than a card grid: the hero's
+              subject is the scene behind it, and a pair of marketing tiles here
+              would compete with the bee for the same attention.
+            */}
+            <div className="hero-roles">
+              <div className="hero-role">
+                <span className="hero-role__tag">Giáo viên</span>
+                <p>Xây dựng bài học trực quan với mô hình 3D/XR</p>
+                <StartWithYooLabButton className="hero-role__cta hero-role__cta--primary">
+                  Mở YooLab ngay <span aria-hidden="true">→</span>
+                </StartWithYooLabButton>
+              </div>
+              <div className="hero-role">
+                <span className="hero-role__tag">Học sinh</span>
+                <p>Khám phá, tương tác và thực hành với Sandbox/STEM 3D/XR</p>
+                <a className="hero-role__cta" href="#thu-vien">
+                  Khám phá bài học ngay <span aria-hidden="true">→</span>
+                </a>
+              </div>
             </div>
           </div>
           <div className="hero-spec">

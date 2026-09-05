@@ -29,6 +29,13 @@
 @import './styles/exp-physics.css';
 @import './styles/exp-earth.css';
 @import './styles/exp-toolkit.css';
+@import './styles/faq.css';
+@import './styles/library-page.css';
+@import './styles/auth.css';
+@import './styles/toast.css';
+@import './styles/pricing.css';
+@import './styles/closing.css';
+@import './styles/conversion.css';
 
 /* ==========================================================================
    YooLab design tokens
@@ -449,6 +456,79 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 .header-cta:hover { background: var(--brand-hover); transform: translateY(-1px); }
 .header-cta span { color: var(--color-accent-on); opacity: 0.66; }
 
+.user-menu--desktop {
+  position: relative;
+  justify-self: end;
+}
+
+.user-menu-trigger {
+  display: flex;
+  padding: 0;
+  border: none;
+  background: none;
+  border-radius: 50%;
+  line-height: 0;
+}
+
+.user-menu-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1.5px solid rgba(255, 255, 255, 0.6);
+}
+
+.user-menu-avatar--fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--brand);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.user-menu-dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 20;
+  min-width: 180px;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-lift);
+}
+
+.user-menu-dropdown .user-menu-name {
+  margin: 0 0 8px;
+  padding: 0 4px;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--color-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.user-menu-logout {
+  width: 100%;
+  padding: 9px 10px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 620;
+  text-align: left;
+  cursor: pointer;
+}
+
+.user-menu-logout:hover {
+  background: var(--color-border-hair);
+}
+
 .menu-toggle, .mobile-nav { display: none; }
 
 /* ------------------------------------------------------------------- hero --- */
@@ -575,7 +655,38 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   grid-row: 1 / -1;
   align-self: start;
   max-width: 52rem;
-  margin-top: clamp(126px, 15.5vh, 176px);
+  /* Lifted from `clamp(126px, 15.5vh, 176px)`. The opening gained an eyebrow, a
+     capability line and two role rows for the MKT round, and at the old offset
+     the last of those landed in the flower band where the student CTA was
+     effectively unreadable. */
+  margin-top: clamp(88px, 11.5vh, 138px);
+  /* A legibility ground, not a card.
+     The copy column sits over a meadow whose colour is unpredictable and moves,
+     and viewport height decides how much of it is behind the text. A soft wash
+     in the page's own cream keeps every line readable at any height without
+     putting a panel on the hero. */
+  position: relative;
+  isolation: isolate;
+}
+.hero-copy::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  /* The box is deliberately far bigger than the gradient needs. The first
+     version sized it to the copy and the ellipse still had ~0.5 alpha where the
+     box ended, which drew a straight edge across the meadow — a translucent
+     panel, which is the one thing this must not look like. Oversizing lets the
+     falloff reach zero well inside the element, so there is no boundary to see. */
+  inset: -190px -46% -170px -170px;
+  background: radial-gradient(
+    62% 52% at 27% 52%,
+    rgba(255, 253, 249, 0.93) 0%,
+    rgba(255, 253, 249, 0.8) 34%,
+    rgba(255, 253, 249, 0.44) 62%,
+    rgba(255, 253, 249, 0.12) 84%,
+    rgba(255, 253, 249, 0) 100%
+  );
+  pointer-events: none;
 }
 
 .hero h1 {
@@ -601,10 +712,145 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 
 .hero-lede {
   max-width: 64ch;
-  margin: 20px 0 0;
+  margin: 16px 0 0;
   color: var(--ink-2);
   font-size: 15.5px;
   line-height: 1.62;
+}
+
+/* ------------------------------------------------- hero product positioning --- */
+/*
+ * The eyebrow, the capability line and the two role rows.
+ *
+ * All three are type and rules only — no card, no fill, no shadow. The hero's
+ * subject is the scene behind the copy, and every box added here is a box the
+ * bee has to be read through.
+ */
+.hero-eyebrow {
+  margin: 0 0 14px;
+  color: var(--color-accent-readable);
+  font-size: 12px;
+  font-weight: 620;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.hero-capability {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  margin: 12px 0 0;
+  padding: 0;
+  color: var(--ink-3, var(--ink-2));
+  font-size: 12.5px;
+  letter-spacing: 0.04em;
+}
+/* Separators are drawn, not typed, so a wrap never leaves a dot stranded at the
+   start of the second line. */
+.hero-capability span + span::before {
+  content: '';
+  display: inline-block;
+  width: 3px;
+  height: 3px;
+  margin-right: 10px;
+  border-radius: 50%;
+  background: var(--color-accent-line, currentColor);
+  vertical-align: 0.28em;
+}
+
+.hero-roles {
+  /*
+   * A grid, not a flex row.
+   *
+   * The two roles carry different amounts of copy — the student line wraps to
+   * two, the teacher line to one — and under `flex` that meant two columns of
+   * different widths whose buttons landed at different heights. Equal tracks fix
+   * the width; `align-items: stretch` plus the auto margin below fixes the
+   * baseline, so the two actions sit on one line whatever the copy does.
+   */
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 30px;
+  align-items: stretch;
+  max-width: 640px;
+  margin-top: 20px;
+}
+.hero-role {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  padding-left: 14px;
+  border-left: 1.5px solid var(--color-accent-line, rgba(0, 170, 171, 0.42));
+}
+.hero-role__tag {
+  color: var(--brand-ink, var(--color-ink));
+  font-size: 11.5px;
+  font-weight: 660;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.hero-role p {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 13.5px;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
+/*
+ * Real buttons.
+ *
+ * These were underlined text links sitting over a photographic meadow, which is
+ * the one place on the page a text link cannot hold: the student action was
+ * teal-on-flowers and effectively invisible. The primary takes the brand fill,
+ * the secondary a teal stroke on the page's own cream — a pair, not two
+ * identical buttons competing at the same weight.
+ */
+.hero-role__cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  /* Pushed to the bottom of its own track so both buttons share a baseline. */
+  margin-top: auto;
+  padding: 0 18px;
+  min-height: 46px;
+  border: 1.5px solid var(--color-accent-strong, #00aaab);
+  border-radius: 12px;
+  background: rgba(255, 253, 249, 0.86);
+  color: var(--color-accent-readable, #00aaab);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 640;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 200ms var(--ease-reveal, ease), color 200ms var(--ease-reveal, ease),
+              border-color 200ms var(--ease-reveal, ease), transform 200ms var(--ease-reveal, ease);
+}
+.hero-role__cta span { transition: transform 220ms var(--ease-reveal, ease); }
+.hero-role__cta:hover { background: #fff; transform: translateY(-1px); }
+.hero-role__cta:hover span { transform: translateX(3px); }
+.hero-role__cta:active { transform: translateY(0); }
+
+.hero-role__cta--primary {
+  border-color: transparent;
+  background: var(--color-accent-strong, #00aaab);
+  color: #fff;
+  box-shadow: 0 10px 24px -14px rgba(0, 170, 171, 0.9);
+}
+.hero-role__cta--primary:hover {
+  background: var(--color-accent-hover, #018e8f);
+  border-color: transparent;
+}
+
+@media (max-width: 700px) {
+  .hero-roles { grid-template-columns: minmax(0, 1fr); gap: 16px; margin-top: 18px; max-width: none; }
+  .hero-role__cta { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-role__cta, .hero-role__cta span { transition: none; }
 }
 
 .hero-actions { display: flex; align-items: center; gap: 22px; margin-top: 26px; flex-wrap: wrap; }
@@ -1549,35 +1795,11 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
  * worth of breathing room at most, and the ceiling is what stops a tall display
  * from ending the page on emptiness.
  */
-.final-cta {
-  position: relative;
-  display: flex;
-  min-height: clamp(400px, 58svh, 580px);
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  padding: clamp(56px, 8vh, 92px) max(var(--page-gutter), calc((100% - var(--page-max)) / 2));
-  scroll-margin-top: 0;
-  text-align: center;
-  color: var(--ink);
-  background:
-    radial-gradient(circle at 50% 104%, rgba(0, 170, 171, 0.15), transparent 48%),
-    linear-gradient(180deg, var(--color-bg) 0%, #f8efe2 100%);
-}
-.final-cta h2 {
-  position: relative;
-  z-index: 2;
-  color: var(--ink);
-  /* Same height cap as the other display headings: the closing statement is the
-     largest type on the page, and unguarded `5.2vw` put it at 71 px on a 1366
-     laptop where two lines then left no room for the copy and the two actions
-     under it. */
-  font-size: clamp(34px, min(4.6vw, 6.6vh), 70px);
-}
-.final-cta > p:not(.section-kicker) { position: relative; z-index: 2; max-width: 52ch; margin: 18px 0 0; color: var(--ink-2); font-size: 14.5px; line-height: 1.65; }
-.final-cta > div:last-child { position: relative; z-index: 2; display: flex; align-items: center; gap: 28px; margin-top: clamp(22px, 3vh, 32px); flex-wrap: wrap; justify-content: center; }
-.final-cta > div:last-child > a:not(.cta-main) { color: var(--ink-2); font-size: 12px; font-weight: 560; }
+/* `.final-cta` layout, type and actions now live in styles/closing.css, which
+   rebuilt this band as a studio cove. They were here too, later in the cascade,
+   and silently won. */
+
+
 .cta-main {
   display: inline-flex;
   align-items: center;
@@ -1602,70 +1824,12 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
  * two-tone circle sitting behind the call to action. Fading a colour to its own
  * zero-alpha self has no edge at any opacity.
  */
-.cta-orb { position: absolute; border-radius: 50%; }
-.cta-orb--one {
-  top: -170px;
-  left: -130px;
-  width: 520px;
-  height: 520px;
-  background: radial-gradient(circle at 50% 50%,
-    rgba(140, 217, 217, 0.30) 0%, rgba(140, 217, 217, 0.11) 44%, rgba(140, 217, 217, 0) 72%);
-}
-.cta-orb--two {
-  right: -190px;
-  bottom: -220px;
-  width: 640px;
-  height: 640px;
-  background: radial-gradient(circle at 50% 50%,
-    rgba(203, 180, 234, 0.26) 0%, rgba(203, 180, 234, 0.09) 44%, rgba(203, 180, 234, 0) 72%);
-}
+/* `.cta-orb` is retired by closing.css. */
 
-/*
- * The footer is on the shell too.
- *
- * `max(6.5vw, 26px)` was the last independent horizontal system on the page: at
- * 1920 it put the wordmark 125 px from the edge while every section above it
- * started at 80. The grid lives in a shell-width wrapper via `width` +
- * `margin-inline`, so the closing alignment line is the same as the opening one.
- */
-.site-footer {
-  display: grid;
-  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
-  gap: clamp(32px, 4vw, 72px);
-  /*
-   * Full-bleed ground, shell-aligned content, and no extra wrapper element.
-   *
-   * `max(gutter, (100% - page-max) / 2)` is the shell expressed as padding: below
-   * the cap the gutter wins and the content is `100% - 2 * gutter`; above it the
-   * second term wins and the content is exactly `--page-max`, centred. Same box
-   * as `.shell`, on an element that also has to paint edge to edge.
-   */
-  padding:
-    clamp(48px, 7vh, 76px)
-    max(var(--page-gutter), calc((100% - var(--page-max)) / 2))
-    24px;
-  color: var(--ink-2);
-  border-top: 1px solid var(--line);
-  background: #f8efe2;
-}
-.footer-brand { display: grid; align-content: start; justify-items: start; gap: 13px; color: var(--brand-logo-ink); }
-.footer-brand p { margin: 0; color: var(--ink-3); font-size: 11px; line-height: 1.55; }
-.footer-links { display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; }
-.footer-links div { display: flex; flex-direction: column; gap: 10px; }
-.footer-links b { margin-bottom: 6px; color: var(--ink-4); font-size: 9px; font-weight: 650; text-transform: uppercase; letter-spacing: 0.11em; }
-.footer-links a { color: var(--ink-2); font-size: 11.5px; }
-.footer-links a:hover { color: var(--brand-ink); }
-.footer-bottom {
-  grid-column: 1 / -1;
-  display: flex;
-  justify-content: space-between;
-  margin-top: 40px;
-  padding-top: 20px;
-  border-top: 1px solid var(--line);
-  color: var(--ink-4);
-  font-size: 10px;
-}
-.footer-bottom span:last-child { display: flex; gap: 18px; }
+
+ 
+/* The footer is owned by styles/closing.css. The rules here set 9-11px type and
+   outranked it by position. */
 
 
 /* ====================================================== shared primitives === */
@@ -1693,7 +1857,33 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
    than a third of a very tall box, and the whole section is sized so headline and
    both frames compose in one viewport.
    ======================================================================== */
+/*
+ * The bridge is re-skinned to the brand palette by overriding four tokens here,
+ * not by editing the fifty rules below that read them.
+ *
+ * This section was authored against a lilac-and-blush duotone: `--color-lavender`
+ * carried every active state, eyebrow and hotspot, and `--color-blush-soft` was
+ * the wash the specimen stands in. On a page whose one accent is #00AAAB and
+ * whose ground is warm ivory, that made the single largest block on the site the
+ * one that looked like a different product — "cứ hồng hồng", as the review put
+ * it, and the pink was strongest exactly where the eye goes, behind the bee.
+ *
+ * Custom properties inherit, so redeclaring them on the section retargets every
+ * `var()` and `color-mix()` underneath it — including the ones inside the
+ * viewport's gradients — while the same tokens keep their original values for
+ * the subject tints elsewhere, which is what they were actually introduced for.
+ *
+ * The duotone survives; only its two hues change. Teal is the accent and warm
+ * cream is the second wash, which is the pairing the hero and the closing band
+ * already use, so the specimen now stands in the same room as the rest of the
+ * page rather than in a pink one.
+ */
 .bridge {
+  --color-lavender: var(--color-accent-readable, #00aaab);
+  --color-lavender-soft: #c7e8e8;
+  --color-blush: var(--color-accent-readable, #00aaab);
+  --color-blush-soft: #f6e6cd;
+
   position: relative;
   z-index: 4;
   overflow: hidden;
@@ -3029,14 +3219,32 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
    * The sheet hangs off the bottom of the bar and is shell-aligned like the bar
    * itself, so opening the menu does not introduce a fifth left edge.
    */
+  /*
+   * The sheet opens by animating its grid row, not its height.
+   *
+   * This used to run `max-height: 0` to `560px`, which meant two things. The
+   * browser relaid the sheet's subtree on every frame of the open — with a
+   * `backdrop-filter` over it, so the blur resolved again each time — and the
+   * `560px` was a guess that had to stay comfortably larger than the real
+   * content, so the easing curve never matched the distance actually travelled.
+   *
+   * `grid-template-rows: 0fr -> 1fr` measures the content instead of guessing at
+   * it, and interpolates a track size rather than a box height. The padding
+   * moved to `.mobile-nav__inner` for the same reason: it was the second layout
+   * property being animated here, and on the inner element it is simply
+   * constant and clipped.
+   *
+   * Browsers without `0fr` interpolation (pre-2023) snap open instead of
+   * sliding, which is the correct degradation — the menu works, it just does not
+   * animate.
+   */
   .mobile-nav {
     position: absolute;
     top: calc(100% + 8px);
     right: 0;
     left: 0;
-    display: flex;
-    max-height: 0;
-    flex-direction: column;
+    display: grid;
+    grid-template-rows: 0fr;
     overflow: hidden;
     border: 1px solid transparent;
     border-radius: 15px;
@@ -3046,7 +3254,18 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
     box-shadow: 0 24px 55px rgba(87, 62, 43, 0.16);
     backdrop-filter: blur(20px) saturate(1.12);
     -webkit-backdrop-filter: blur(20px) saturate(1.12);
-    transition: max-height 300ms ease, opacity 200ms ease, background-color 300ms ease, color 300ms ease;
+    transition: grid-template-rows 300ms ease, opacity 200ms ease, background-color 300ms ease, color 300ms ease;
+  }
+
+  /* `min-height: 0` is what lets the track actually collapse: a grid item's
+     automatic minimum size would otherwise hold the row open at content height
+     and nothing would animate. */
+  .mobile-nav__inner {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 10px 14px 14px;
   }
   .site-header[data-theme='dark'] .mobile-nav {
     color: #fff;
@@ -3054,15 +3273,14 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
     background: rgba(4, 16, 39, 0.72);
   }
   .site-header.is-open .mobile-nav {
-    max-height: 560px;
-    padding: 10px 14px 14px;
+    grid-template-rows: 1fr;
     border-color: var(--color-border-hair);
     opacity: 1;
   }
   .site-header.is-open[data-theme='dark'] .mobile-nav {
     border-color: rgba(255, 255, 255, 0.16);
   }
-  .mobile-nav > a {
+  .mobile-nav__inner > a {
     display: flex;
     align-items: center;
     gap: 15px;
@@ -3071,7 +3289,7 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
     font-size: 14px;
     font-weight: 540;
   }
-  .mobile-nav > a span { color: color-mix(in srgb, currentColor 55%, transparent); font-size: 9px; }
+  .mobile-nav__inner > a span { color: color-mix(in srgb, currentColor 55%, transparent); font-size: 9px; }
   .mobile-nav .mobile-nav-cta {
     justify-content: center;
     margin-top: 10px;
@@ -3081,10 +3299,37 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
     background: var(--brand);
     font-weight: 620;
   }
+  .mobile-nav .user-menu--mobile {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 10px;
+    padding: 10px 4px;
+  }
+  .mobile-nav .user-menu-identity {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+  .mobile-nav .user-menu-identity .user-menu-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .mobile-nav .user-menu--mobile .user-menu-logout {
+    flex-shrink: 0;
+    width: auto;
+    border-radius: 999px;
+    padding: 8px 14px;
+  }
 }
 
 @media (max-width: 860px) {
-  .header-cta { display: none; }
+  .header-cta, .user-menu--desktop { display: none; }
   .site-header-inner { grid-template-columns: auto minmax(0, 1fr) auto; }
   .site-footer { grid-template-columns: 1fr; }
   .footer-links { margin-top: 20px; }

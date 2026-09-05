@@ -44,6 +44,12 @@
         ],
         "createdAt": "2026-09-02T17:20:36.400Z",
         "reason": "Claude: .edu-viewer-floor is the ground plane of the lesson player's 3D viewport (inside .edu-viewer-stage), which is the canvas/measurement case the rule exempts, not page decoration. It is bottom-masked (linear 34-78% intersected with a radial pool at 52%/96%) so no line is visible beside the specimen's bell, and a contact-shadow ellipse on the same surface aligns with it so the model reads as standing on it. The user's reference image for this section shows this exact grid in this exact place."
+      },
+      {
+        "rule": "overused-font",
+        "value": "plus jakarta sans",
+        "createdAt": "2026-09-04T03:03:50.398Z",
+        "reason": "project decided: DESIGN.md section 3 'Type - one family' commits to Plus Jakarta Sans 200-800 roman+italic, 'Nothing else', with --font-display/body/editorial/mono all resolving to it and tabular-nums replacing a mono face; PRODUCT.md requires the face survive diacritic-heavy Vietnamese. Replaced a previous four-face stack deliberately."
       }
     ]
   }
