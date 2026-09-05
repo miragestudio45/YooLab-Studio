@@ -945,11 +945,13 @@
  */
 @media (max-width: 1180px) {
   /*
-   * Still two columns, but the copy column is now under 400 px wide, so the lede
-   * and the point rows wrap one line more than they do on a 1366 — which was
-   * exactly the pixels by which the panel overran its budget at 1024×768. The
-   * rhythm tightens; nothing is removed.
+   * The lesson player stacks under the brief card (KNOWN_LIMITATIONS.md: this is
+   * the section's documented floor). Below it the copy column no longer shares
+   * the row with the player, so the section gives up the one-screen fit and
+   * grows to whatever the stacked content needs — `.education-stage` still uses
+   * `min-height`, never `height`, so that growth was already safe.
    */
+  .education-panel { grid-template-columns: minmax(0, 1fr); }
   .education-points li { padding: clamp(4px, 0.72vh, 9px) 0; }
   .education-points b { font-size: 12px; }
   .education-cta { margin-top: clamp(12px, 1.8vh, 26px); }
