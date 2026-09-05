@@ -1,0 +1,779 @@
+/*
+ * The closing band and the footer.
+ *
+ * ## Three concepts, and why this is the third
+ *
+ * The first attempt drew the studio's grid floor in perspective under the type,
+ * and a wireframe grid on an empty cream field reads as a placeholder for a
+ * scene rather than as a scene. The second replaced it with a cyclorama built
+ * from three gradients — a wall, a curved floor, a pool of key light — which was
+ * honest and quiet and, on a 1440 display, still 500 px of empty cream with two
+ * buttons in the middle of it.
+ *
+ * This one uses the artwork the brand ships: a 3 : 1 illustration with an
+ * authoring card on the left, a globe on the right, two orbs, two orbit arcs and
+ * a wave field along the bottom. The band's job is to be the one section on the
+ * site with no specimen in it, so the illustration IS the subject, and the
+ * content sits in the corridor the artwork leaves open down its middle.
+ *
+ * ## How it stays responsive
+ *
+ * A 3 : 1 image cannot be `cover`-ed into a portrait box: everything that makes
+ * the picture sits in its outer thirds, so a phone would get the empty middle.
+ * `scripts/build-cta-background.mjs` therefore emits the banner AND three
+ * feathered cut-outs of its parts. Above 1024 px the banner is one full-bleed
+ * layer. Below, the banner is dropped and the cut-outs take over as independent
+ * layers — globe off the top-right, card off the bottom-left, waves along the
+ * bottom — each free to take its own size and position per breakpoint.
+ *
+ * Both regimes sit on the same CSS gradient, authored to the artwork's own
+ * palette, so nothing depends on an image having loaded.
+ */
+
+/* =============================================================== closing === */
+
+.final-cta {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: clamp(560px, 74svh, 780px);
+  overflow: hidden;
+  padding: clamp(72px, 9vh, 112px) max(var(--page-gutter), calc((100% - var(--page-max)) / 2))
+    clamp(84px, 10vh, 132px);
+  scroll-margin-top: 0;
+  text-align: center;
+  color: var(--ink);
+  /*
+   * The ground the artwork sits on, and the fallback if it never arrives.
+   *
+   * Sampled off the source PNG rather than guessed: a teal haze at the left edge
+   * (#b2e4e5 at x = 0, gone by x = 160), a warm cream body, and a cooler tint in
+   * the bottom-right where the globe's glow lands. The comments live above the
+   * declaration because `lightningcss` rejects a comment inside a value and
+   * fails the build with `Unexpected token Delim('/')` rather than a line.
+   */
+  background:
+    radial-gradient(46% 62% at 0% 46%, rgba(150, 220, 222, 0.34) 0%, rgba(150, 220, 222, 0) 72%),
+    radial-gradient(52% 72% at 100% 42%, rgba(126, 214, 216, 0.24) 0%, rgba(126, 214, 216, 0) 70%),
+    radial-gradient(64% 52% at 50% 40%, #fffdf8 0%, rgba(255, 253, 248, 0) 78%),
+    linear-gradient(178deg, #fdf6ec 0%, #fdf8f1 42%, #f7f5ee 100%);
+}
+
+/* ------------------------------------------------------------ the artwork --- */
+
+.cta-scene {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+.cta-scene span {
+  position: absolute;
+  background-repeat: no-repeat;
+}
+
+/*
+ * A dither, and why a section this quiet needs one.
+ *
+ * Everything in this band is a shallow gradient across two thousand pixels —
+ * three CSS radials, a WebP whose whole subject is soft falloff, and an alpha
+ * mask over the top of it. Each of those is quantised to 8 bits per channel
+ * independently, and a ramp that moves one step every ninety pixels shows every
+ * one of those steps as a horizontal stripe. Nothing is wrong with the artwork;
+ * the review's "hơi vỡ vỡ" is the compositor running out of values.
+ *
+ * One octave of monochrome noise at 4% breaks the steps up. It is authored as an
+ * inline SVG rather than a PNG so it costs no request, `stitchTiles` makes the
+ * 180 px tile seamless, and `overlay` keeps it neutral — it lightens where the
+ * ground is light and darkens where it is dark, instead of tinting the whole
+ * band the way a flat grey at low opacity would.
+ */
+.cta-scene::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity: 0.04;
+  mix-blend-mode: overlay;
+  pointer-events: none;
+}
+
+/*
+ * The whole banner, for widths where the section is wide enough to hold it.
+ *
+ * Not `inset: 0` with `cover`, which is the obvious spelling and the wrong one.
+ * The band's content is about 500 px tall and the artwork is 3 : 1, so at
+ * 1440 px the section is a 2.2 : 1 box; `cover` then scales the picture to the
+ * section's HEIGHT, which zooms it to 1998 px wide and cuts 280 px off each end
+ * — the authoring card loses its left third and the globe loses its right.
+ *
+ * So the layer is given the artwork's own aspect ratio and pinned to the bottom
+ * edge, which fixes the scale at "one viewport wide" instead of at "however tall
+ * the copy happens to be". The picture then lands where the composition wants
+ * it: the wave field on the section's bottom edge, the globe bleeding off the
+ * right, the authoring card clear of the left gutter, and the type in the
+ * corridor between them.
+ *
+ * The mask is what lets it sit lower than the section without drawing an edge.
+ * The artwork's own top strip is plain cream, so fading the layer out across it
+ * hands over to the CSS gradient with nothing to see — and unlike a gradient
+ * overlay in a matching colour, it cannot drift when the ground is retuned. 12%,
+ * because the globe's crown starts at 13.8% of the artwork's height and a longer
+ * ramp would eat it.
+ */
+.cta-scene__band {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  aspect-ratio: 2172 / 724;
+  background-image: url('/asset/ui/cta/band.webp');
+  background-size: 100% 100%;
+  mask-image: linear-gradient(180deg, transparent 0%, #000 12%);
+  -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 12%);
+}
+
+/* The cut-outs are the narrow regime and are switched on in the media query at
+   the bottom of this block. Declaring them off here rather than on there keeps
+   the three layers' geometry in one place. */
+.cta-scene__waves,
+.cta-scene__globe,
+.cta-scene__card { display: none; }
+
+/*
+ * The two orbs, drawn rather than cut out.
+ *
+ * They are soft teal spheres on a flat ground — a two-stop radial gradient is a
+ * closer match than a WebP of one, it costs no request, and it lets them sit at
+ * different places in the two regimes. The inner stop is offset up and left so
+ * the sphere is lit from the same direction as the globe beside it.
+ */
+.cta-orb {
+  position: absolute;
+  border-radius: 50%;
+  background:
+    radial-gradient(58% 58% at 36% 32%, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0) 62%),
+    radial-gradient(circle at 50% 50%, #6fd3d4 0%, #8fdedd 52%, rgba(163, 230, 228, 0) 72%);
+  filter: blur(0.4px);
+}
+.cta-orb--one { display: none; }
+.cta-orb--two { display: none; }
+
+/* ------------------------------------------------------------- the corridor --- */
+/*
+ * Everything readable rides in one column, capped well short of the shell.
+ *
+ * The artwork leaves roughly the middle 46% of the banner clear at 1440 px, and
+ * the cap is what keeps the heading and the promise row inside it rather than
+ * running over the card on one side and the globe on the other.
+ */
+.cta-inner {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  width: 100%;
+  max-width: 860px;
+  flex-direction: column;
+  align-items: center;
+}
+
+.final-cta .section-kicker { margin-bottom: clamp(8px, 1.2vh, 14px); }
+
+.final-cta h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: clamp(38px, min(5vw, 7vh), 76px);
+  line-height: 1.02;
+  letter-spacing: -0.045em;
+  text-wrap: balance;
+}
+
+.cta-lede {
+  max-width: 44ch;
+  margin: clamp(14px, 2vh, 22px) 0 0;
+  color: var(--ink-2);
+  font-size: clamp(14.5px, 1.15vw, 16.5px);
+  line-height: 1.62;
+  text-wrap: pretty;
+}
+
+/* ------------------------------------------------------------- the promises --- */
+/*
+ * Three cards, and why they are cards rather than a sentence.
+ *
+ * The band used to be a heading, one sentence and two buttons, and the sentence
+ * was the only thing between a 76 px headline and a 56 px button — so the whole
+ * section read as an ad for itself. These three restate the page's argument one
+ * last time, one card per audience, and they are what gives the composition a
+ * middle: a row of quiet glass tiles between the display type and the actions.
+ *
+ * `grid`, not `flex`, because the three bodies are different lengths and equal
+ * columns are the only way the row does not go lopsided at 1024 px.
+ */
+.cta-promises {
+  display: grid;
+  width: 100%;
+  /* Narrower than the corridor the heading uses. At the corridor's own 860 px
+     the first tile sits over the authoring card's heart and the last over the
+     globe's meridian, and a glass tile is opaque enough that the picture then
+     reads as damaged rather than as layered. */
+  max-width: 790px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(12px, 1.2vw, 18px);
+  margin: clamp(28px, 4vh, 46px) 0 0;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+}
+.cta-promises li {
+  display: flex;
+  align-items: flex-start;
+  gap: 13px;
+  padding: clamp(14px, 1.4vw, 19px) clamp(14px, 1.3vw, 20px);
+  border: 1px solid rgba(255, 255, 255, 0.86);
+  border-radius: 16px;
+  /* Glass over an illustration, not a white card on it: the artwork's arcs and
+     wave crests stay faintly visible through the tile, which is what stops the
+     row from cutting the picture into a top half and a bottom half. */
+  background: rgba(255, 255, 255, 0.62);
+  backdrop-filter: blur(14px) saturate(1.1);
+  -webkit-backdrop-filter: blur(14px) saturate(1.1);
+  box-shadow: 0 12px 30px rgba(87, 62, 43, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+.cta-promise__mark {
+  display: grid;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border-radius: 12px;
+  background: rgba(0, 170, 171, 0.12);
+  color: var(--color-accent-readable, #00aaab);
+}
+.cta-promise__mark svg { width: 21px; height: 21px; }
+.cta-promises b {
+  display: block;
+  color: var(--ink);
+  font-size: 14.5px;
+  font-weight: 660;
+  letter-spacing: -0.012em;
+}
+.cta-promises small {
+  display: block;
+  margin-top: 4px;
+  color: var(--ink-2);
+  font-size: 12.5px;
+  line-height: 1.48;
+}
+
+/* -------------------------------------------------------------- the actions --- */
+
+.cta-actions {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: clamp(26px, 3.6vh, 44px);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+/* A contact shadow — a wide, soft, low ellipse under the pair. It is the single
+   detail that makes them read as objects standing in the illustration rather
+   than as UI pasted onto it, and it is the same trick every stage on this site
+   uses under its specimen. */
+.cta-actions::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  left: 50%;
+  bottom: -24px;
+  width: 116%;
+  height: 44px;
+  transform: translateX(-50%);
+  background: radial-gradient(50% 50% at 50% 50%, rgba(120, 92, 62, 0.14) 0%, rgba(120, 92, 62, 0) 72%);
+  pointer-events: none;
+}
+
+/*
+ * Two buttons, one pair.
+ *
+ * The secondary was a 12 px underlined link beside a 56 px filled button, which
+ * is not a secondary action — it is an action the layout is apologising for. It
+ * takes the same height and the same corner as the primary and gives up only the
+ * fill, so the choice reads as a choice.
+ */
+.final-cta .cta-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 56px;
+  padding: 0 30px;
+  border: 1.5px solid rgba(24, 32, 34, 0.13);
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.86);
+  color: var(--color-ink);
+  font: inherit;
+  font-size: 14.5px;
+  font-weight: 620;
+  text-decoration: none;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 8px 22px rgba(87, 62, 43, 0.07);
+  transition: background-color 220ms var(--ease-reveal, ease), border-color 220ms var(--ease-reveal, ease),
+    transform 220ms var(--ease-reveal, ease);
+}
+.final-cta .cta-secondary:hover {
+  background: #fff;
+  border-color: var(--color-accent-line, rgba(0, 170, 171, 0.42));
+  transform: translateY(-1px);
+}
+
+/* ============================================================== narrow ===== */
+/*
+ * The cut-out regime.
+ *
+ * 1024 px is where the section's own box stops being wide enough to show the
+ * banner's outer thirds: below it `cover` starts eating the card and the globe
+ * from both ends at once, and by 768 px there is nothing left but cream. So the
+ * banner goes and its parts come in, positioned against the same gradient.
+ *
+ * The globe is deliberately cropped by the viewport's right edge and the card by
+ * its left — an illustration that bleeds off two corners reads as a window onto
+ * something larger, where three fully visible objects would read as clip art.
+ *
+ * Those two edges may be cropped hard because there is nothing behind them. The
+ * globe's TOP may not, and that is the one rule the numbers below encode: the
+ * section's top edge is a join with the band above it, so a globe pushed above
+ * it draws a horizontal teal line across the page where `overflow: hidden` cuts
+ * the glow. `top: 0` lands the cut-out's own feathered edge exactly on that
+ * join; the phone rule's -6 px is inside the 12% ramp and still soft.
+ */
+@media (max-width: 1024px) {
+  .final-cta { min-height: 0; }
+
+  .cta-scene__band { display: none; }
+  .cta-scene__waves,
+  .cta-scene__globe,
+  .cta-scene__card { display: block; }
+
+  .cta-scene__waves {
+    left: 0;
+    right: 0;
+    bottom: -2%;
+    height: 34%;
+    background-image: url('/asset/ui/cta/waves.webp');
+    background-size: 100% 100%;
+    background-position: 50% 100%;
+  }
+  .cta-scene__globe {
+    top: 0;
+    right: -14%;
+    width: min(62%, 460px);
+    aspect-ratio: 696 / 700;
+    background-image: url('/asset/ui/cta/globe.webp');
+    background-size: 100% 100%;
+  }
+  .cta-scene__card {
+    bottom: -4%;
+    left: -12%;
+    width: min(46%, 330px);
+    aspect-ratio: 545 / 520;
+    background-image: url('/asset/ui/cta/card.webp');
+    background-size: 100% 100%;
+  }
+
+  .cta-orb--one,
+  .cta-orb--two { display: block; }
+  /* Where the banner has them, relative to their neighbour: one just clear of
+     the globe's upper left, one just clear of the card's lower left. */
+  .cta-orb--one { top: 5%; right: 52%; width: 42px; height: 42px; }
+  .cta-orb--two { bottom: 15%; left: 26%; width: 34px; height: 34px; }
+}
+
+@media (max-width: 860px) {
+  .cta-promises { grid-template-columns: minmax(0, 1fr); max-width: 460px; gap: 10px; }
+  .cta-scene__globe { width: min(72%, 370px); top: 0; right: -19%; }
+  .cta-scene__card { width: min(50%, 300px); left: -8%; bottom: -2%; }
+  .cta-orb--one { right: 62%; width: 34px; height: 34px; }
+  .cta-orb--two { left: 12%; bottom: 20%; width: 26px; height: 26px; }
+}
+
+@media (max-width: 560px) {
+  .final-cta { padding-bottom: clamp(96px, 16vh, 140px); }
+  .cta-actions { flex-direction: column; align-items: stretch; width: 100%; max-width: 340px; }
+  .final-cta .cta-main, .final-cta .cta-secondary { width: 100%; justify-content: center; }
+  /* The primary's 38 px gap is tuned for a button that hugs its label. Full
+     width, it parks the arrow a thumb's width from the words it belongs to. */
+  .final-cta .cta-main { gap: 12px; }
+  .cta-scene__card { width: 200px; left: -40px; bottom: -14px; }
+  /* Further off the corner than the tablet rule puts it: at 390 px the kicker
+     runs to within 60 px of the right gutter, and the globe's landmasses are
+     the one part of this artwork with enough contrast to compete with type. */
+  .cta-scene__globe { width: 230px; right: -92px; top: -6px; }
+  .cta-orb--two { display: none; }
+}
+
+/* ================================================================ footer === */
+/*
+ * The footer is the same room one step further back: the closing band's own
+ * floor colour carried across the join, so the page ends without a seam.
+ */
+
+.site-footer {
+  position: relative;
+  padding: 0 max(var(--page-gutter), calc((100% - var(--page-max)) / 2)) clamp(24px, 3vh, 34px);
+  color: var(--ink-2);
+  background: linear-gradient(180deg, #f7f5ee 0%, #f6f1e7 46%, #f4ede1 100%);
+}
+
+/* ----------------------------------------------------------- pledge strip --- */
+/*
+ * The strip that carries the join.
+ *
+ * It is pulled up out of the footer by half its own height so it straddles the
+ * boundary with the closing band. That is the whole reason it exists: the page
+ * used to end with a full-width hairline and a link grid, and a rule drawn
+ * across a room says "this is a different page" — a card lying across the same
+ * seam says "keep reading".
+ */
+.footer-pledge {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: clamp(20px, 3vw, 56px);
+  margin-top: clamp(-64px, -6vh, -44px);
+  padding: clamp(18px, 2vw, 26px) clamp(20px, 2.4vw, 34px);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(18px) saturate(1.08);
+  -webkit-backdrop-filter: blur(18px) saturate(1.08);
+  box-shadow: 0 20px 52px rgba(87, 62, 43, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+.footer-pledge__lead { display: flex; align-items: center; gap: 16px; min-width: 0; flex: 1 1 auto; }
+.footer-pledge__mark {
+  display: grid;
+  flex: none;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  border-radius: 14px;
+  background: rgba(0, 170, 171, 0.12);
+  color: var(--color-accent-readable, #00aaab);
+}
+.footer-pledge__mark svg { width: 24px; height: 24px; }
+.footer-pledge__lead b {
+  display: block;
+  color: var(--ink);
+  font-size: clamp(14.5px, 1.2vw, 16.5px);
+  font-weight: 660;
+  letter-spacing: -0.016em;
+}
+.footer-pledge__lead p {
+  margin: 3px 0 0;
+  color: var(--ink-3, var(--ink-2));
+  font-size: 12.5px;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
+.footer-pledge__values {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: clamp(16px, 2vw, 30px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.footer-pledge__values li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-left: clamp(16px, 2vw, 30px);
+  border-left: 1px solid rgba(24, 32, 34, 0.09);
+}
+.footer-pledge__values li:first-child { padding-left: 0; border-left: none; }
+.footer-pledge__values li > span {
+  display: grid;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 10px;
+  background: rgba(0, 170, 171, 0.1);
+  color: var(--color-accent-readable, #00aaab);
+}
+.footer-pledge__values svg { width: 17px; height: 17px; }
+.footer-pledge__values b {
+  display: block;
+  color: var(--ink);
+  font-size: 12.5px;
+  font-weight: 640;
+  white-space: nowrap;
+}
+.footer-pledge__values small {
+  display: block;
+  color: var(--ink-3, var(--ink-2));
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------- link grid --- */
+
+/*
+ * Brand · links · quote.
+ *
+ * Three columns, not five with the nav flattened into them. `display: contents`
+ * on the `<nav>` would have let the three link groups be direct grid items, and
+ * it removes the element's box — which is exactly the thing screen readers have
+ * historically stopped announcing as a landmark when it happens. The nav keeps
+ * its box and lays its own three columns out inside it.
+ */
+.footer-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.85fr) minmax(0, 0.78fr);
+  gap: clamp(28px, 3vw, 56px);
+  padding: clamp(48px, 6vh, 76px) 0 0;
+}
+
+.footer-brand {
+  display: grid;
+  align-content: start;
+  justify-items: start;
+  gap: 16px;
+  color: var(--brand-logo-ink);
+}
+/*
+ * The brand column carries a statement, not a caption.
+ *
+ * At 11 px in `--ink-3` it was a legal note in a column nearly half the footer
+ * wide, so the left third of the page ended on nothing. This is the last
+ * sentence anybody reads on the site; it is allowed to be a sentence.
+ */
+.footer-statement {
+  margin: 0;
+  max-width: 22ch;
+  color: var(--ink);
+  font-size: clamp(17px, 1.45vw, 21px);
+  font-weight: 500;
+  line-height: 1.34;
+  letter-spacing: -0.022em;
+  text-wrap: balance;
+}
+.footer-blurb {
+  margin: 0;
+  max-width: 42ch;
+  color: var(--ink-3, var(--ink-2));
+  font-size: 12.5px;
+  line-height: 1.68;
+  text-wrap: pretty;
+}
+
+.footer-links {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(20px, 2.4vw, 40px);
+  align-content: start;
+}
+.footer-links > div { display: flex; flex-direction: column; gap: 12px; align-content: start; }
+.footer-links b {
+  margin-bottom: 4px;
+  color: var(--color-accent-readable, #00aaab);
+  font-size: 11px;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.13em;
+}
+.footer-links a {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  width: fit-content;
+  max-width: 100%;
+  color: var(--ink-2);
+  font-size: 13.5px;
+  text-decoration: none;
+  transition: color 200ms var(--ease-reveal, ease);
+}
+.footer-links a i {
+  display: grid;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border-radius: 8px;
+  background: rgba(0, 170, 171, 0.1);
+  color: var(--color-accent-readable, #00aaab);
+}
+.footer-links a i svg { width: 15px; height: 15px; }
+/* A drawn underline that grows from the left, rather than the browser's own. It
+   is the same gesture the Library rows use on hover. The contact rows opt out:
+   the rule would run under their icon tile as well as their label. */
+.footer-links a::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -3px;
+  width: 100%;
+  height: 1px;
+  background: var(--color-accent-strong, #00aaab);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 260ms var(--ease-reveal, cubic-bezier(0.22, 1, 0.36, 1));
+}
+.footer-links a:hover { color: var(--brand-ink); }
+.footer-links a:hover::after { transform: scaleX(1); }
+.footer-links__contact a::after { display: none; }
+.footer-links__contact a:hover i { background: rgba(0, 170, 171, 0.2); }
+
+.footer-social {
+  display: flex;
+  gap: 10px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.footer-social a {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 50%;
+  /* A near-black disc rather than the brand teal: four teal circles in the one
+     column that already carries two teal icon tiles turns the corner of the
+     footer into a colour field. */
+  background: #23282b;
+  color: #fff;
+  transition: background-color 200ms var(--ease-reveal, ease), transform 200ms var(--ease-reveal, ease);
+}
+.footer-social a::after { display: none; }
+.footer-social svg { width: 17px; height: 17px; }
+.footer-social a:hover { background: var(--color-accent-strong, #00aaab); transform: translateY(-2px); }
+
+/* ------------------------------------------------------------- the quote --- */
+
+.footer-quote {
+  position: relative;
+  margin: 0;
+  padding-left: clamp(18px, 1.6vw, 26px);
+  border-left: 2px solid rgba(0, 170, 171, 0.28);
+}
+.footer-quote blockquote {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: clamp(13.5px, 1.05vw, 15px);
+  font-style: italic;
+  font-weight: 460;
+  line-height: 1.62;
+  text-wrap: pretty;
+}
+/* Typographic quote marks rather than a glyph in the text: they hang outside the
+   measure, so the quotation's own first line still starts on the rule. */
+.footer-quote blockquote::before,
+.footer-quote blockquote::after {
+  color: rgba(0, 170, 171, 0.42);
+  font-size: 1.35em;
+  line-height: 0;
+  vertical-align: -0.22em;
+}
+.footer-quote blockquote::before { content: '\201C'; margin-right: 1px; }
+.footer-quote blockquote::after { content: '\201D'; margin-left: 2px; }
+.footer-quote figcaption {
+  margin-top: 12px;
+  color: var(--ink-3, var(--ink-2));
+  font-size: 12px;
+  font-weight: 560;
+}
+
+/* ------------------------------------------------------------- the bottom --- */
+
+.footer-bottom {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: clamp(40px, 5vh, 64px);
+  padding-top: 22px;
+  border-top: 1px solid rgba(24, 32, 34, 0.08);
+  color: var(--ink-3);
+  font-size: 12px;
+}
+.footer-legal { display: flex; align-items: center; gap: 22px; }
+/* A dot between the items, drawn rather than typed, so the last one has none. */
+.footer-legal > * + *::before {
+  content: '';
+  position: absolute;
+  left: -12px;
+  top: 50%;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.45;
+  transform: translateY(-50%);
+}
+.footer-legal > * { position: relative; }
+.footer-legal__link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition: color 200ms var(--ease-reveal, ease);
+}
+.footer-legal__link:hover { color: var(--brand-ink); }
+
+/* ================================================================ narrow === */
+
+@media (max-width: 1180px) {
+  /* The quote drops to a full-width row under the other two: at this width its
+     column is about 150 px, which turns a sentence into a stack of two-word
+     lines with a rule down the side of it. */
+  .footer-main { grid-template-columns: minmax(0, 1fr) minmax(0, 1.7fr); }
+  .footer-quote { grid-column: 1 / -1; }
+  .footer-quote blockquote { max-width: 62ch; }
+}
+
+@media (max-width: 1024px) {
+  /* The pledge strip becomes two rows: the values wrap under the lead rather
+     than compressing into it. */
+  .footer-pledge { flex-direction: column; align-items: stretch; gap: 18px; }
+  .footer-pledge__values { flex-wrap: wrap; gap: 14px 22px; }
+  .footer-pledge__values li { padding-left: 22px; }
+  .footer-main { gap: 30px 26px; }
+}
+
+@media (max-width: 860px) {
+  .footer-main { grid-template-columns: minmax(0, 1fr); gap: 34px; }
+  .footer-blurb { max-width: 58ch; }
+  .footer-pledge__values li:nth-child(3) { padding-left: 0; border-left: none; }
+}
+
+@media (max-width: 620px) {
+  .footer-pledge { border-radius: 18px; padding: 20px; }
+  .footer-pledge__values { flex-direction: column; align-items: stretch; gap: 12px; }
+  .footer-pledge__values li { padding-left: 0; border-left: none; }
+  .footer-pledge__values b, .footer-pledge__values small { white-space: normal; }
+  /* Two link columns rather than three: at 360 px the third is four characters
+     wide and every label in it wraps. */
+  .footer-links { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 26px 18px; }
+  .footer-links__contact { grid-column: 1 / -1; }
+  .footer-bottom { flex-direction: column; align-items: flex-start; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .final-cta .cta-secondary,
+  .footer-links a,
+  .footer-links a::after,
+  .footer-social a,
+  .footer-legal__link { transition: none; }
+}

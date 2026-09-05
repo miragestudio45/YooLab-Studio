@@ -57,7 +57,11 @@ export function UserMenu({
   if (!loggedIn) {
     return (
       <StartWithYooLabButton className={variant === 'desktop' ? 'header-cta' : 'mobile-nav-cta'} onClick={onNavigate}>
-        Bắt đầu với YooLab {variant === 'desktop' ? <span aria-hidden="true">↗</span> : '→'}
+        {/* One CTA vocabulary across the site. This said "Bắt đầu với YooLab"
+            while every other product entry — hero, education, pricing, the trial
+            dialog, the final CTA — says "Mở YooLab ngay", and they all do the
+            same thing. */}
+        Mở YooLab ngay {variant === 'desktop' ? <span aria-hidden="true">↗</span> : '→'}
       </StartWithYooLabButton>
     );
   }

@@ -21,6 +21,7 @@ const links = [
   ['Thực hành', '#thuc-hanh'],
   ['Giáo dục', '#giao-duc'],
   ['Bài học mẫu', '#bai-hoc-mau'],
+  ['Bảng giá', '#bang-gia'],
 ] as const;
 
 export function SiteHeader() {

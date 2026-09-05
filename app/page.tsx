@@ -1,6 +1,10 @@
-import Link from 'next/link';
-import { BrandLockup } from './components/BrandMark';
 import { BridgeSection } from './components/BridgeSection';
+/* The closing band and the footer. They live in a component rather than in this
+   file because the design they follow needs eleven marks the product's generated
+   icon set has no reason to contain, and a hundred lines of path data between
+   `PricingSection` and `</main>` would bury the page's own shape. */
+import { FinalCta, SiteFooter } from './components/ClosingBand';
+import { ConsultProvider } from './components/ConsultModal';
 import { EducationSection } from './components/EducationSection';
 import { ExploreStory } from './components/ExploreStory';
 import { FaqSection, FaqStructuredData } from './components/FaqSection';
@@ -8,12 +12,13 @@ import { FormulaGate } from './components/FormulaGate';
 import { GfxHud } from './components/GfxHud';
 import { LibraryWorkspace } from './components/library/LibraryWorkspace';
 import { PracticeSection } from './components/PracticeSection';
+import { PricingSection } from './components/PricingSection';
 import { ProofSection } from './components/ProofSection';
 import { ScrollReveal } from './components/ScrollReveal';
 import { SectionSnap } from './components/SectionSnap';
 import { SiteHeader } from './components/SiteHeader';
-import { StartWithYooLabButton } from './components/StartWithYooLabButton';
 import { StudioDemoGate } from './components/StudioDemoGate';
+import { TrialInvite } from './components/TrialInvite';
 /* From the shared module, not the full set: these four are the editor's own
    glyphs, but importing them out of `EditorIcons` drags all sixty-five into the
    first request wave and undoes `StudioDemoGate`. */
@@ -63,6 +68,7 @@ export default function Home() {
   return (
     <main id="trang-chu">
       <FormulaGate>
+       <ConsultProvider>
         <ScrollReveal />
         <GfxHud />
         <SectionSnap />
@@ -134,59 +140,12 @@ export default function Home() {
         <ProofSection />
         <FaqSection />
         <FaqStructuredData />
+        <PricingSection />
+        <TrialInvite />
 
-        <section className="final-cta" id="bat-dau-voi-yoolab" aria-labelledby="cta-title">
-          <div className="cta-orb cta-orb--one" /><div className="cta-orb cta-orb--two" />
-          <p className="section-kicker section-kicker--light" data-reveal>Sẵn sàng để bắt đầu?</p>
-          <h2 id="cta-title" data-reveal>Bắt đầu từ<br /><em>bài học tiếp theo.</em></h2>
-          <p data-reveal>
-            Gửi cho chúng tôi môn học bạn đang dạy, chúng tôi sẽ dựng thử một
-            scene cùng bạn.
-          </p>
-          <div data-reveal>
-            <StartWithYooLabButton className="cta-main">
-              Bắt đầu với YooLab <span aria-hidden="true">↗</span>
-            </StartWithYooLabButton>
-            <a href="mailto:hello@yoolab.vn?subject=Trao%20đổi%20cùng%20YooLab">Trao đổi cùng chúng tôi</a>
-          </div>
-        </section>
-
-        <footer className="site-footer">
-          <div className="footer-brand">
-            <BrandLockup height={26} />
-            <p>Không gian học tập 3D/XR<br />cho một thế hệ tò mò.</p>
-          </div>
-          <div className="footer-links">
-            <div>
-              <b>Sản phẩm</b>
-              <a href="#kham-pha">Khám phá</a>
-              <a href="#cong-cu">YooLab</a>
-              {/* A URL, not a fragment: this is the only edge from the homepage
-                  into the library's own pages, and every specimen is two clicks
-                  behind it. The interactive rail is still one scroll away at
-                  `#thu-vien`. `Link` because it is a route — the neighbours here
-                  are fragments on this page and stay plain anchors. */}
-              <Link href="/thu-vien" prefetch={false}>Thư viện</Link>
-              <a href="#thuc-hanh">Thực hành &amp; STEM</a>
-            </div>
-            <div>
-              <b>Giáo dục</b>
-              <a href="#giao-duc">Giáo viên</a>
-              <a href="#giao-duc">Học sinh</a>
-              <a href="#giao-duc">Nhà trường</a>
-              <a href="#bai-hoc-mau">Bài học mẫu</a>
-            </div>
-            <div>
-              <b>Kết nối</b>
-              <a href="#bat-dau-voi-yoolab">Bắt đầu với YooLab</a>
-              <a href="mailto:hello@yoolab.vn">hello@yoolab.vn</a>
-            </div>
-          </div>
-          <div className="footer-bottom">
-            <span>© 2026 YooLab. Made for curious minds.</span>
-            <span>Quyền riêng tư · Điều khoản</span>
-          </div>
-        </footer>
+        <FinalCta />
+        <SiteFooter />
+       </ConsultProvider>
       </FormulaGate>
     </main>
   );

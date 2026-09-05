@@ -35,6 +35,29 @@ Provenance research and the reasoning behind each decision is in
 | Modification | None to the geometry, the rig or the five clips (`run`, `bite`, `roar`, `attack_tail`, `idle`). Two runtime adaptations, neither written back to the file: `ModelStage` maps the asset's `KHR_materials_pbrSpecularGlossiness` material onto metallic-roughness (three.js dropped that extension in r155, and without the mapping the hand-painted skin does not load at all), and it flattens the `bn_Spine` position track so the animal performs in place instead of walking out of the viewer. |
 | Required attribution | CC BY 4.0 requires author, licence and source. All three are carried in `app/lib/library/subjects/biology.ts` (`credits` on the `trex` entry) and displayed to users under "Nguồn & giấy phép" in the Library's knowledge panel. |
 
+### `public/asset/robotics/*.glb` — 3 robotics models ⚠️ **LICENCE NOT VERIFIED**
+
+| | |
+| --- | --- |
+| Files | `work-drone.glb` (337 KB), `spider-drone.glb` (906 KB), `mech-whale.glb` (544 KB) |
+| Source names | `Dv2 Animated 4 Skins Set.glb`, `Spider Drone Animations Reel.glb`, `Biomechanical Whale Animated.glb` |
+| Author | **Unknown** |
+| Licence | **Unknown** |
+| Origin | Sketchfab, per the person who supplied them. The specific entries are not recorded. |
+| Where used | The Education section's lesson player only — `app/lib/education/showcase.ts`. Deliberately **not** in the Library manifest, and they carry no `credits` block, because `app/lib/library/types.ts` requires a verified licence before an entry ships. |
+| Obtained via | Hand-off into `reference-sources/Model -robot/`. |
+| Verified how | **Not verified.** Unlike the T-rex above, none of the three carries `asset.extras` — `glTF-Transform` re-wrote each file and the only thing `asset` declares is its own generator, so there is no author, licence or source string inside the files to check. |
+| Modification | `scripts/build-robotics-models.mjs`. The whale and the spider are copied byte for byte. `Dv2` is subsetted: the source is four drones in one file — Cybertech, RedManga, SciFi and Wood — as four sibling subtrees at the origin at scales three orders of magnitude apart, so all four render at once. Only the Cybertech subtree survives, with the twelve images belonging to the other three dropped; 1,158 KB → 337 KB. Nothing is decompressed, and no meshopt block is re-encoded — the subset moves byte ranges and rewrites the offsets that name them. Two runtime adaptations, not written back: `ModelStage` flattens each reel's root translation track so the machine performs in place, and the `natural` preset calibrates the file's own materials. |
+| **What is needed** | Three lines per model — the Sketchfab entry URL, the author's name and the licence it is published under. Sketchfab is a marketplace, not a licence: its entries ship under everything from CC0 to "editorial use only" to a paid royalty-free licence with attribution terms, and CC BY needs attribution rendered where a user can see it. **Until those three lines exist for each file, treat these as unlicensed and do not ship this section to production.** Once known, add the `credits` blocks in `showcase.ts` and the entries can move into `app/lib/library/subjects/stem.ts` unchanged. |
+
+A fourth model, `Smart Drone.glb`, was prepared and then dropped rather than
+fixed. Its texture atlas carries another company's wordmark — 完美世界 (Perfect
+World) with three emoji — painted across the disc on the front of the machine, at
+the exact centre of the composition. A third party's branding rendered full size
+on a product page is a trademark question rather than a copyright one, and it is
+not a question worth answering when a clean model was available: the Dv2 above
+replaced it and its Cybertech atlas carries no marks of any kind.
+
 ### `public/asset/Library/Biology/anatomy/*.glb` — 12 human organs
 
 | | |
@@ -78,6 +101,25 @@ Provenance research and the reasoning behind each decision is in
 | Modification | **No geometry changed** — no vertex moved, welded, decimated or re-indexed, and every triangle count is unchanged. Two things are done, both by `scripts/build-drone-assets.mjs`. *(1) De-interleaving*: these GLBs pack position, normal and UV into one strided buffer view, and the repacker writes each attribute out tightly instead. The bytes are identical; the layout is not, and it is disclosed because it is a real change to the file. Verified afterwards by re-measuring all four airframe parts against the bounds the sandbox's own `assets/drone.ts` records for them — 0.971 × 0.260 × 0.998 for the fuselage and so on, matching to the millimetre. *(2) Texture re-encoding*: each model embeds three PBR maps, which is where the megabyte goes — `setback-tower` is 1.75 MB for 4,103 triangles. They are resampled and re-encoded to WebP at 512² (airframe, which the onboard camera sits inside), 384² (props) and 256² (buildings, never closer than 30 m). The panorama goes to 2048 × 1024 WebP. Total **20.1 MB → 4.6 MB, 77% smaller.** |
 | Source files | Downloaded into `.cache/mint/` (gitignored) and re-fetchable from the URLs in `mint-assets.json`; only the processed output under `public/asset/practice/drone/` is committed. |
 | Files | `fuselage-normalized-6522f19fea2b75a9.glb`, `motor-arm-normalized-6fef996b69c9ac52.glb`, `propeller-normalized-e08127e92a577c02.glb`, `landing-skid-normalized-451b7f833b22aabd.glb`, `camera-pod-normalized-dbc7f71872911c6a.glb`, `glass-tower-normalized-7fcdce95838dd939.glb`, `setback-tower-normalized-797ce47c71e3bdd3.glb`, `corner-office-normalized-214b2fef93ded224.glb`, `apartment-block-normalized-785c7ebf0af12916.glb`, `podium-tower-normalized-84a8a66352e8753b.glb`, `concrete-mid-rise-normalized-d8104d81b8b2906a.glb`, `storefront-block-normalized-6444a878987a7e4f.glb`, `hotel-tower-normalized-a6dfd731c01aaf06.glb`, `shipping-container-normalized-16a139c1ee46ff53.glb`, `scaffold-tower-normalized-5034d54bbc0818d9.glb`, `concrete-barrier-normalized-4e1219aceea984ac.glb`, `cable-drum-normalized-83782e35ffc8a817.glb`, `antenna-mast-normalized-54051007d20b1b55.glb`, `traffic-cone-normalized-9c4e797c99aae7db.glb`, `mountain-horizon-panorama-7c9f3e-069d64edae2fdf24.png` |
+
+### `public/asset/robotics/*.glb` — ⚠️ PROVENANCE NOT ESTABLISHED
+
+**This is the one entry in this file that does not clear its own bar, and it is
+here to say so rather than to record a clearance.** Every other row above names
+an author, a licence and a source that was checked. These three name none,
+because none arrived with them.
+
+| | |
+| --- | --- |
+| Files | `smart-drone.glb` (784 KB), `spider-drone.glb` (906 KB), `mech-whale.glb` (544 KB) |
+| Author | **Unknown** |
+| Licence | **Unknown** |
+| Origin | **Unknown.** Handed over as three files in `reference-sources/Model -robot/`, named `Smart Drone.glb`, `Spider Drone Animations Reel.glb` and `Biomechanical Whale Animated.glb`. |
+| What the files themselves say | Nothing. All three were written by `glTF-Transform v4.3.0` and carry `asset.generator` and `asset.version` only — no `asset.extras`, which is where the T-rex above carries its own author, licence and source. Their internal names (`b8d0a9c282cc4ca1b4fd778dc0924ae3.fbx`, `Smart_Drone.FBX`) are export artefacts, not attribution. |
+| Where they are used | The Education section's lesson player, and nowhere else. They are deliberately **not** in the Library manifest — see `app/lib/education/showcase.ts`, which states the same reason: `lib/library/types.ts` requires that "an asset whose licence has not been verified does not get an entry — it does not ship". |
+| Modification | Copied byte for byte by `scripts/build-robotics-models.mjs`, except for one patch to `smart-drone.glb`. Its 2048² base-colour atlas carried a **game studio's wordmark and three emoji** painted onto the display panel that faces the camera, which at the size the page renders it is a legible foreign logo in the middle of a YooLab product page. The script paints that rectangle out in the panel's own interior tone and re-encodes the atlas to WebP (q84, 170,522 → 154,548 bytes), splicing it back at the same byte offset so the meshopt-compressed views around it are untouched. Geometry, rig and animation are unchanged in all three. |
+| Runtime | `natural` preset — all three ship real base-colour, normal and ORM maps, and any other preset would discard them. Each carries one clip (`Scene`), and each has its root joint's translation track flattened at load (`Move_Body`, `Main body driver`, `Core_bone`) so the machine performs on the spot instead of travelling out of the viewer. |
+| **What has to happen before this ships** | Find the author, the licence and the source, and record them here. Then either add a `credits` block to the three entries in `app/lib/education/showcase.ts` and move them into `subjects/stem.ts`, or replace them. Note that painting a logo out is a **visual** fix and not a licence: if the terms turn out to require attribution or to forbid modification, the patch above is itself a problem and the right answer is a different model. |
 
 ### Models **not** shipped, and why
 

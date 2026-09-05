@@ -495,6 +495,39 @@ const SHOTS = [
       tool.click();`,
     settle: 2400,
   },
+  /* Dismiss the trial invitation before shooting anything else. It fires six
+     seconds in, which is inside every settle on this list, so without this it
+     lands on top of whatever is being photographed. */
+  /* The MKT round: new hero positioning, pricing, the consultation dialog and
+     the trial invitation. All DOM, so these are cheap and worth having pinned. */
+  { name: 'hero-copy', at: '#trang-chu', settle: 2600, run: `try { sessionStorage.setItem('yoolab.trial-invite.seen', '1'); } catch {} const t = document.querySelector('.trial-modal .modal-close'); if (t) t.click(); await new Promise((r) => setTimeout(r, 260));`, clipOf: { sel: '.hero-copy', scale: 1.5 } },
+  { name: 'hero-full', at: '#trang-chu', settle: 2800, run: `try { sessionStorage.setItem('yoolab.trial-invite.seen', '1'); } catch {} const t = document.querySelector('.trial-modal .modal-close'); if (t) t.click(); await new Promise((r) => setTimeout(r, 260));` },
+  { name: 'pricing', at: '#bang-gia', settle: 900, run: `try { sessionStorage.setItem('yoolab.trial-invite.seen', '1'); } catch {} const t = document.querySelector('.trial-modal .modal-close'); if (t) t.click(); await new Promise((r) => setTimeout(r, 260));` },
+  { name: 'final-cta', at: '#bat-dau-voi-yoolab', settle: 700, run: `try { sessionStorage.setItem('yoolab.trial-invite.seen', '1'); } catch {} const t = document.querySelector('.trial-modal .modal-close'); if (t) t.click(); await new Promise((r) => setTimeout(r, 260));` },
+  {
+    name: 'consult-modal',
+    at: '#bat-dau-voi-yoolab',
+    settle: 700,
+    run: `
+      try { sessionStorage.setItem('yoolab.trial-invite.seen', '1'); } catch {} const t = document.querySelector('.trial-modal .modal-close'); if (t) t.click(); await new Promise((r) => setTimeout(r, 260));
+      const btn = document.querySelector('.cta-secondary');
+      if (!btn) throw new Error('no "Trao doi them" button');
+      btn.click();
+      await new Promise((r) => setTimeout(r, 420));
+    `,
+  },
+  {
+    name: 'consult-errors',
+    at: '#bat-dau-voi-yoolab',
+    settle: 700,
+    run: `
+      try { sessionStorage.setItem('yoolab.trial-invite.seen', '1'); } catch {} const t = document.querySelector('.trial-modal .modal-close'); if (t) t.click(); await new Promise((r) => setTimeout(r, 260));
+      document.querySelector('.cta-secondary').click();
+      await new Promise((r) => setTimeout(r, 380));
+      document.querySelector('.consult-submit').click();
+      await new Promise((r) => setTimeout(r, 320));
+    `,
+  },
   { name: 'library-empty', at: '#thu-vien', run: OPEN('Khoa học vũ trụ'), settle: 900 },
   /*
    * The practice hub, three labs deep.
@@ -1004,6 +1037,24 @@ const SHOTS = [
     run: `document.querySelector('.faq-item').open = true;`,
   },
   { name: 'cta', at: '#bat-dau-voi-yoolab' },
+  /*
+   * The footer, whole.
+   *
+   * `#bat-dau-voi-yoolab` lands the closing band's top edge at viewport 0 and
+   * the footer is 600 px further down, so every previous shot of "the end of the
+   * page" stopped at the pledge strip. Scrolled to the document's end rather
+   * than clipped to the element: `clipOf` captures out of the composited frame,
+   * so the part of the footer below the fold comes back blank.
+   */
+  {
+    name: 'footer',
+    at: '#bat-dau-voi-yoolab',
+    run: `
+      window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'auto' });
+      await new Promise((r) => setTimeout(r, 400));
+    `,
+    settle: 700,
+  },
 
   /*
    * The library deep link, end to end. Run with the fragment in the URL:
@@ -1342,6 +1393,14 @@ try {
         target.scrollIntoView({ block: 'start', behavior: 'auto' });
         document.documentElement.style.scrollBehavior = previous;
         await new Promise((r) => setTimeout(r, 400));
+      `);
+      /* The trial dialog fires six seconds in and lands on top of whatever is
+         being photographed. Suppressed for every shot, not per shot: it has its
+         own entry when it is the subject. */
+      await evaluate(`
+        try { sessionStorage.setItem('yoolab.trial-invite.seen', '1'); } catch {}
+        const invite = document.querySelector('.trial-modal .modal-close');
+        if (invite) invite.click();
       `);
       if (shot.run) await evaluate(shot.run);
 

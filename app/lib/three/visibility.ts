@@ -35,11 +35,28 @@ export function createVisibilityGate(element: Element, margin = 160): Visibility
   );
   observer.observe(element);
 
+  /*
+   * A hidden tab is not a visible element, whatever the rect says.
+   *
+   * This lives here rather than in each caller because every heavy surface on
+   * the page already asks this one function whether to draw — the Explore hero,
+   * the flower valley, the editor, both Library stages, the molecule and globe
+   * viewers. Half of them had grown their own `visibilitychange` listener and
+   * half had none, which is how a background tab kept a full-screen scene
+   * drawing. Browsers do throttle `requestAnimationFrame` in a backgrounded tab,
+   * but that is the browser's mitigation, not ours, and it does not cover a
+   * window merely occluded on a second monitor.
+   */
+  let documentVisible = typeof document === 'undefined' || document.visibilityState !== 'hidden';
+  const onDocumentVisibility = () => { documentVisible = document.visibilityState !== 'hidden'; };
+  document.addEventListener('visibilitychange', onDocumentVisibility);
+
   let lastProbe = -Infinity;
   let probed = true;
 
   return {
     visible: () => {
+      if (!documentVisible) return false;
       if (observed) return true;
       const now = performance.now();
       if (now - lastProbe < 200) return probed;
@@ -52,7 +69,10 @@ export function createVisibilityGate(element: Element, margin = 160): Visibility
         && rect.top < viewport + margin;
       return probed;
     },
-    dispose: () => observer.disconnect(),
+    dispose: () => {
+      observer.disconnect();
+      document.removeEventListener('visibilitychange', onDocumentVisibility);
+    },
   };
 }
 

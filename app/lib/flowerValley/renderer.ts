@@ -277,6 +277,14 @@ export function createFlowerValley(host: HTMLElement, options: FlowerValleyOptio
    * frame is the most this field may claim before it is genuinely too dense.
    * The gap between the two numbers is hysteresis in the cost domain, on top of
    * the sample counts below.
+   *
+   * These were briefly tightened to 5.5 / 3.2 to attack a hot-machine report.
+   * Reverted: a tier change calls `rebuildField()`, so making downgrades more
+   * frequent makes visible repopulations of the meadow more frequent too, and a
+   * repopulation caught mid-chapter-crossing is a real visual defect against a
+   * heat saving that was never measured on the machine that was hot. The scroll
+   * work now lives where it belongs — see the velocity gate in
+   * `contextRegistry.ts`, which is measured and does not touch what is drawn.
    */
   const COST_DOWNGRADE_MS = 9;
   const COST_UPGRADE_MS = 5;

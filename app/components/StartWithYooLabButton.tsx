@@ -37,8 +37,17 @@ export function StartWithYooLabButton({
     router.push('/register');
   };
 
+  /*
+   * No inline `border: none` here any more.
+   *
+   * It was a reasonable default when this button had one skin, and it became a
+   * bug the moment it had five: an inline style outranks every stylesheet, so
+   * the outline variants in the pricing table rendered as bare text with no box
+   * around them and no way for CSS to put one back. Each call site's class now
+   * states its own border, including the ones that want none.
+   */
   return (
-    <button type="button" className={className} style={{ border: 'none' }} onClick={handleClick}>
+    <button type="button" className={className} onClick={handleClick}>
       {children}
     </button>
   );

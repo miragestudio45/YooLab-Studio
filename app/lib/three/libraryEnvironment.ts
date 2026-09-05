@@ -60,29 +60,45 @@ export const libraryEnvironmentPalette: EnvironmentPalette = {
 export const LIBRARY_CLEAR_COLOR = 0xfffdf9;
 
 /**
- * The bridge viewer is still the same warm YooLab room, but with enough tonal
- * separation for the bee's colourless optical shell to stay legible. The
- * Library remains untouched; this preset is opt-in from the bridge only.
+ * The bridge viewer's room.
+ *
+ * It exists because the bee's optical shell is colourless: dropped into the
+ * Library's near-white cove it loses its silhouette, so this preset trades some
+ * of that brightness for tonal separation behind the specimen. That reasoning
+ * still holds. The HUE it used to do it in did not.
+ *
+ * Every value below was a mauve or a pink — horizon `#eadde8`, ground `#dccfd9`,
+ * a lavender rim at `#d8c7ff` and a rose point fill at `#f1bec1` — and this room
+ * fills the largest panel on the site. The section came back from review as "cứ
+ * hồng hồng": on a page whose one accent is #00AAAB over warm ivory, the biggest
+ * thing on it was rendering in a colour the brand does not contain, and because
+ * the bee is glass it was reflecting that colour too, so the specimen looked
+ * pink as well as the floor.
+ *
+ * Same structure, same strengths, same separation — moved onto the page's own
+ * pair. The sky and key stay warm ivory, and the cool half of the room (horizon,
+ * ground, rim and fill) is now the brand teal, which is also the colour the
+ * shell has been reflecting in the hero all along.
  */
 const bridgeEnvironmentPalette: EnvironmentPalette = {
-  zenith: 0xfff7f2,
-  horizon: 0xeadde8,
-  ground: 0xdccfd9,
-  keyColor: 0xffe9df,
+  zenith: 0xfffaf4,
+  horizon: 0xdff0ed,
+  ground: 0xc8e3df,
+  keyColor: 0xfff1e4,
   keyStrength: 4.15,
-  rimColor: 0xd8c7ff,
+  rimColor: 0x9fdfdd,
   rimStrength: 1.45,
-  fillColor: 0xf1bec1,
+  fillColor: 0xa6dcd8,
   fillStrength: 0.72,
 };
 
 const bridgeBackdropPalette: BackdropPalette = {
-  center: 0xfbf1eb,
-  mid: 0xeee2e8,
-  edge: 0xded7e7,
+  center: 0xfdf6ed,
+  mid: 0xe9f2ef,
+  edge: 0xd2e6e3,
 };
 
-const BRIDGE_CLEAR_COLOR = 0xe9dfe5;
+const BRIDGE_CLEAR_COLOR = 0xe6f0ec;
 
 export type LibraryStage = {
   renderer: THREE.WebGLRenderer;
@@ -178,8 +194,8 @@ export function createLibraryStage(host: HTMLElement, options: LibraryStageOptio
      separate the silhouette from the plate, and a soft point on the camera side
      so the near surfaces are not carried by the environment alone. */
   const hemisphere = new THREE.HemisphereLight(
-    bridgeAppearance ? 0xffeee8 : 0xfff6ec,
-    bridgeAppearance ? 0xd5c8d4 : 0xdccbb6,
+    bridgeAppearance ? 0xfff4ec : 0xfff6ec,
+    bridgeAppearance ? 0xc6ded9 : 0xdccbb6,
     bridgeAppearance ? 0.92 : 0.86,
   );
   scene.add(hemisphere);
@@ -187,7 +203,7 @@ export function createLibraryStage(host: HTMLElement, options: LibraryStageOptio
   keyLight.position.set(-3.2, 4.4, 5.0);
   scene.add(keyLight);
   const rimLight = new THREE.DirectionalLight(
-    bridgeAppearance ? 0xd5c2ff : 0xffd9c6,
+    bridgeAppearance ? 0x9edfdd : 0xffd9c6,
     bridgeAppearance ? 1.15 : 1.42,
   );
   rimLight.position.set(4.0, -0.6, -4.0);
@@ -198,7 +214,7 @@ export function createLibraryStage(host: HTMLElement, options: LibraryStageOptio
      surfaces should not be carried by the environment alone — at a strength that
      lifts the shadow side instead of erasing it. */
   const fillLight = new THREE.PointLight(
-    bridgeAppearance ? 0xf1c6ca : 0xe4d9f6,
+    bridgeAppearance ? 0xa9ded9 : 0xe4d9f6,
     bridgeAppearance ? 3.15 : 2.4,
     18,
     2,
@@ -208,7 +224,7 @@ export function createLibraryStage(host: HTMLElement, options: LibraryStageOptio
 
   const backdrop = createStudioBackdrop(camera, bridgeAppearance ? bridgeBackdropPalette : undefined);
   const shadow = createContactShadow({
-    color: bridgeAppearance ? 0x6e4a55 : undefined,
+    color: bridgeAppearance ? 0x35635f : undefined,
     /* Raised with the rest of the rebalance. A specimen framed in mid-air over a
        0.16 shadow was floating; the grid below now says where the floor is, and
        the shadow has to agree with it. */

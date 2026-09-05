@@ -114,9 +114,25 @@ export default defineConfig(async () => {
 
   return {
     css: { postcss: { plugins: [tailwindcss()] } },
-    server: isCodexSeatbeltSandbox
-      ? { watch: { useFsEvents: false, usePolling: true } }
-      : undefined,
+    server: {
+      /*
+       * Pinned to 3000 rather than left on Vite's default.
+       *
+       * 5173 is the default for *every* Vite project, so leaving it unset means
+       * this repo fights whatever else is running for the same port — and Vite's
+       * normal response is to quietly take the next free one instead, which is
+       * worse than failing: the dev server comes up fine and every bookmark,
+       * screenshot harness and launch config still points at the old number.
+       *
+       * `strictPort` makes that collision loud. If something already holds 3000,
+       * startup stops and says so instead of drifting to 3001.
+       */
+      port: 3000,
+      strictPort: true,
+      ...(isCodexSeatbeltSandbox
+        ? { watch: { useFsEvents: false, usePolling: true } }
+        : {}),
+    },
     plugins,
   };
 });
