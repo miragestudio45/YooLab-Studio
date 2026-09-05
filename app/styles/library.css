@@ -1291,7 +1291,14 @@
 .library-body.is-empty .viewer-empty { gap: 16px; }
 
 /* =========================================================== knowledge === */
-.library-knowledge { display: grid; grid-template-rows: minmax(0, 1fr); }
+/* `position: relative` lives here, not with the scrollbar indicator's
+   containing-block rule below: that rule is unconditioned and sits after the
+   ≤1180px breakpoint that turns this panel into a `position: fixed` bottom
+   sheet, so at equal specificity it was winning on every width below 1180 and
+   silently undoing the sheet — which re-entered `.library-body`'s grid as a
+   normal item and forced an extra implicit row that collapsed the rail and
+   stage to a sliver. */
+.library-knowledge { position: relative; display: grid; grid-template-rows: minmax(0, 1fr); }
 
 .library-knowledge-scroll {
   min-height: 0;
@@ -1859,9 +1866,11 @@
 .library-rail-list::-webkit-scrollbar,
 .library-knowledge-scroll::-webkit-scrollbar { display: none; }
 
-/* The two panels that host an indicator become its containing block. */
-.library-rail,
-.library-knowledge { position: relative; }
+/* The rail hosts an indicator and becomes its containing block. The knowledge
+   panel already has its own `position: relative` above — set there, not here,
+   because this rule is unconditioned and would otherwise win over the
+   ≤1180px breakpoint's `position: fixed` on every narrower width. */
+.library-rail { position: relative; }
 
 .scroll-thumb {
   position: absolute;
