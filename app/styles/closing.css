@@ -41,8 +41,23 @@
   justify-content: center;
   min-height: clamp(560px, 74svh, 780px);
   overflow: hidden;
+  /*
+   * The bottom is deeper than the top, and by more than symmetry wants: the
+   * artwork's wave field lives down there, and the last thing in the content
+   * column is a pair of buttons that must not sit on it.
+   *
+   * It is *not* where the clearance to the footer's pledge card comes from —
+   * that is `.site-footer`'s top padding now. Worth recording why, because it
+   * cost a measurement: the band is `min-height`-bound with its content
+   * vertically centred, so at desktop widths only ~80 px of the box is free
+   * space, and adding Δ here takes Δ from that free space and moves the content
+   * up by Δ/2. The clearance under the buttons therefore grows by half of what
+   * is asked for, and the composition drifts upward off the illustration to pay
+   * for it. Below 1024, where `min-height` is 0, the padding is honoured to the
+   * pixel and this value is the whole bottom margin.
+   */
   padding: clamp(72px, 9vh, 112px) max(var(--page-gutter), calc((100% - var(--page-max)) / 2))
-    clamp(84px, 10vh, 132px);
+    clamp(96px, 11vh, 148px);
   scroll-margin-top: 0;
   text-align: center;
   color: var(--ink);
@@ -402,7 +417,10 @@
 }
 
 @media (max-width: 560px) {
-  .final-cta { padding-bottom: clamp(96px, 16vh, 140px); }
+  /* The phone regime overrides the band's own bottom padding because the
+     actions here are full-width stacked buttons rather than a centred pair, and
+     because the cut-out artwork sits lower in the box than the banner does. */
+  .final-cta { padding-bottom: clamp(104px, 15vh, 144px); }
   .cta-actions { flex-direction: column; align-items: stretch; width: 100%; max-width: 340px; }
   .final-cta .cta-main, .final-cta .cta-secondary { width: 100%; justify-content: center; }
   /* The primary's 38 px gap is tuned for a button that hugs its label. Full
@@ -424,20 +442,41 @@
 
 .site-footer {
   position: relative;
-  padding: 0 max(var(--page-gutter), calc((100% - var(--page-max)) / 2)) clamp(24px, 3vh, 34px);
+  /*
+   * The top padding is the gap between the closing band's edge and the pledge
+   * card, and it is the whole answer to the review. See `.footer-pledge`.
+   */
+  padding: clamp(28px, 3.4vh, 46px) max(var(--page-gutter), calc((100% - var(--page-max)) / 2))
+    clamp(24px, 3vh, 34px);
   color: var(--ink-2);
   background: linear-gradient(180deg, #f7f5ee 0%, #f6f1e7 46%, #f4ede1 100%);
 }
 
 /* ----------------------------------------------------------- pledge strip --- */
 /*
- * The strip that carries the join.
+ * The strip that opens the footer.
  *
- * It is pulled up out of the footer by half its own height so it straddles the
- * boundary with the closing band. That is the whole reason it exists: the page
- * used to end with a full-width hairline and a link grid, and a rule drawn
- * across a room says "this is a different page" — a card lying across the same
- * seam says "keep reading".
+ * It used to be pulled up out of the footer so that it straddled the boundary
+ * with the closing band, on the reasoning that a card lying across a seam says
+ * "keep reading" where a horizontal rule says "this is a different page". The
+ * reasoning was sound and the device was not: it came back from review twice as
+ * sitting too close to the closing band, and it was right both times, because
+ * *any* overlap is the thing being objected to. A slab this wide crossing the
+ * band's bottom edge does not read as lying across a join — it reads as stuck
+ * to the section above it, and the second pass, which shrank the pull from
+ * 39 px to 19 px, only made it a smaller version of the same picture.
+ *
+ * So the pull is gone. The card sits wholly inside the footer, and
+ * `.site-footer`'s new top padding — about 35 px at the reviewed height — is the
+ * clearance. Measured at 1904 × 1030: the card's top edge goes from **19 px
+ * above** the band's bottom edge to 35 px below it, and the clearance from the
+ * CTA buttons goes from 137 px to about 190 px, most of which is the wave field
+ * at the bottom of the artwork rather than empty ground.
+ *
+ * The original worry does not come back with it. Nothing here draws a rule: the
+ * footer opens on a card floating on its own ground, which is a beginning, and
+ * the seam it no longer crosses was never visible as an edge — the band and the
+ * footer share a colour there by construction.
  */
 .footer-pledge {
   position: relative;
@@ -445,7 +484,6 @@
   display: flex;
   align-items: center;
   gap: clamp(20px, 3vw, 56px);
-  margin-top: clamp(-64px, -6vh, -44px);
   padding: clamp(18px, 2vw, 26px) clamp(20px, 2.4vw, 34px);
   border: 1px solid rgba(255, 255, 255, 0.9);
   border-radius: 20px;

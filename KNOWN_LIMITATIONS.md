@@ -178,10 +178,17 @@ report says `scrolls` rather than `CUT`:
 | YooStudio | 700 px | Editor keeps its height, the section scrolls |
 | Practice & STEM | 1180 px | Rail becomes a row of tabs above the stage; below 1000 the brief column moves under it |
 | Education | **1180 px** | Lesson player stacks under the brief card; the capability row goes to two columns |
-| Sample lessons | 700 px | Four cards become one column |
 
-Library, the hero, the three creature chapters and the CTA compose in one
-viewport at **every** tested size, 390 to 1920.
+Library, the hero, the three creature chapters, the sample lessons and the CTA
+compose in one viewport at **every** tested size, 390 to 1920.
+
+**Sample lessons left this table.** It was a four-column grid that reflowed to
+two columns and then to one, so at 390 px it overran the fold by 926 px — the
+worst overrun of any section on the page, on the section whose whole job is to be
+glanceable. It is now a horizontally moving belt of sixteen cards, which is one
+row at every width by construction: `measure.mjs` reports 282–510 px of slack
+across all nine viewports. The composition change was asked for on its own
+merits; fitting the fold on a phone came with it.
 
 **Education's number moved from 1000 to 1180 in this pass**, and the reason is a
 shape change rather than a regression. Its product is now the lesson player —

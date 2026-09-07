@@ -233,7 +233,10 @@ const ROLES: Role[] = [
       clip: MECH_WHALE_THUMBNAIL,
       specimen: 'Drone quan trắc Dv2',
       caption: 'Công nghệ 8 · Cơ cấu bay',
-      parts: ['Ống đẩy', 'Cánh cân bằng', 'Khoang quan sát', 'Vỏ thân'],
+      /* "Vỏ thân · 4 lớp" names what the stage is doing on its own: the asset
+         carries four painted liveries and cycles through them, so without a row
+         saying so the colour change reads as a glitch rather than as the model. */
+      parts: ['Ống đẩy', 'Cánh cân bằng', 'Khoang quan sát', 'Vỏ thân · 4 lớp'],
       pins: [0, 1, 3],
       note: 'Bốn ống đẩy đặt đối xứng quanh trọng tâm. Đổi lực đẩy giữa chúng là đổi hướng bay — không có bánh lái nào cả.',
       step: { index: 2, total: 5, title: 'Không bánh lái thì rẽ bằng gì' },

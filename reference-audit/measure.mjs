@@ -76,7 +76,7 @@ const TARGETS = [
      five-row list at 1024. See the note in `sections.css` and the table in
      KNOWN_LIMITATIONS.md. */
   { id: 'giao-duc', must: '.education-panel', label: 'Education panel', fitAbove: 1180 },
-  { id: 'bai-hoc-mau', must: '.proof-grid', label: 'Proof row', fitAbove: 700 },
+  { id: 'bai-hoc-mau', must: '.proof-belt', label: 'Lesson belt', fitAbove: 700 },
   { id: 'bat-dau-voi-yoolab', must: '.final-cta > div:last-child', label: 'CTA actions' },
 ];
 

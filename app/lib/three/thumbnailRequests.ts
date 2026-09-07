@@ -99,6 +99,16 @@ export const TOOLKIT_THUMBNAIL: ThumbnailRequest = {
  * doing the thing it is worth a picture of.
  */
 
+/*
+ * The drone's `poseTime` is also a livery choice.
+ *
+ * `work-drone.glb` carries the machine in four painted finishes as four sibling
+ * subtrees and takes turns between them by scale — Cybertech holds the stage for
+ * 0.04–5.00 s, then RedManga, SciFi and Wood. A bake at t = 6 is a bake of
+ * RedManga with Cybertech collapsed to a dot beside it, so the value below sits
+ * inside the first window: the thumbnail is the blue-grey livery, which is the
+ * one the rail has always shown and the one `showcase.ts` opens the stage on.
+ */
 export const WORK_DRONE_THUMBNAIL: ThumbnailRequest = {
   url: '/asset/robotics/work-drone.glb',
   preset: 'natural',
@@ -106,7 +116,7 @@ export const WORK_DRONE_THUMBNAIL: ThumbnailRequest = {
   height: 224,
   yaw: 0.92,
   pitch: 0.26,
-  poseTime: 6,
+  poseTime: 3.2,
   zoom: 1.04,
 };
 

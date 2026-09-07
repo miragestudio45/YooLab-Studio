@@ -99,6 +99,53 @@ because its own narrow regime removes height rather than stacking it: the asset
 rail becomes a short horizontal shelf and the knowledge panel leaves the flow
 entirely as a bottom sheet.
 
+## 2c. Nothing on this page may take the page's scroll
+
+`lib/three/wheelZoom.ts` owns one rule, and every 3D surface goes through it:
+**a plain wheel scrolls the document, always; zoom needs `ctrl`/`⌘`; and only a
+surface with no document scroll left to take may claim the plain wheel.**
+
+It exists because the opposite shipped. Each stage carried its own copy of
+
+```ts
+if (Math.abs(event.deltaY) < 2) return;
+event.preventDefault();
+```
+
+written as "only a clear zoom gesture, so the page still scrolls past the
+viewer", and it does not do that: a wheel notch is 100 px of delta and a
+trackpad's gentlest glide clears 2 in its first frame, so the branch never
+returned. The page simply could not be scrolled while the pointer was over a 3D
+panel — which, on a page whose sections are mostly 3D panels, is most of the
+page. Review reported it as "scroll vướng vào phần zoom", and on a site whose
+scroll position *is* the animation clock it is the same class of defect the
+chapter snap exists to prevent: a region that eats the gesture.
+
+Three things make the replacement more than a compromise:
+
+- **`ctrl` + wheel is also a trackpad pinch.** Chrome, Safari and Edge all
+  deliver a two-finger pinch as `wheel` with `ctrlKey: true`, so pinch-to-zoom
+  over a specimen now works on every stage without a line of code that mentions
+  pinching.
+- **The exception is read, not passed.** Whether the document can scroll is
+  computed per event from `body`/`html` overflow and the document's own scroll
+  height, not handed down as a prop. The labs have two mount points each and the
+  Library's stages have two, so a flag would have to be threaded correctly
+  through all of them and a future third parent would inherit whatever it forgot
+  to pass. The full-screen labs therefore keep the plain-wheel zoom they always
+  had, because their overlay locks the body.
+- **The affordance is replaced, not dropped.** `ModelStage`, `CreatureStage` and
+  `MoleculeViewer` already carry `Gần` / `Xa` buttons in their rails, and every
+  hint that read "Cuộn để phóng" now names the modifier through
+  `lib/useZoomModifier.ts` — which resolves `Ctrl` versus `⌘` with
+  `useSyncExternalStore`, so a server render and a Mac agree without a hydration
+  mismatch. The bridge and `CellStudio` have no button and are left with the hint
+  alone; the bridge because its own toolbar replaces the stage rail.
+
+Verified in a real browser: over the bridge viewer, the Library viewer and the
+YooStudio editor canvas a plain wheel is left to the page and `ctrl` is claimed;
+inside the drone lab's overlay, with the body locked, both are claimed.
+
 ## 3. Type — one family
 
 **Plus Jakarta Sans**, 200–800, roman and italic. Nothing else. No serif anywhere;
@@ -167,6 +214,37 @@ italic, the weight drop and the size rather than by the ramp inside it.
 
 Every colour is a token in `globals.css`; nothing downstream hard-codes a hex.
 
+### The one room that is not the ground, and how much of it it may be
+
+The bridge viewer is the exception, and it is an exception about **value**, not
+about hue. The bee's optical shell is colourless: in the Library's near-white
+cove it loses its silhouette, so that stage runs its own room — a warm ivory sky
+and key over a cooler horizon and ground — purely so a transparent specimen has a
+shadow side. The relationship that does the work is the 15-point luminance step
+from horizon to ground. Nothing about it needs chroma.
+
+Two passes proved that the hard way. The first room was mauve and pink and came
+back as "cứ hồng hồng": the biggest rectangle on the site rendering in a colour
+the brand does not contain, reflected in the glass so the specimen looked pink
+too. Moving it onto the brand teal was right and the amount was not — the rim
+landed at `#9fdfdd` and the point fill at `#a6dcd8`, chroma 64 and 54 against a
+ground of chroma 16, and it came back again as "xanh nhiều quá, rực quá". The
+`LearningGrid`'s salmon-over-lavender lines are what turned that into glare
+rather than colour: on a saturated mint plate they are a near-complementary pair
+at matching chroma.
+
+So the rule is now written down. **A room may hold its value structure and about
+a third of its chroma, and its floor has to be in its own family.** Every cool
+value in `bridgeEnvironmentPalette` keeps its luminance and lost two thirds of
+its chroma; the plate's vignette was re-cut as a ten-point *value* falloff,
+because a hue-shift vignette reads flat once desaturated; and the bridge passes
+`LearningGrid` its own low-chroma cool-neutral pair, since the authored salmon is
+tuned for the Library's warm cove and belongs there. `.bridge-viewport`'s CSS
+placeholder carries the same three hex values as the backdrop palette, so the
+panel does not change colour when WebGL composites its first frame.
+
+The Library's own room is untouched.
+
 ## 5. Surfaces
 
 Three separate bordered, shadowed cards with a 14 px gutter — not one box with
@@ -209,10 +287,44 @@ a constant tuned on a laptop is wrong on a portrait screen.
 ## 8. Motion
 
 One reveal for the whole page: a 20 px rise and a fade on `--ease-reveal`
-(`cubic-bezier(.22,.61,.36,1)`), 760 ms, set once and never removed. Nothing
-scales, nothing slides in from the side. The cinematic budget is spent entirely on
-the creature stage; the product half stays calm. `prefers-reduced-motion` drops
-transitions and auto-rotation.
+(`cubic-bezier(.22,.61,.36,1)`), **520 ms** with a 44 ms stagger step, set once
+and never removed. Nothing scales, nothing slides in from the side. The cinematic
+budget is spent entirely on the creature stage; the product half stays calm.
+`prefers-reduced-motion` drops transitions and auto-rotation.
+
+### The reveal and the settle are one number
+
+Those two durations are not free choices, because the chapter settle in
+`lib/story/snap.ts` lands a section's top edge at viewport 0 in 300–620 ms. The
+reveal used to be 760 ms with a 70 ms stagger, which put a six-item row's last
+card 1,180 ms after it was observed — the page had stopped, the visitor was
+already reading, and the content was still arriving underneath them. Review
+called it "chưa mượt", and it was not a dropped frame: it was a transition still
+running after the gesture that caused it had visibly finished. **A reveal must
+not outlast the scroll that triggered it.**
+
+It also costs less. `translate3d` promotes each section to its own layer, and
+while it moves the browser composites it under the fixed blurred header — the one
+per-frame CSS cost on this page, the same one `data-gpu="lean"` exists to remove.
+Halving the time in that state halves how often it is paid.
+
+### The settle is an ease-out, not an ease-in-out
+
+`snap.ts` eased cubic in-out over 420–800 ms. Wrong curve for the job: the
+settle begins *after* the page has already been still for `IDLE_MS`, so its first
+frames are the answer to "did anything notice I stopped?" — and an in-out curve
+spends them accelerating from rest, which reads as a pause and then a lunge. It
+is now a cubic ease-out over 300–620 ms: motion on the first frame, deceleration
+into the anchor, and the page appears to have been going there all along.
+
+Two guards came with it, both from real input rather than from taste. A trackpad
+momentum tail delivers 10–20 px of delta that scrolls nothing, so cancelling a
+glide on any wheel over 8 px stranded the page between anchors; overriding now
+takes 26 px in the direction of travel but only 6 px against it, because nobody
+reverses direction by accident. And the 100 ms liveness interval — which exists
+because rAF ticks about once a second under a software rasteriser — now defers
+whenever rAF has run in the last 70 ms, instead of stepping the scroll a second
+time between frames.
 
 ## 9. Verification
 
@@ -428,6 +540,52 @@ physics.
 
 ---
 
+## 11b. Sample lessons — a belt, not a row
+
+The section's claim is that there is a *library* of lessons, and four cards
+cannot make it: four is a number you finish counting. It is sixteen cards on a
+strip that moves continuously, and the fifteen the visitor has not read yet are
+the argument.
+
+Four rules hold it, and each of them is the answer to a way a marquee usually
+goes wrong.
+
+- **Nothing in it is authored.** `BELT` in `ProofSection.tsx` is a list of
+  manifest ids; every title, subtitle, subject label, subject tint and picture is
+  read from `lib/library/manifest.ts` at render time, and both numbers in the
+  lede are counted (`CARDS.length` and `READY_EXPERIENCES.length`). A card cannot
+  drift from the thing it opens, and a mistyped id warns rather than silently
+  shortening the belt — which is exactly what `formula-workshop` for `formula`
+  did before the warning existed.
+- **The set is chosen by what it costs.** `RailVisual` gives anything with a real
+  mesh a real render and everything else a drawn diagram on its subject's tint,
+  so a picture here is never a decorative stand-in. But a belt that pulled the
+  T-rex, the clownfish and the toolkit into every visitor's scroll would be
+  megabytes spent on a marketing strip, so **only entries whose visual costs this
+  page nothing new are in the list** — fifteen inline-SVG marks, plus a bee bake
+  the section was already paying for. Giving a lesson a `thumbnail` rail is the
+  whole change needed to promote it to a photograph later.
+- **The order is the composition.** Interleaved by subject, so every card
+  entering the frame is a different colour from the one leaving it. Grouped, the
+  belt would read as four blocks of one colour sliding past.
+- **It has three regimes, because a strip that cannot be stopped cannot be
+  read.** With a pointer and motion allowed it runs and pauses on hover or
+  focus-within. With no hover — touch has no pointer to park — the animation is
+  off and the belt is a native horizontal scroller with snap points and the clone
+  removed. Reduced motion gets the same scroller. The looping regime fades both
+  edges because cards enter through one and leave through the other; the scroller
+  fades only the right, because it has a real first card at scroll 0 and fading
+  that is indistinguishable from a fault.
+
+Two mechanics worth keeping: the track is the same run **twice** and translates
+to exactly `-50%` of its own width, so the reset is invisible at any card count
+without a number knowing the count; and it is `translate3d`, because this is the
+only thing on the page animating continuously outside a canvas and it must cost
+the main thread nothing.
+
+It is also the section that stopped overrunning the fold on a phone — see
+KNOWN_LIMITATIONS.md, which it left rather than joined.
+
 ## 12. Education — one player, three lessons
 
 The section's product is the **lesson player**, and the role tabs change its
@@ -469,6 +627,16 @@ Three rules hold it together:
   institution.
 - **A stale reflection, never a stale creature.** The bee's two refraction
   captures run at 30 Hz; see §13.
+- **If the specimen does something on its own, the panel names it.** The teacher
+  lesson's drone carries four painted liveries and its reel cycles through them
+  every ~4.6 s (see THIRD_PARTY_ASSETS.md for why that is the asset rather than
+  a runtime trick). An object that changes colour with nothing in the interface
+  accounting for it reads as a glitch, so the object outline's fourth row is
+  "Vỏ thân · 4 lớp" and the manifest's own `subtitle` says the same. The row is
+  the whole fix and it is the cheapest kind: the panel is a picture of software
+  and may not grow a live control — see the note in `EducationSection` on why
+  the transport's play button was removed — so the answer is a label, not a
+  switcher.
 
 ### The height contract, and the width it gives up
 

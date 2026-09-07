@@ -330,37 +330,16 @@
 }
 .edu-media-kind svg { width: 9px; height: 9px; }
 
-.proof-visual { position: relative; }
-.proof-still {
-  position: absolute;
-  left: 10px;
-  bottom: 10px;
-  padding: 3px 8px;
-  border-radius: 999px;
-  background: rgba(255, 253, 249, 0.86);
-  color: var(--ink-2);
-  font-size: 10.5px;
-  letter-spacing: 0.02em;
-  backdrop-filter: blur(4px);
-}
-
 /* ================================= object → content affordance (P5) === */
 /*
- * The proof card's visual is a control now. It has to look like one on hover
- * without becoming a button at rest — these are specimens, not tiles.
+ * The proof cards' "click the object to reach its lesson" affordance lived here
+ * as a set of rules on `button.proof-visual`, plus a `.proof-still` badge that
+ * marked the one card whose picture was a photograph rather than a bake.
+ *
+ * Both are gone with the four-card grid. The belt makes the *whole card* the
+ * button — see `BeltCard` in `ProofSection.tsx` on why sixteen cards may not
+ * each carry two focusable nodes — so the affordance is now the card's own hover
+ * lift in `sections.css`, and there is no bare photograph left on the row to
+ * disclaim: every belt plate is either a bake of a real mesh or a drawn diagram,
+ * which `RailVisual` guarantees by construction.
  */
-button.proof-visual {
-  display: block;
-  width: 100%;
-  padding: 0;
-  border: none;
-  font: inherit;
-  cursor: pointer;
-  background: none;
-  transition: transform 260ms var(--ease-reveal, cubic-bezier(0.22, 1, 0.36, 1));
-}
-.proof-card:hover button.proof-visual.is-openable { transform: translateY(-2px) scale(1.012); }
-@media (prefers-reduced-motion: reduce) {
-  button.proof-visual { transition: none; }
-  .proof-card:hover button.proof-visual.is-openable { transform: none; }
-}

@@ -46,17 +46,36 @@ import type { ExperienceManifest } from '../library/types';
  *   - `lockRoot`. All three reels animate their root joint, so unlocked the
  *     drone flies out of frame in about four seconds and the whale swims past
  *     the camera. The stem names the joint whose translation track is flattened;
- *     everything below it keeps moving. See `lockRootMotion` in `ModelStage`.
+ *     everything below it keeps moving. On the drone the stem resolves to
+ *     **four** roots, one per livery — see below. See `lockRootMotion` in
+ *     `ModelStage`.
  *   - No `clips`. Each file carries exactly one animation, named `Scene` by the
  *     exporter, so a clip rail would be one button that changes nothing. With
  *     `clips` absent the stage plays animation zero, and `animate: true` in the
  *     framing is what keeps it running rather than holding a pose.
+ *
+ * ## The drone is four drones
+ *
+ * `work-drone.glb` carries the machine in four painted finishes — Cybertech,
+ * RedManga, SciFi and Wood — as four sibling subtrees, and its reel changes
+ * livery by scaling three of them to nothing while the fourth performs its own
+ * ~4.6 s window. Nothing in this file selects a skin, because the asset already
+ * does: the stage plays the reel and the drone re-materialises in the next
+ * finish. `poseTime` below sits inside the Cybertech window so the panel opens
+ * on the same blue-grey livery the baked rail thumbnail shows, then cycles.
+ *
+ * This is also the entry's one shipped bug fix worth naming, because the
+ * symptom was reported as "the model looks broken": the build script used to
+ * subset the file to Cybertech alone and kept its scale track, so the drone was
+ * full size for 5 s of every 19.33 s and 218× too small for the other 13.7 —
+ * and the camera, the contact shadow and the grid were all fitted against the
+ * collapsed box. See `scripts/build-robotics-models.mjs`.
  */
 const SHOWCASE: ExperienceManifest[] = [
   {
     id: 'work-drone',
     title: 'Drone quan trắc Dv2',
-    subtitle: 'Bốn ống đẩy · khoang quan sát mở được',
+    subtitle: 'Bốn ống đẩy · bốn lớp vỏ vật liệu',
     poetic: 'Không có bánh lái nào cả — nó lái bằng cách đẩy bên này mạnh hơn bên kia.',
     subject: 'stem',
     topic: 'Thiết kế & cơ cấu',
@@ -64,20 +83,26 @@ const SHOWCASE: ExperienceManifest[] = [
     status: 'ready',
     summary: 'Bốn ống đẩy quanh trọng tâm, cánh cân bằng và nắp khoang quan sát.',
     description:
-      'Mô hình khái niệm của một drone quan trắc. Bốn ống đẩy đặt đối xứng quanh trọng tâm, và toàn bộ việc điều khiển nằm ở chênh lệch lực đẩy giữa chúng — đây là cách trực quan nhất để nói vì sao một cỗ máy không có bánh lái vẫn rẽ, nghiêng và giữ độ cao được. Nắp khoang mở ra khi thiết bị quan sát làm việc.',
+      'Mô hình khái niệm của một drone quan trắc. Bốn ống đẩy đặt đối xứng quanh trọng tâm, và toàn bộ việc điều khiển nằm ở chênh lệch lực đẩy giữa chúng — đây là cách trực quan nhất để nói vì sao một cỗ máy không có bánh lái vẫn rẽ, nghiêng và giữ độ cao được. Nắp khoang mở ra khi thiết bị quan sát làm việc. Mô hình mang sẵn bốn lớp vỏ vật liệu và lần lượt đổi qua cả bốn, nên cùng một cơ cấu được nhìn dưới bốn cách hoàn thiện khác nhau.',
     view: {
       type: 'model',
       url: '/asset/robotics/work-drone.glb',
       preset: 'natural',
       /* `spinSafe` because the frame auto-orbits and this machine is much wider
          across its thrusters than it is deep: fitting one angle only leaves an
-         outer duct outside the frame a quarter turn later. */
-      framing: { yaw: 0.92, pitch: 0.42, fill: 0.94, poseTime: 6, animate: true, spinSafe: true },
-      /* The reel flies the whole aircraft across the scene. The joint below is
-         the one that carries it — note it is the bare `Drone v2 WorkMachine`
-         and not the mesh node `Drone v2 WorkMachine_Cybertech Material_0`,
-         which the stem matcher does not reach because the suffix is joined with
-         an underscore rather than a dot. */
+         outer duct outside the frame a quarter turn later.
+
+         `poseTime` is 3.2 rather than 6 because the file's four liveries take
+         turns by scale and 6 lands in the second one: opening on Cybertech is
+         what makes the panel agree with its own rail thumbnail. `fill` is 0.9
+         rather than 0.94 because the fit is solved against one instant and the
+         Wood livery finishes its turn banked about 16° — the six per cent that
+         buys is what keeps a duct inside the frame there. */
+      framing: { yaw: 0.92, pitch: 0.42, fill: 0.9, poseTime: 3.2, animate: true, spinSafe: true },
+      /* Every livery's root travels — up to 1.66 units on Wood — because the
+         reel expects an engine to carry the aircraft. The stem below names the
+         four shallowest nodes it matches, one per livery, and not the mesh
+         nodes `Drone v2 WorkMachine_<material>_0`, which are their children. */
       lockRoot: 'Drone v2 WorkMachine',
     },
     rail: { kind: 'thumbnail', thumb: 'work-drone' },
@@ -86,8 +111,9 @@ const SHOWCASE: ExperienceManifest[] = [
       { label: 'Cánh cân bằng', body: 'Cặp cánh nhỏ và vạt trước, giữ thân khỏi chao.' },
       { label: 'Khoang quan sát', body: 'Nắp trượt mở khi thiết bị bên trong làm việc.' },
       { label: 'Vỏ thân ghép mảnh', body: 'Nhiều tấm rời, tháo được từng mảnh để bảo trì.' },
+      { label: 'Bốn lớp vỏ', body: 'Cùng một cơ cấu, bốn cách hoàn thiện vật liệu.' },
     ],
-    keywords: 'drone quan trac dv2 ong day canh can bang khoang quan sat bay khong nguoi lai stem',
+    keywords: 'drone quan trac dv2 ong day canh can bang khoang quan sat bay khong nguoi lai bon lop vo mau sac stem',
   },
   {
     id: 'walker-drone',

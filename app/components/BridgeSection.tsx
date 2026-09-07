@@ -7,6 +7,7 @@ import {
   type CreatureStageMode,
 } from './library/CreatureStage';
 import { LibraryIcon } from './library/LibraryIcons';
+import { useZoomModifier } from '../lib/useZoomModifier';
 
 type FeatureIconName = 'rotate' | 'structure' | 'motion' | 'annotation';
 type ToolIconName = 'model' | 'text' | 'audio' | 'effects';
@@ -147,6 +148,10 @@ export function BridgeSection() {
   const [autoSpin, setAutoSpin] = useState(true);
   const [effectsEnabled, setEffectsEnabled] = useState(true);
   const [speaking, setSpeaking] = useState(false);
+  /* The wheel only zooms with a modifier now, so the hint has to name it.
+     See `lib/three/wheelZoom.ts`. */
+  const zoomKey = useZoomModifier();
+
 
   const activeFeature = FEATURES.find((feature) => feature.id === activeStep) ?? FEATURES[0];
   const activePart = PARTS.find((part) => part.name === selectedPart) ?? null;
@@ -336,7 +341,7 @@ export function BridgeSection() {
                   <span>Tự xoay</span>
                   <i aria-hidden="true" />
                 </button>
-                <p className="bridge-orbit-hint">Kéo để xoay · Cuộn để phóng</p>
+                <p className="bridge-orbit-hint">Kéo để xoay · {zoomKey} + cuộn để phóng</p>
               </>
             )}
 

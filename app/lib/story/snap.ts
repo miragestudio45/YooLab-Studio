@@ -49,7 +49,7 @@
 export type SnapController = { dispose(): void };
 
 /** How long the page must be genuinely STILL before settling begins. */
-const IDLE_MS = 150;
+const IDLE_MS = 120;
 /** How long after deliberate input before settling may begin. */
 const INPUT_IDLE_MS = 170;
 /** Below this, we are already there. */
@@ -62,12 +62,33 @@ const DEAD_ZONE_PX = 6;
  * scroll can do.
  */
 const FORWARD_BIAS = 0.32;
-/** A wheel this big, mid-glide, is a person taking the page back. */
-const OVERRIDE_DELTA = 8;
+/**
+ * How big a mid-glide wheel has to be to count as a person taking the page back.
+ *
+ * Two thresholds, because a trackpad's momentum tail and a deliberate correction
+ * are the same event with different numbers on it. Pushing FURTHER in the
+ * direction the glide is already going needs a real shove — a tail routinely
+ * delivers 10-20 px of delta that scrolls nothing, and cancelling on those left
+ * the page stranded a third of the way between two anchors, which is the exact
+ * failure this module exists to prevent. Pushing BACK is unambiguous at any
+ * size: nobody reverses direction by accident, and a reversal that is ignored
+ * feels like the page has been taken away from you.
+ */
+const OVERRIDE_WITH = 26;
+const OVERRIDE_AGAINST = 6;
 
 const clamp = (v: number, a: number, b: number) => (v < a ? a : v > b ? b : v);
-/** Cubic in-out. No overshoot: this is a settle, not a bounce. */
-const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+/**
+ * Cubic ease-out. No overshoot: this is a settle, not a bounce.
+ *
+ * It was a cubic in-OUT, and that is the wrong curve for this job. A settle
+ * begins after the page has already been still for `IDLE_MS`, so its first
+ * frames are the visitor's answer to "did anything notice I stopped?" — and an
+ * in-out curve spends them accelerating from rest, which reads as a pause and
+ * then a lunge. Ease-out moves on the first frame and decelerates into the
+ * anchor: the page appears to have been going there all along.
+ */
+const ease = (t: number) => 1 - Math.pow(1 - t, 3);
 
 export function createSectionSnap(): SnapController {
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -221,17 +242,23 @@ export function createSectionSnap(): SnapController {
       return;
     }
     /* Longer for a longer move, but bounded: a snap approaching a second reads
-       as the page having been taken away from you. */
+       as the page having been taken away from you. Shorter than it was (it was
+       420-800) because the curve changed: an ease-out spends its whole budget
+       visibly decelerating, where the old in-out spent the first half getting
+       started, so the same *felt* travel now needs less time on the clock. */
     const span = Math.abs(distance) / Math.max(1, window.innerHeight);
     glideFrom = y;
     glideTo = to;
     glideStart = now;
-    glideEnd = now + clamp(420 + span * 420, 420, 800);
+    glideEnd = now + clamp(300 + span * 380, 300, 620);
   };
 
+  /** When rAF last ran, so the liveness interval can stay out of its way. */
+  let lastFrameAt = -Infinity;
   const tick = (now: number) => {
     if (disposed) return;
     frame = requestAnimationFrame(tick);
+    lastFrameAt = now;
     step(now);
   };
 
@@ -253,10 +280,12 @@ export function createSectionSnap(): SnapController {
    * movement.
    */
   const onWheel = (event: WheelEvent) => {
-    if (glideEnd && Math.abs(event.deltaY) >= OVERRIDE_DELTA) {
-      lastInputAt = performance.now();
-      stopGlide();
-    }
+    if (!glideEnd) return;
+    const delta = event.deltaY;
+    const against = Math.sign(delta) !== Math.sign(glideTo - glideFrom);
+    if (Math.abs(delta) < (against ? OVERRIDE_AGAINST : OVERRIDE_WITH)) return;
+    lastInputAt = performance.now();
+    stopGlide();
   };
 
   const onKey = (event: KeyboardEvent) => {
@@ -287,7 +316,24 @@ export function createSectionSnap(): SnapController {
   window.addEventListener('keydown', onKey);
   window.addEventListener('resize', onViewportResize, { passive: true });
   frame = requestAnimationFrame(tick);
-  const heartbeat = setInterval(() => step(performance.now()), 100);
+  /*
+   * Liveness, and only liveness.
+   *
+   * The interval exists because rAF is not a reliable heartbeat on this page —
+   * measured at roughly once a second under a software rasteriser — so without
+   * it a visitor could stop mid-crossing and wait before anything noticed. But
+   * it must not *drive* a glide that rAF is already driving: an interval write
+   * lands between frames, so the two together stepped the scroll position twice
+   * in one composited frame at uneven spacing, which is visible as a stutter in
+   * the one animation on this page whose whole job is to feel smooth. It now
+   * defers whenever rAF has ticked recently, and takes over within 70 ms of rAF
+   * going quiet.
+   */
+  const heartbeat = setInterval(() => {
+    const now = performance.now();
+    if (now - lastFrameAt < 70) return;
+    step(now);
+  }, 100);
 
   if (process.env.NODE_ENV !== 'production') {
     /*

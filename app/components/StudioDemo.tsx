@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import * as THREE from 'three';
+import { attachWheelZoom } from '../lib/three/wheelZoom';
 import {
   createCarLoaders,
   createCarMaterials,
@@ -472,15 +473,18 @@ function CarViewport({ mode, explode, playing, light, showGrid, resetKey, onRead
       dragging = false;
       if (renderer.domElement.hasPointerCapture(event.pointerId)) renderer.domElement.releasePointerCapture(event.pointerId);
     };
-    const onWheel = (event: WheelEvent) => {
-      event.preventDefault();
-      orbitRadius = THREE.MathUtils.clamp(orbitRadius + event.deltaY * 0.006, 5.0, 10.5);
-    };
+    /* The editor mock claimed every wheel event unconditionally, which made the
+       whole YooStudio section a dead zone for scrolling — it is the worst case
+       of the bug, because the canvas is the widest thing in the section. Shared
+       policy now: a plain wheel scrolls the page, ctrl/cmd and a trackpad pinch
+       orbit the camera in. See `lib/three/wheelZoom.ts`. */
+    const detachWheel = attachWheelZoom(renderer.domElement, (deltaY) => {
+      orbitRadius = THREE.MathUtils.clamp(orbitRadius + deltaY * 0.006, 5.0, 10.5);
+    });
     renderer.domElement.addEventListener('pointerdown', onPointerDown);
     renderer.domElement.addEventListener('pointermove', onPointerMove);
     renderer.domElement.addEventListener('pointerup', onPointerUp);
     renderer.domElement.addEventListener('pointercancel', onPointerUp);
-    renderer.domElement.addEventListener('wheel', onWheel, { passive: false });
 
     const resize = () => {
       const width = Math.max(host.clientWidth, 1);
@@ -634,7 +638,7 @@ function CarViewport({ mode, explode, playing, light, showGrid, resetKey, onRead
       renderer.domElement.removeEventListener('pointermove', onPointerMove);
       renderer.domElement.removeEventListener('pointerup', onPointerUp);
       renderer.domElement.removeEventListener('pointercancel', onPointerUp);
-      renderer.domElement.removeEventListener('wheel', onWheel);
+      detachWheel();
       backdrop.geometry.dispose();
       (backdrop.material as THREE.Material).dispose();
       disposeScene(world);

@@ -1533,11 +1533,28 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 /* The revealed flag is an attribute, not a class: React owns `className` on
    these elements and a class set from outside React can be wiped by a
    re-render. `data-revealed` is invisible to reconciliation. */
+/*
+ * 520 ms, not 760, and the stagger step is 44 ms rather than 70.
+ *
+ * The two numbers have to be read against the chapter settle in
+ * `lib/story/snap.ts`, which lands a section's top edge at viewport 0 in about
+ * 300-620 ms. At the old pair, a six-item staggered row finished 1,180 ms after
+ * it was observed — so the page had stopped moving, the visitor was already
+ * reading, and the content was still arriving underneath them. That gap is what
+ * the review called "chua muot": not a dropped frame, a transition still
+ * running after the gesture that caused it had visibly ended.
+ *
+ * There is a second cost the shorter duration buys back. A `translate3d` reveal
+ * promotes the section to its own layer, and while it moves the browser
+ * composites it under the fixed blurred header — the one per-frame CSS cost on
+ * this page (see DESIGN.md on `data-gpu="lean"`). Halving the time each section
+ * spends in that state halves how often it is paid during a scroll.
+ */
 [data-reveal] {
   opacity: 0;
   transition:
-    opacity 760ms var(--ease-reveal) var(--reveal-delay, 0ms),
-    transform 760ms var(--ease-reveal) var(--reveal-delay, 0ms);
+    opacity 520ms var(--ease-reveal) var(--reveal-delay, 0ms),
+    transform 520ms var(--ease-reveal) var(--reveal-delay, 0ms);
 }
 /* `soft` fades only. It is for elements that already carry a transform of
    their own — the Explore copy blocks are centred with `translateY(-50%)`, and
@@ -1550,12 +1567,12 @@ html:not(.reveal-ready) [data-reveal] { opacity: 1; transition: none; }
 html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: none; }
 
 [data-stagger] > *:nth-child(1) { --reveal-delay: 0ms; }
-[data-stagger] > *:nth-child(2) { --reveal-delay: 70ms; }
-[data-stagger] > *:nth-child(3) { --reveal-delay: 140ms; }
-[data-stagger] > *:nth-child(4) { --reveal-delay: 210ms; }
-[data-stagger] > *:nth-child(5) { --reveal-delay: 280ms; }
-[data-stagger] > *:nth-child(6) { --reveal-delay: 350ms; }
-[data-stagger] > *:nth-child(n+7) { --reveal-delay: 420ms; }
+[data-stagger] > *:nth-child(2) { --reveal-delay: 44ms; }
+[data-stagger] > *:nth-child(3) { --reveal-delay: 88ms; }
+[data-stagger] > *:nth-child(4) { --reveal-delay: 132ms; }
+[data-stagger] > *:nth-child(5) { --reveal-delay: 176ms; }
+[data-stagger] > *:nth-child(6) { --reveal-delay: 220ms; }
+[data-stagger] > *:nth-child(n+7) { --reveal-delay: 264ms; }
 
 /* The anchor scroll margin used to be declared here as a bare 96 px as well as
    in the safe-area block at the bottom of this file. Two declarations of the
@@ -2400,12 +2417,23 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
   min-width: 0;
   min-height: 0;
   overflow: hidden;
+  /*
+   * What is behind the canvas until the canvas exists.
+   *
+   * The three stops below are literally `bridgeBackdropPalette` in
+   * `lib/three/libraryEnvironment.ts` — centre, mid and edge — because this is
+   * the plate the visitor sees for the second before WebGL composites its first
+   * frame, and any other colour here is a flash. It was a blush-and-lavender
+   * pair, from the room the section had before the palette moved, so the panel
+   * opened pink and then turned; matching the render is what removes the change
+   * rather than re-timing it.
+   */
   background:
-    radial-gradient(ellipse 58% 18% at 53% 78%, color-mix(in srgb, var(--color-blush-soft) 46%, transparent), transparent 72%),
-    radial-gradient(circle at 54% 45%, color-mix(in srgb, var(--color-blush-soft) 22%, var(--color-surface-raised)) 0%, color-mix(in srgb, var(--color-lavender-soft) 30%, var(--color-surface)) 62%, transparent 100%);
+    radial-gradient(ellipse 58% 18% at 53% 78%, rgba(210, 219, 215, 0.55), transparent 72%),
+    radial-gradient(circle at 54% 45%, #fdf8f1 0%, #ecf1ee 62%, #d2dbd7 100%);
   transition: background-color 240ms ease;
 }
-.bridge-viewer:not(.is-effects-on) .bridge-viewport { background: color-mix(in srgb, var(--color-surface) 72%, var(--color-lavender-soft)); }
+.bridge-viewer:not(.is-effects-on) .bridge-viewport { background: #ecf1ee; }
 /* The bridge drives the same `CreatureStage` the Library does but supplies its
    own toolbar, so the stage's own chrome is hidden here. `.stage-rail` replaced
    `.stage-tools` when the rail was regrouped; `.stage-guide` is the card that

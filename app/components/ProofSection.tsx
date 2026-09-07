@@ -1,11 +1,9 @@
 'use client';
 
-import { useFormulaGate } from './FormulaGate';
 import { openLibraryExperience } from '../lib/library/openExperience';
-import { ModelThumbnail } from './ModelThumbnail';
-import { LibraryMark } from './library/LibraryMark';
-import { BEE_THUMBNAIL } from '../lib/three/thumbnailRequests';
-import type { MarkId } from '../lib/library/types';
+import { READY_EXPERIENCES, SUBJECTS, experienceById } from '../lib/library/manifest';
+import { RailVisual } from './library/RailVisual';
+import type { ExperienceManifest } from '../lib/library/types';
 
 /**
  * Proof, built from evidence rather than from claims.
@@ -14,83 +12,135 @@ import type { MarkId } from '../lib/library/types';
  * logos, no testimonials and no user counts: inventing any of those would damage
  * trust more than having none. What it carries instead is stronger and checkable
  * on the spot — every card opens something that is running on this page right
- * now, and the set spans four different subjects so the range is evidence too.
+ * now, and the set spans five different subjects so the range is evidence too.
  *
- * Four cards, not five, and every one of them *opens an experience* rather than
- * scrolling to a section. Five cards on a 1512 px screen are 265 px wide, which
- * is small enough that the picture stops being a specimen and becomes a chip —
- * and the fifth was a link to the studio section, which is the one promise on
- * the row that "mở ngay" did not actually keep. The two cards that used to show
- * a letter now show the same drawn diagrams the Library rail uses, so no card
- * on the row is visibly weaker than its neighbours.
+ * ## Why it is a belt now and not a row of four
+ *
+ * Four cards proved that a lesson exists. They could not prove there is a
+ * *library* of them, and that is the claim this section is actually making — the
+ * heading says "những bài học", plural, over a set small enough to count at a
+ * glance. Sixteen cards moving past continuously say "there are more of these
+ * than fit on your screen" in the one way a static grid cannot, and the fifteen
+ * the visitor has not read yet are the argument.
+ *
+ * ## Every card is a manifest entry, and nothing here is authored
+ *
+ * `BELT` is a list of ids. Titles, subtitles, subject labels, subject tints and
+ * pictures are all read from `lib/library/manifest.ts` at render time, so a card
+ * cannot drift from the thing it opens and a renamed lesson renames its own
+ * card. `experienceById` returning nothing is a build-time-visible mistake
+ * rather than a silent gap: the id is dropped from the belt and the count in the
+ * lede — which is `BELT.length` and not a typed number — goes down with it.
+ *
+ * ## The picture rule, and the one constraint on this set
+ *
+ * `RailVisual` is the Library's own rule about what a picture may be: anything
+ * with a real mesh gets a real render of that mesh, everything else gets a drawn
+ * diagram on its subject's tint. A picture here is therefore either the object
+ * itself or visibly a diagram of it, never a decorative stand-in for an asset
+ * that does not exist.
+ *
+ * **The set below is deliberately restricted to entries whose visual costs this
+ * page nothing new.** Fifteen resolve to drawn marks, which are inline SVG; the
+ * bee resolves to a bake this section was already paying for, and the workshop
+ * to a photograph the Library rail already loads. No entry whose `rail` names an
+ * unbaked GLB is in the list — a belt that pulled the T-rex, the clownfish and
+ * the toolkit into every visitor's scroll would be several megabytes spent on a
+ * marketing strip. When a lesson gets a real cover render, giving its manifest
+ * entry a `thumbnail` rail is the whole change; it flows through here with no
+ * edit to this file.
  */
 
-type Sample = {
-  id: string;
-  subject: string;
-  title: string;
-  task: string;
-  /*
-   * The subject's own accent, for the two cards whose experience has no mesh to
-   * render. It arrives as a custom property and becomes both the plate's wash and
-   * `currentColor` inside the drawn mark — the same mechanism the Library rail
-   * uses to make nineteen hand-drawn diagrams read as one colour-coded set rather
-   * than as nineteen missing images.
-   */
-  tint?: string;
-  /*
-   * `library` opens a named experience in the workspace rather than linking to
-   * the section. A card that says "mở bảng tuần hoàn" and delivers whatever the
-   * Library happened to have selected would be exactly the kind of empty promise
-   * this section exists to avoid.
-   */
-  action:
-    | { kind: 'link'; href: string; label: string }
-    | { kind: 'library'; id: string; label: string }
-    | { kind: 'formula'; label: string };
-  visual: { kind: 'thumbnail'; request: typeof BEE_THUMBNAIL } | { kind: 'poster'; src: string } | { kind: 'mark'; mark: MarkId };
-};
-
-const SAMPLES: Sample[] = [
-  {
-    id: 'bee',
-    subject: 'Sinh học · Giải phẫu',
-    title: 'Ong mật',
-    task: 'Đổi giữa ba trạng thái để thấy cơ chế bay.',
-    action: { kind: 'library', id: 'bee', label: 'Mở bài học' },
-    visual: { kind: 'thumbnail', request: BEE_THUMBNAIL },
-  },
-  {
-    id: 'periodic-table',
-    subject: 'Hóa học · Nguyên tố',
-    title: 'Bảng tuần hoàn',
-    task: 'Chọn một trong 118 nguyên tố và mở mô hình nguyên tử.',
-    action: { kind: 'library', id: 'periodic-table', label: 'Mở bảng tuần hoàn' },
-    visual: { kind: 'mark', mark: 'atom-grid' },
-    tint: 'var(--color-lavender)',
-  },
-  {
-    id: 'globe',
-    subject: 'Địa lý · Địa cầu',
-    title: 'Địa cầu tương tác',
-    task: 'Xoay quả cầu, chọn quốc gia và đọc số liệu thật.',
-    action: { kind: 'library', id: 'globe-explorer', label: 'Mở địa cầu' },
-    visual: { kind: 'mark', mark: 'globe' },
-    tint: 'var(--color-cyan)',
-  },
-  {
-    id: 'formula',
-    subject: 'KHCN & STEM · Thực hành',
-    title: 'Xưởng mô hình xe đua',
-    task: 'Lắp ráp từng chi tiết, quan sát, rồi tự cầm lái.',
-    action: { kind: 'formula', label: 'Mở trải nghiệm' },
-    visual: { kind: 'poster', src: '/asset/Library/Car/formula-preview.jpg' },
-  },
+/**
+ * Sixteen ids, ordered so no two neighbours share a subject tint.
+ *
+ * The order is the composition. Grouped by subject, the belt reads as four
+ * blocks of one colour sliding past; interleaved, every card that enters the
+ * frame is a different colour from the one leaving it, which is what makes a
+ * continuous strip read as a catalogue rather than as a filmstrip of one thing.
+ */
+const BELT = [
+  'bee',
+  'periodic-table',
+  'projectile-lab',
+  'globe-explorer',
+  'organ-heart',
+  'molecule-water',
+  'wave-lab',
+  'formula',
+  'cell-animal',
+  'molecule-caffeine',
+  'incline-lab',
+  'earth-layers',
+  'organ-brain',
+  'molecule-nacl',
+  'circuit-lab',
+  'organ-lungs',
 ];
 
-export function ProofSection() {
-  const { openFormula } = useFormulaGate();
+type Card = { entry: ExperienceManifest; subject: string; tint: string };
 
+const CARDS: Card[] = BELT.flatMap((id) => {
+  const entry = experienceById(id);
+  const subject = entry && SUBJECTS.find((item) => item.id === entry.subject);
+  if (!entry || !subject) {
+    /* Loud, because the failure is otherwise invisible: a mistyped id silently
+       shortens the belt and the lede's count goes down with it, so the page
+       stays internally consistent while quietly showing fewer lessons than the
+       list asks for. `formula-workshop` for `formula` cost exactly one card
+       before this line existed. */
+    console.warn(`ProofSection: no ready manifest entry "${id}"`);
+    return [];
+  }
+  return [{ entry, subject: subject.label, tint: subject.tint }];
+});
+
+/**
+ * One card, and it is one control.
+ *
+ * The four-card version split each card into an `aria-hidden` button around the
+ * picture plus a labelled "Mở bài học" link, so a pointer could click the object
+ * and a keyboard got exactly one tab stop. At sixteen cards that shape costs
+ * thirty-two focusable nodes for sixteen destinations, so the whole card is the
+ * button instead: its accessible name is its own text, the entire surface is the
+ * target, and the belt is sixteen tab stops rather than thirty-two.
+ *
+ * `hidden` is the clone's flag. The belt is the same run twice — that is how the
+ * loop is seamless, see `.proof-belt-track` — and the second run must be
+ * invisible to assistive technology and unreachable by Tab, or the section
+ * announces every lesson twice.
+ */
+function BeltCard({ card, clone }: { card: Card; clone?: boolean }) {
+  const { entry, subject, tint } = card;
+  return (
+    <li className="proof-belt-item">
+      <button
+        type="button"
+        className="proof-belt-card"
+        style={{ '--proof-tint': tint } as React.CSSProperties}
+        tabIndex={clone ? -1 : undefined}
+        /*
+         * Every card opens in the Library workspace, including the workshop —
+         * whose own card used to open the full-screen build directly. One
+         * destination for sixteen cards is the honest one here: the section's
+         * claim is that these are library entries, and landing on the entry with
+         * its knowledge panel beside it is what proves that. The workshop's
+         * "Mở trải nghiệm" button is waiting one click away in the viewer.
+         */
+        onClick={() => openLibraryExperience(entry.id)}
+      >
+        <span className={`proof-belt-plate proof-belt-plate--${entry.rail.kind}`}>
+          <RailVisual visual={entry.rail} />
+        </span>
+        <span className="proof-belt-subject">{subject}</span>
+        <span className="proof-belt-title">{entry.title}</span>
+        <span className="proof-belt-sub">{entry.subtitle}</span>
+      </button>
+    </li>
+  );
+}
+
+export function ProofSection() {
   return (
     <section className="proof" id="bai-hoc-mau" aria-labelledby="proof-title">
       <div className="shell-editorial">
@@ -99,82 +149,48 @@ export function ProofSection() {
             <p className="section-kicker">Bài học mẫu</p>
             <h2 id="proof-title">Những bài học<br /><em>bạn có thể mở ngay.</em></h2>
           </div>
-          <p>Bốn nội dung dưới đây đang chạy thật trên trang này. Mở một mục và tự đánh giá.</p>
+          {/*
+            Both numbers are counted, not typed. The first is the belt's own
+            length and the second is how many entries the manifest marks
+            `ready` — so the sentence stays true when a lesson is added, and the
+            gap between the two is the point: the belt is a window onto a larger
+            shelf rather than the whole shelf.
+          */}
+          <p>
+            {CARDS.length} bài học dưới đây đang chạy thật trên trang này, trong{' '}
+            {READY_EXPERIENCES.length} học liệu mở được ngay. Bấm một thẻ để mở.
+          </p>
         </div>
+      </div>
 
-        <div className="proof-grid" data-stagger>
-          {SAMPLES.map((sample) => {
-            const actionId = sample.action.kind === 'library' ? sample.action.id : '';
-            return (
-            <article className="proof-card" key={sample.id} data-reveal>
-              {/*
-                The object itself opens the lesson (MKT: "cho phép click vào vật
-                thể dẫn ra sector tương ứng").
+      {/*
+        Full-bleed, and that is the composition rather than a shortcut.
 
-                It is a `button` so a pointer gets a real control with a real
-                cursor, and it is `aria-hidden` with `tabIndex={-1}` so it does
-                *not* become a second tab stop: the labelled CTA below already
-                reaches the same destination, and an unlabelled duplicate in the
-                tab order would make the card worse for a keyboard than it was.
-                Mouse gains a shortcut; assistive technology loses nothing.
-              */}
-              <button
-                type="button"
-                aria-hidden="true"
-                tabIndex={-1}
-                onClick={() => {
-                  if (sample.action.kind === 'formula') openFormula();
-                  else if (sample.action.kind === 'library') openLibraryExperience(actionId);
-                  else if (sample.action.kind === 'link') window.location.hash = sample.action.href.replace(/^#/, '');
-                }}
-                className={`proof-visual is-openable${sample.visual.kind === 'mark' ? ' proof-visual--mark' : ''}`}
-                style={sample.tint ? ({ '--proof-tint': sample.tint } as React.CSSProperties) : undefined}
-              >
-                {sample.visual.kind === 'thumbnail' && (
-                  <ModelThumbnail request={sample.visual.request} alt={sample.title} />
-                )}
-                {sample.visual.kind === 'poster' && (
-                  <>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={sample.visual.src} alt={sample.title} loading="lazy" decoding="async" />
-                    {/* The only still photograph among these cards. Its
-                        neighbours are live bakes of real meshes, so without this
-                        it is the one card that quietly claims to be a render of
-                        something the visitor can open. */}
-                    <span className="proof-still">Ảnh minh họa</span>
-                  </>
-                )}
-                {sample.visual.kind === 'mark' && (
-                  <span className="proof-mark" aria-hidden="true"><LibraryMark mark={sample.visual.mark} /></span>
-                )}
-              </button>
-              <span className="proof-subject">{sample.subject}</span>
-              <h3>{sample.title}</h3>
-              <p>{sample.task}</p>
-              {sample.action.kind === 'formula' && (
-                <button type="button" className="proof-action" onClick={openFormula}>
-                  {sample.action.label} <span aria-hidden="true">↗</span>
-                </button>
-              )}
-              {sample.action.kind === 'library' && (
-                <button
-                  type="button"
-                  className="proof-action"
-                  onClick={() => openLibraryExperience(actionId)}
-                >
-                  {sample.action.label} <span aria-hidden="true">→</span>
-                </button>
-              )}
-              {sample.action.kind === 'link' && (
-                <a className="proof-action" href={sample.action.href}>
-                  {sample.action.label} <span aria-hidden="true">→</span>
-                </a>
-              )}
-            </article>
-            );
-          })}
+        A belt that begins and ends at the editorial shell's gutters reads as a
+        grid someone clipped; one that runs off both edges of the screen reads as
+        a strip continuing past the window, which is the whole claim. The heading
+        and the note above and below it stay on the shell, so the section still
+        has one left edge for its words.
+
+        `role="group"` with a label, not a list landmark: the moving strip is a
+        set of controls the visitor may pick from, and the `ul` inside already
+        carries the list semantics.
+      */}
+      <div className="proof-belt" role="group" aria-label="Bài học mở được ngay" data-reveal>
+        <div className="proof-belt-track">
+          <ul className="proof-belt-run">
+            {CARDS.map((card) => <BeltCard card={card} key={card.entry.id} />)}
+          </ul>
+          {/* The clone. Same run, hidden from assistive technology and out of the
+              tab order, and dropped entirely in the regimes where the belt is a
+              native scroller instead of an animation. */}
+          <ul className="proof-belt-run proof-belt-run--clone" aria-hidden="true">
+            {CARDS.map((card) => <BeltCard card={card} clone key={card.entry.id} />)}
+          </ul>
         </div>
+      </div>
 
+      <div className="shell-editorial">
         <p className="proof-note" data-reveal>
           Không logo trường, không lời nhận xét, không con số người dùng — YooLab
           chưa công bố danh sách trường đang triển khai, nên trang này không dựng

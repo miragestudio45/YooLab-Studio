@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import * as THREE from 'three';
+import { attachWheelZoom } from '../../lib/three/wheelZoom';
 import { LabPad } from './LabChrome';
 import { PracticeIcon } from './PracticeIcons';
 import { Autopilot, planCourse, type Waypoint } from '../../lib/drone/autopilot';
@@ -469,16 +470,18 @@ export function DroneLab() {
       if (host.hasPointerCapture(event.pointerId)) host.releasePointerCapture(event.pointerId);
       delete host.dataset.grabbing;
     };
-    const onWheel = (event: WheelEvent) => {
-      if (Math.abs(event.deltaY) < 2) return;
-      event.preventDefault();
-      view.distance = THREE.MathUtils.clamp(view.distance * (1 + event.deltaY * 0.0012), 1.2, 26);
-    };
+    /* Two mount points — `PracticeSection`'s own modal and `PracticeOverlay` —
+       and both lock the body, so this lab keeps the plain wheel it has always
+       had. The rule reads the document per event rather than taking a flag from
+       whichever parent mounted it, which is what makes that true without this
+       file knowing which one did. See `lib/three/wheelZoom.ts`. */
+    const detachWheel = attachWheelZoom(host, (deltaY) => {
+      view.distance = THREE.MathUtils.clamp(view.distance * (1 + deltaY * 0.0012), 1.2, 26);
+    });
     host.addEventListener('pointerdown', onPointerDown);
     host.addEventListener('pointermove', onPointerMove);
     host.addEventListener('pointerup', endDrag);
     host.addEventListener('pointercancel', endDrag);
-    host.addEventListener('wheel', onWheel, { passive: false });
 
     /*
      * The "Tự do" button reaches the camera through a DOM event.
@@ -783,7 +786,7 @@ export function DroneLab() {
       host.removeEventListener('pointermove', onPointerMove);
       host.removeEventListener('pointerup', endDrag);
       host.removeEventListener('pointercancel', endDrag);
-      host.removeEventListener('wheel', onWheel);
+      detachWheel();
       mount.removeEventListener('adoptfree', onAdoptFree);
       delete host.dataset.grabbing;
       motionTrail.dispose();

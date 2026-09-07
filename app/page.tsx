@@ -35,7 +35,9 @@ import { IconQuiz, IconSpace, IconSteps, IconText } from './components/studio/Ed
  *   06 Practice   what can I simulate?
  *   07 Education  what do I get out of it?     (teacher / student / school)
  *   08 Proof      what actually works?
- *   09 Start      what do I do now?
+ *   09 Pricing    what does it cost?
+ *   10 FAQ        what is still stopping me?   (the objections pricing creates)
+ *   11 Start      what do I do now?
  *
  * A section is allowed to say its one thing once. Where two sections were making
  * the same claim in different words — "khám phá", "sáng tạo" and "trải nghiệm"
@@ -138,9 +140,18 @@ export default function Home() {
         <PracticeSection />
         <EducationSection />
         <ProofSection />
+        <PricingSection />
+        {/*
+          The FAQ answers the objections *pricing* creates, so it sits after it.
+          It used to run between Proof and Pricing, which put the answers before
+          the question they answer — a visitor reads "không cần cài đặt gì" while
+          still deciding whether the product is worth a price they have not seen.
+          Its own file has always said it belongs "immediately before the final
+          CTA"; the page now agrees with it, and the last thing before the button
+          is six reasons not to click resolved rather than a price table.
+        */}
         <FaqSection />
         <FaqStructuredData />
-        <PricingSection />
         <TrialInvite />
 
         <FinalCta />

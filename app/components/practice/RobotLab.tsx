@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
+import { attachWheelZoom } from '../../lib/three/wheelZoom';
 import { PracticeIcon } from './PracticeIcons';
 import {
   CASE,
@@ -366,11 +367,12 @@ export function RobotLab() {
       if (host.hasPointerCapture(event.pointerId)) host.releasePointerCapture(event.pointerId);
       delete host.dataset.grabbing;
     };
-    const onWheel = (event: WheelEvent) => {
-      if (Math.abs(event.deltaY) < 2) return;
-      event.preventDefault();
-      cameraDistance = THREE.MathUtils.clamp(cameraDistance * (1 + event.deltaY * 0.0012), 3.2, 42);
-    };
+    /* Two mount points, both full-screen and both body-locking, so the plain
+       wheel still zooms here. Decided from the document per event rather than
+       from a flag. See `lib/three/wheelZoom.ts`. */
+    const detachWheel = attachWheelZoom(host, (deltaY) => {
+      cameraDistance = THREE.MathUtils.clamp(cameraDistance * (1 + deltaY * 0.0012), 3.2, 42);
+    });
 
     /* --- keyboard ---------------------------------------------------------- */
     const onKeyDown = (event: KeyboardEvent) => {
@@ -395,7 +397,6 @@ export function RobotLab() {
     host.addEventListener('pointermove', onPointerMove);
     host.addEventListener('pointerup', endDrag);
     host.addEventListener('pointercancel', endDrag);
-    host.addEventListener('wheel', onWheel, { passive: false });
     host.addEventListener('keydown', onKeyDown);
     host.addEventListener('keyup', onKeyUp);
     host.addEventListener('blur', onBlur);
@@ -841,7 +842,7 @@ export function RobotLab() {
       host.removeEventListener('pointermove', onPointerMove);
       host.removeEventListener('pointerup', endDrag);
       host.removeEventListener('pointercancel', endDrag);
-      host.removeEventListener('wheel', onWheel);
+      detachWheel();
       host.removeEventListener('keydown', onKeyDown);
       host.removeEventListener('keyup', onKeyUp);
       host.removeEventListener('blur', onBlur);

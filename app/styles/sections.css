@@ -737,123 +737,205 @@
 
 .proof .section-heading { min-height: var(--proof-head); }
 
+/* ------------------------------------------------------------- the belt --- */
 /*
- * Four cards, explicitly four.
+ * A continuously moving strip of lesson cards.
  *
- * `repeat(auto-fit, minmax(258px, 1fr))` looked flexible and behaved as a bug: at
- * 1024 px it silently reflowed to three-plus-one, so the row that is supposed to
- * be evidence of range read as a grid that had run out. Four named columns down
- * to the tablet breakpoint, then two, then one.
+ * It replaced a four-column grid, and the reason is in `ProofSection.tsx`: four
+ * cards prove a lesson exists, a moving strip proves there is a library. What
+ * follows is only how it is built.
+ *
+ * ## The loop
+ *
+ * The track holds the same sixteen cards twice and translates to exactly -50% of
+ * its own width. At the end of that travel the second run is sitting precisely
+ * where the first one started, so the reset to 0 is invisible — there is no gap
+ * to cover and no seam to hide, and it holds at any card count and any card
+ * width without a number here needing to know either.
+ *
+ * `translate3d` rather than `translateX` so the track is composited rather than
+ * repainted: this is the only thing on the page that animates continuously
+ * outside a canvas, and it must cost the main thread nothing.
+ *
+ * ## Three regimes, and why a marquee needs all three
+ *
+ * A strip that moves and cannot be stopped is a strip whose cards cannot be
+ * read, let alone clicked. So:
+ *
+ *   1. **Pointer, motion allowed** — it runs, and hover or keyboard focus
+ *      anywhere inside pauses it. That is the desktop case and the only one that
+ *      animates.
+ *   2. **No hover** — touch has no pointer to park, so a visitor there could
+ *      never pause it. The animation is off and the belt becomes a native
+ *      horizontal scroller with snap points: a shelf you swipe, which is the
+ *      idiom that platform already has.
+ *   3. **Reduced motion** — the same native scroller, for the same reason and by
+ *      the visitor's explicit request.
+ *
+ * In regimes 2 and 3 the clone is `display: none`, because a scroller does not
+ * need a second copy and a person swiping through would reach the same sixteen
+ * lessons twice.
  */
-.proof-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: clamp(14px, 1.4vw, 24px);
+.proof-belt {
+  position: relative;
   margin-top: clamp(20px, 3vh, 40px);
+  overflow: hidden;
+  /* Cards enter and leave through a fade rather than a cut. Without it the strip
+     has two hard vertical edges at the viewport bounds, which is what makes a
+     marquee look like a clipped grid instead of a continuing one. */
+  mask-image: linear-gradient(90deg, transparent 0, #000 5%, #000 95%, transparent 100%);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 5%, #000 95%, transparent 100%);
 }
 
-/*
- * A grid, not a flex column, so the four cards share baselines.
- *
- * The visual, the subject label, the title, the description and the action are
- * five rows, and the description row is the flexible one — so a two-line
- * description on one card cannot push its "Mở bài học" a line below its
- * neighbours'. That alignment across the row is most of what makes four cards
- * read as one set.
- */
-.proof-card {
+.proof-belt-track {
+  display: flex;
+  width: max-content;
+  /* Slow on purpose. DESIGN.md §8: the cinematic budget is spent on the creature
+     stage and the product half stays calm — at 16 cards this is about 55 px/s,
+     which reads as drift rather than as a carousel demanding attention. */
+  animation: proof-belt-run 82s linear infinite;
+}
+.proof-belt:hover .proof-belt-track,
+.proof-belt:focus-within .proof-belt-track { animation-play-state: paused; }
+
+@keyframes proof-belt-run {
+  to { transform: translate3d(-50%, 0, 0); }
+}
+
+.proof-belt-run {
+  display: flex;
+  gap: clamp(14px, 1.4vw, 24px);
+  /* The gap has to continue across the join between the two runs, or the loop
+     shows a double-width space once per cycle. */
+  margin: 0 clamp(7px, 0.7vw, 12px);
+  padding: 0;
+  list-style: none;
+}
+
+/* `stretch` is the default on a flex row and `height: 100%` is what makes the
+   button honour it: without the pair, a card whose subtitle wraps to two lines
+   is taller than its neighbours and the belt's bottom edge ripples as it moves. */
+.proof-belt-item { display: flex; align-items: stretch; }
+
+.proof-belt-card {
   display: grid;
-  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+  width: clamp(212px, 17vw, 272px);
+  height: 100%;
   padding: 0 0 18px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   overflow: hidden;
+  color: inherit;
   background: var(--color-surface);
-  transition: transform 220ms ease, box-shadow 220ms ease;
+  font: inherit;
+  text-align: left;
+  transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease;
 }
-.proof-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lift); }
+.proof-belt-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--color-border-strong);
+  box-shadow: var(--shadow-lift);
+}
 
 /*
- * One height for every visual on the row, scaled to the viewport.
+ * One height for every plate on the belt.
  *
- * 168 px of picture under a 104 px section padding was the reason this row read
- * as four chips in a large empty slab. It is now a fifth of the screen, which on
- * a 1080 display is 216 px and on a 768 laptop is 165 — the same proportion of
- * the page rather than the same number of pixels.
+ * Shorter than the four-card grid's `22svh` because the cards are now 240 px
+ * wide rather than 340: a plate that kept the old height would be taller than it
+ * is wide, and a portrait picture of a horizontal specimen is mostly plate.
  */
-.proof-visual {
+.proof-belt-plate {
   position: relative;
-  height: clamp(146px, 22svh, 260px);
+  height: clamp(124px, 15svh, 176px);
   display: grid;
   place-items: center;
   overflow: hidden;
   background: linear-gradient(160deg, #fdf3ea, #f8e4da);
 }
-.proof-visual img,
-.proof-visual .model-thumbnail { width: 100%; height: 100%; }
-.proof-visual img { object-fit: cover; }
+/* `cover`, including inside a bake. The offscreen renderer frames a specimen
+   with margin around it for the Library's 56 px rail rows, and `contain` in a
+   240 px plate keeps that margin — the bee came out a pale ghost in the middle
+   of an empty plate. Filling the plate is what makes the picture the subject. */
+.proof-belt-plate img,
+.proof-belt-plate .model-thumbnail { width: 100%; height: 100%; }
+.proof-belt-plate img { object-fit: cover; }
 
 /*
- * The two experiences with no bakeable mesh — the periodic table and the globe
- * are a DOM grid and a canvas, so there is no GLB to render — get the same
- * treatment the Library rail gives its drawn marks: the subject's own tint as
- * both the wash and `currentColor`, on a soft dome. That is what stops a line
- * drawing from reading as a missing image next to two photographs.
+ * The drawn marks get the Library rail's own treatment: the subject's tint as
+ * both a 6% wash on a soft dome and as `currentColor` inside the diagram. That
+ * is what stops a line drawing from reading as a missing image beside a
+ * photograph, and it is what colour-codes the belt by subject as it moves.
  */
-.proof-visual--mark {
-  background:
-    radial-gradient(120% 120% at 32% 22%, var(--color-surface-raised) 0%, var(--color-surface-2) 100%);
+.proof-belt-plate--mark {
+  background: radial-gradient(120% 120% at 32% 22%, var(--color-surface-raised) 0%, var(--color-surface-2) 100%);
 }
-.proof-visual--mark::before {
+.proof-belt-plate--mark::before {
   content: '';
   position: absolute;
   inset: 0;
   background: var(--proof-tint, var(--color-accent-strong));
-  /* Enough to colour-code the plate, not enough to make two of the four cards a
-     different temperature from the row they belong to. */
   opacity: 0.06;
 }
-.proof-mark {
+.proof-belt-plate--mark .library-mark {
   position: relative;
-  display: block;
-  width: clamp(96px, 46%, 136px);
+  width: clamp(76px, 44%, 112px);
   height: auto;
   aspect-ratio: 1;
   color: var(--proof-tint, var(--color-accent-deep));
 }
-.proof-mark .library-mark { width: 100%; height: 100%; }
 
-.proof-subject {
-  margin: 16px 18px 0;
+.proof-belt-subject {
+  margin: 15px 16px 0;
   color: var(--color-muted-2);
   font-size: 9.5px;
   font-weight: 650;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
-.proof-card h3 {
-  margin: 6px 18px 0;
-  font-size: 19px;
+.proof-belt-title {
+  margin: 6px 16px 0;
+  font-size: 17px;
   font-weight: 660;
-  letter-spacing: -0.034em;
-  line-height: 1.16;
+  letter-spacing: -0.032em;
+  line-height: 1.18;
 }
-.proof-card > p { margin: 7px 18px 0; color: var(--color-muted); font-size: 12px; line-height: 1.6; }
+.proof-belt-sub {
+  margin: 6px 16px 0;
+  color: var(--color-muted);
+  font-size: 11.5px;
+  line-height: 1.55;
+}
 
-.proof-action {
-  justify-self: start;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin: 14px 18px 0;
-  padding: 0;
-  border: 0;
-  color: var(--color-accent-deep);
-  background: transparent;
-  font-size: 12px;
-  font-weight: 620;
+/* Regimes 2 and 3: a native shelf instead of an animation. See the note above. */
+@media (hover: none), (prefers-reduced-motion: reduce) {
+  .proof-belt {
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    /*
+     * Right edge only. The looping belt fades both sides because cards enter
+     * through one and leave through the other; a scroller has a real first card
+     * sitting at scroll 0, and fading it is indistinguishable from a rendering
+     * fault. The fade that survives is the one still doing a job: it says there
+     * is more to the right.
+     */
+    mask-image: linear-gradient(90deg, #000 0, #000 88%, transparent 100%);
+    -webkit-mask-image: linear-gradient(90deg, #000 0, #000 88%, transparent 100%);
+  }
+  .proof-belt::-webkit-scrollbar { display: none; }
+  .proof-belt-track { animation: none; width: auto; }
+  .proof-belt-run--clone { display: none; }
+  .proof-belt-run {
+    /* The gutters become real padding here: the first and last card of a
+       scroller must clear the screen edge, where a looping belt has no first or
+       last card to worry about. */
+    margin: 0;
+    padding: 0 var(--page-gutter);
+  }
+  .proof-belt-item { scroll-snap-align: center; }
 }
-.proof-action:hover { color: var(--brand-ink); }
 
 .proof-note { max-width: 74ch; margin: clamp(20px, 3vh, 32px) 0 0; color: var(--color-muted); font-size: 11.5px; line-height: 1.7; }
 
@@ -901,11 +983,9 @@
   .edu-tool { width: 36px; }
   .edu-tool span { font-size: 8px; }
   .education-points b { font-size: 12px; }
-  .proof-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  /* Two rows of cards instead of one, so each visual gives back what the second
-     row costs: at 22svh the pair of rows was 17 px taller than a 768×1024
-     tablet's viewport. */
-  .proof-visual { height: clamp(140px, 17svh, 210px); }
+  /* The belt is one row at every width — a strip that reflowed to two rows
+     would not be a strip — so the tablet regime only trims the plate. */
+  .proof-belt-plate { height: clamp(118px, 13svh, 156px); }
 }
 
 @media (max-width: 860px) {
@@ -958,8 +1038,10 @@
   /* Two readouts in 350 px is two things saying where you are. The step
      readout keeps its number and the track keeps the picture of it. */
   .edu-transport-step b { display: none; }
-  .proof-grid { grid-template-columns: minmax(0, 1fr); }
-  .proof-visual { height: clamp(170px, 26svh, 230px); }
+  /* Narrower cards, not fewer: at 390 px this shows about one and a half of
+     them, which is what tells a thumb there is more to the right. */
+  .proof-belt-card { width: clamp(196px, 62vw, 240px); }
+  .proof-belt-plate { height: clamp(124px, 17svh, 164px); }
 }
 
 /*
