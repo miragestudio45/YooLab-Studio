@@ -4,6 +4,7 @@ import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { createProceduralEnvironment, exploreEnvironmentPalette } from './environment';
 import { pixelRatioCap } from './deviceTier';
+import { gfxRelease, trackRenderer } from './gfx';
 import { loadLibraryGltf, refreshSkinnedBounds, registerSpecularGlossiness } from './creatures';
 
 /**
@@ -95,6 +96,15 @@ function ensureRuntime(): Runtime {
    */
   renderer.setPixelRatio(pixelRatioCap('thumb'));
   renderer.setClearColor(0x000000, 0);
+  /*
+   * Named, because this baker is offscreen.
+   *
+   * Its canvas is never inserted and never given a class, so `nameOf` in
+   * `gfx.ts` fell all the way through to `anonymous` — and a census in which
+   * the noisiest context has no name is a census nobody can read. The loss this
+   * module used to raise sat unexplained in reports for that reason alone.
+   */
+  trackRenderer(renderer.domElement, 'thumbnail-baker');
   const draco = new DRACOLoader();
   draco.setDecoderPath('/asset/draco/');
   const loader = new GLTFLoader();
@@ -116,6 +126,10 @@ function scheduleTeardown() {
     runtime.environment.dispose();
     runtime.draco.dispose();
     runtime.renderer.dispose();
+    /* Declared before the fact: this teardown is the point of the timer, and
+       without saying so it reached `appleSafePath` as evidence of a bad GPU and
+       took the page's quality down with it on every machine. */
+    gfxRelease(runtime.renderer.domElement);
     runtime.renderer.forceContextLoss();
     runtime = null;
   }, 6000);

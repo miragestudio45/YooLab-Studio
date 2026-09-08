@@ -774,6 +774,16 @@ const readFlag = (flag, fallback) => {
 const url = await devUrl(readFlag('--url', null));
 const outDir = readFlag('--out', 'reference-audit/shots');
 const viewportKey = readFlag('--viewport', 'w1512');
+/*
+ * Device pixel ratio, because 1 is not where the defects are.
+ *
+ * Every regression this harness was pointed at in the iOS round lived on a 2x
+ * panel and none of them reproduced here, for the plain reason that this file
+ * pinned . An alpha-cut silhouette rendered at a capped
+ * buffer ratio and then scaled up by a retina display is invisible at 1x and
+ * obvious at 2x, so the one screen the whole QA story runs on could not see it.
+ */
+const deviceScale = Number(readFlag('--dpr', '1')) || 1;
 const only = args.filter((value) => !value.startsWith('-'));
 
 const viewport = VIEWPORTS[viewportKey];
@@ -845,7 +855,7 @@ try {
   await send('Emulation.setDeviceMetricsOverride', {
     width: viewport.width,
     height: viewport.height,
-    deviceScaleFactor: 1,
+    deviceScaleFactor: deviceScale,
     mobile: viewport.width < 700,
   });
 

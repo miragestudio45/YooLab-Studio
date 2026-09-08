@@ -369,69 +369,63 @@
 @media (max-width: 1024px) {
   .final-cta { min-height: 0; }
 
-  .cta-scene__band { display: none; }
+  /*
+   * The narrow regime gets the banner whole, not in pieces.
+   *
+   * It used to place three cut-outs — waves, globe, card — at hand-tuned
+   * percentages, and every viewport that was not one of the tuned ones put one
+   * of them somewhere it did not belong: a photographic collage behind the
+   * primary button, a globe crown under the header, an orb on the kicker. Each
+   * was fixed and the next width broke a different one, because three
+   * independently positioned layers over a section whose height is content-driven
+   * has no single correct answer.
+   *
+   * `bg2.webp` is that same composition already assembled, with its card at one
+   * edge, its globe at the other and an empty middle where the type goes. Given
+   * the artwork's own aspect ratio and pinned to the bottom, it can only ever
+   * land one way. It is the treatment the wide regime has always used; the
+   * narrow one simply stops doing something different.
+   */
   .cta-scene__waves,
   .cta-scene__globe,
-  .cta-scene__card { display: block; }
+  .cta-scene__card { display: none; }
 
-  .cta-scene__waves {
+  .cta-scene__band {
+    display: block;
     left: 0;
     right: 0;
-    bottom: -2%;
-    height: 34%;
-    background-image: url('/asset/ui/cta/waves.webp');
+    bottom: 0;
+    aspect-ratio: 1983 / 793;
+    background-image: url('/asset/ui/cta/bg2.webp');
     background-size: 100% 100%;
-    background-position: 50% 100%;
+    /*
+     * Measured at 390 x 823: the band is 155 px tall, so its own top lands at
+     * 81% of the section and the actions end at 84.6%. Holding alpha at zero
+     * across the first half keeps the picture below them at every width the
+     * band can take, and the artwork's top strip is plain cream, so nothing is
+     * lost to the ramp.
+     */
+    -webkit-mask-image: linear-gradient(180deg, transparent 0%, transparent 52%, #000 80%);
+    mask-image: linear-gradient(180deg, transparent 0%, transparent 52%, #000 80%);
   }
-  .cta-scene__globe {
-    top: 0;
-    right: -14%;
-    width: min(62%, 460px);
-    aspect-ratio: 696 / 700;
-    background-image: url('/asset/ui/cta/globe.webp');
-    background-size: 100% 100%;
-  }
-  .cta-scene__card {
-    bottom: -4%;
-    left: -12%;
-    width: min(46%, 330px);
-    aspect-ratio: 545 / 520;
-    background-image: url('/asset/ui/cta/card.webp');
-    background-size: 100% 100%;
-  }
-
-  .cta-orb--one,
-  .cta-orb--two { display: block; }
-  /* Where the banner has them, relative to their neighbour: one just clear of
-     the globe's upper left, one just clear of the card's lower left. */
-  .cta-orb--one { top: 5%; right: 52%; width: 42px; height: 42px; }
-  .cta-orb--two { bottom: 15%; left: 26%; width: 34px; height: 34px; }
 }
 
 @media (max-width: 860px) {
   .cta-promises { grid-template-columns: minmax(0, 1fr); max-width: 460px; gap: 10px; }
-  .cta-scene__globe { width: min(72%, 370px); top: 0; right: -19%; }
-  .cta-scene__card { width: min(50%, 300px); left: -8%; bottom: -2%; }
-  .cta-orb--one { right: 62%; width: 34px; height: 34px; }
-  .cta-orb--two { left: 12%; bottom: 20%; width: 26px; height: 26px; }
 }
 
 @media (max-width: 560px) {
   /* The phone regime overrides the band's own bottom padding because the
-     actions here are full-width stacked buttons rather than a centred pair, and
-     because the cut-out artwork sits lower in the box than the banner does. */
+     actions here are full-width stacked buttons rather than a centred pair, so
+     the column needs more room under it before the banner starts. */
   .final-cta { padding-bottom: clamp(104px, 15vh, 144px); }
   .cta-actions { flex-direction: column; align-items: stretch; width: 100%; max-width: 340px; }
   .final-cta .cta-main, .final-cta .cta-secondary { width: 100%; justify-content: center; }
   /* The primary's 38 px gap is tuned for a button that hugs its label. Full
      width, it parks the arrow a thumb's width from the words it belongs to. */
   .final-cta .cta-main { gap: 12px; }
-  .cta-scene__card { width: 200px; left: -40px; bottom: -14px; }
-  /* Further off the corner than the tablet rule puts it: at 390 px the kicker
-     runs to within 60 px of the right gutter, and the globe's landmasses are
-     the one part of this artwork with enough contrast to compete with type. */
-  .cta-scene__globe { width: 230px; right: -92px; top: -6px; }
-  .cta-orb--two { display: none; }
+  /* Nothing to place here any more: the narrow regime draws one banner, and
+     the banner is positioned once, in the 1024 block above. */
 }
 
 /* ================================================================ footer === */

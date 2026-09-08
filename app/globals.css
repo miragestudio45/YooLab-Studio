@@ -54,6 +54,19 @@
    ========================================================================== */
 
 :root {
+  /*
+   * 1 while the Explore copy sits UNDER the creature stage instead of beside it.
+   *
+   * Not a style — a fact about the layout, published for the one reader that
+   * cannot infer it. `ExploreCanvas` composes the bee for a frame with a copy
+   * column beside it or for a frame without one, and those are different marks:
+   * off to the right at full size, or centred and clamped to fit. It used to
+   * decide with its own `viewportWidth < 780` while the stack actually happens
+   * at 1000, and every iPad in portrait fell in the gap between the two numbers.
+   * The switch is set where the stacking is, so the pair cannot drift again.
+   */
+  --story-stacked: 0;
+
   /* --------------------------------------------------------------- type --- */
   /*
    * One family. Not four.
@@ -1003,7 +1016,38 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   font-weight: 640;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  transition: transform 240ms var(--ease-reveal, ease), box-shadow 240ms var(--ease-reveal, ease);
+  transition:
+    opacity 260ms var(--ease-reveal, ease),
+    transform 260ms var(--ease-reveal, ease),
+    box-shadow 240ms var(--ease-reveal, ease);
+}
+/*
+ * Retired, not removed: it fades and settles downward rather than blinking out,
+ * and it comes back if the visitor returns to the top. `visibility` rides the
+ * same transition so the link stops being focusable once it is invisible —
+ * `opacity: 0` alone leaves a tab stop over the meadow.
+ */
+.scroll-cue[data-retired] {
+  opacity: 0;
+  transform: translateX(-50%) translateY(10px);
+  visibility: hidden;
+  transition:
+    opacity 200ms var(--ease-reveal, ease),
+    transform 200ms var(--ease-reveal, ease),
+    visibility 0s linear 200ms;
+  pointer-events: none;
+}
+/*
+ * Not on a touch device at all.
+ *
+ * The pill says "scroll to explore" to someone whose only way of moving the
+ * page IS to swipe it — it teaches nothing, and it spends the one clear band
+ * between the creature and the copy, which is the scarcest space in the phone
+ * and tablet composition. Asked of the input rather than the width so an iPad
+ * in landscape at 1194 is covered too, and a touchscreen laptop is not.
+ */
+@media (hover: none) and (pointer: coarse) {
+  .scroll-cue { display: none; }
 }
 .scroll-cue:hover {
   transform: translateX(-50%) translateY(-2px);
@@ -3384,6 +3428,20 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
 }
 
 @media (max-width: 1000px) {
+  /*
+   * The creature has to be composed for the layout it is actually in, and this
+   * is where that layout is decided, so this is where it is published.
+   *
+   * `ExploreCanvas` reads it on resize. It used to carry its own copy of the
+   * threshold — `viewportWidth < 780` — while the stack happened here at 1000,
+   * and the 220 px between them is every iPad in portrait: 810, 820 and 834 all
+   * got the one-column layout with a creature still placed off to the right for
+   * a copy column that was no longer beside it, which cropped the bee's abdomen
+   * off the frame. A number duplicated in two languages had drifted, so it is
+   * now written once, here, and read there.
+   */
+  :root { --story-stacked: 1; }
+
   .desktop-nav { display: none; }
   .ribbon { flex-wrap: wrap; }
   .ribbon > li { flex: 1 1 46%; }
@@ -3436,7 +3494,24 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
     content: '';
     position: absolute;
     z-index: -1;
-    inset: -74px calc(var(--page-gutter) * -1) -120px;
+    /*
+     * Bled to the frame, not to the gutter.
+     *
+     * A gutter-sized bleed is only full width while the copy fills the shell,
+     * and in this regime it does not: `max-width: 46rem` above makes the block
+     * narrower than its column, and the plate inherited the shortfall. Measured
+     * at 820 x 1180 — shell 756, copy 736 — the plate ran 0 to 785 against a
+     * 805 px frame and left a 19 px strip of bare canvas down one side. Which
+     * side depended on `justify-self`: the hero starts, so the strip was on the
+     * right; chapter 01 ends, so it was on the left. Both were reported, and
+     * they are one bug.
+     *
+     * `50vw` is not a measurement, it is "past the edge from anywhere" — the
+     * gradient is vertical, so horizontal extent costs nothing and means
+     * nothing, and `.story-panel` is `overflow: hidden`, so the excess is
+     * clipped rather than scrollable.
+     */
+    inset: -74px -50vw -120px;
     pointer-events: none;
     /*
      * Solid by the first line of type, not by the third: the kicker sits 20 px

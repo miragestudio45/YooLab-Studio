@@ -72,6 +72,7 @@ import {
 } from './composition';
 import { buildValleyField, curve, slope, type Flower, type ValleyField } from './valley';
 import { createVisibilityGate } from '../three/visibility';
+import { subjectRect } from '../story/subject';
 import { diveFor, waterlineFor } from '../story/clock';
 
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
@@ -559,13 +560,86 @@ export function createFlowerValley(host: HTMLElement, options: FlowerValleyOptio
     if (studyBox) studyZones = [boxZone(studyBox, COPY_MARGIN, 0.92)];
   }
 
+  /** What the authored subject ellipses removed at their centre. */
+  const SUBJECT_STRENGTH = 0.94;
   /**
-   * Wide layouts no longer carve the meadow around the Bee or the copy.
+   * The published rect is the creature's projected bounding box, and a bee is
+   * mostly wing: the box is far wider and taller than the body a plant can
+   * actually be seen growing out of. 0.8 takes the hole back to roughly the
+   * thorax-and-legs mass that has to stay clear.
+   */
+  const SUBJECT_INSET = 0.8;
+  /** Alpha is given back across the outer third of the zone, INSIDE the box. */
+  const SUBJECT_FEATHER = 0.35;
+  /**
+   * The most of the frame this hole may ever take, as half-extents.
    *
-   * The Bee now owns a real WebGL foreground pass and the compact copy rail sits
-   * above the flower band, so those holes are both unnecessary and visibly
-   * artificial. Narrow layouts keep the measured copy reservation because text
-   * and specimen necessarily share one column there.
+   * A ceiling rather than a tuning value. The rect is projected from a moving
+   * creature by another module, and the first version of this function had no
+   * limit on what it would accept: on a phone the bee is centred and clamped to
+   * fit, so its box came back spanning most of the frame, and the field went
+   * from thin to *gone*. A hole that removes the whole meadow is never the right
+   * answer to a creature standing in front of it, whatever the arithmetic says.
+   */
+  const SUBJECT_MAX_RU = 0.34;
+  const SUBJECT_MAX_RV = 0.4;
+
+  /**
+   * The creature's hole, from where the creature actually is.
+   *
+   * `composition.ts` has said for a while that the authored `subject` ellipses
+   * "are replaced by the bee's projected bounding box — see `subjectRect`", and
+   * `ExploreCanvas` has been projecting and publishing that box every frame. The
+   * replacement half was never written: the authored zones were dropped and
+   * nothing read the rect, so on any machine without the foreground pass the
+   * field had nothing at all keeping it off the bee.
+   *
+   * Read live rather than at measure time, because unlike a block of copy the
+   * creature moves every frame — hover bob, entry arc, pointer parallax, the
+   * chapter hand-over — which is the same reason the authored ellipse was wrong.
+   *
+   * Built here rather than through `boxZone`, which is the copy blocks' helper
+   * and grows what it is given: it divides by `1 - FEATHER` so that full
+   * strength covers the whole block and the release happens outside it. That is
+   * right for type, which must be perfectly clear to its own edge, and wrong for
+   * a creature, where the box is already generous and the softening belongs
+   * inside it.
+   *
+   * `farOnly` is kept from the authored zones. Plants nearer than the foreground
+   * plane are the two corner banks the frame crops, they are nowhere near the
+   * creature, and exempting them is what guarantees this function can thin the
+   * field but never empty it.
+   */
+  function liveSubjectZone(): Zone | null {
+    const strength = SUBJECT_STRENGTH
+      * clamp(subjectRect.presence, 0, 1)
+      * (1 - clamp(subjectRect.covered, 0, 1));
+    if (strength < 0.012) return null;
+    const halfW = (subjectRect.right - subjectRect.left) * 0.5 * SUBJECT_INSET;
+    const halfH = (subjectRect.bottom - subjectRect.top) * 0.5 * SUBJECT_INSET;
+    if (!(halfW > 1) || !(halfH > 1)) return null;
+    return {
+      u: (subjectRect.left + subjectRect.right) * 0.5 / W,
+      v: (subjectRect.top + subjectRect.bottom) * 0.5 / H,
+      ru: Math.min(halfW / W, SUBJECT_MAX_RU),
+      rv: Math.min(halfH / H, SUBJECT_MAX_RV),
+      strength,
+      boxed: true,
+      feather: SUBJECT_FEATHER,
+      farOnly: true,
+    };
+  }
+
+  /**
+   * Wide layouts no longer carve the meadow around the copy.
+   *
+   * The compact copy rail sits above the flower band, so that hole is both
+   * unnecessary and visibly artificial. Narrow layouts keep the measured copy
+   * reservation because text and specimen necessarily share one column there.
+   *
+   * The creature's hole is not a layout question and is never authored: it comes
+   * from `liveSubjectZone`, and it is empty whenever the bee's own foreground
+   * pass is doing the job instead.
    */
   function withMeasured(authored: Zone[], copy: Zone[]): Zone[] {
     const out: Zone[] = [];
@@ -583,6 +657,8 @@ export function createFlowerValley(host: HTMLElement, options: FlowerValleyOptio
       out.push(zone);
     }
     if (reserveCopy && !usedCopy && copy.length) out.push(...copy);
+    const subject = liveSubjectZone();
+    if (subject) out.push(subject);
     return out;
   }
 
@@ -765,7 +841,22 @@ export function createFlowerValley(host: HTMLElement, options: FlowerValleyOptio
     const useStudy = studyMix > 0.002;
     const stride = preset.stride;
     const nearFade = near + 3.2;
-    const fadeIn = far - 40;
+    /*
+     * The far fade is a fraction of the field's own depth, not a fixed 40 units.
+     *
+     * It was `far - 40`, which is a small tail on a deep desktop field and the
+     * WHOLE of a shallow one. The phone's strip runs 46 to 88 valley units — 42
+     * of depth — so every plant in it was inside the fade-out ramp and none ever
+     * reached full alpha. That is why the meadow reads as a smudge on a phone
+     * and as a meadow on a laptop, and it was reported as not being able to see
+     * the valley at all: the composition was right and the alpha was spent
+     * before it got there.
+     *
+     * `min` keeps every wide regime exactly as it was — their depth is far more
+     * than 89 units, so 40 still wins — and gives the narrow ones a ramp
+     * proportional to the band they actually have.
+     */
+    const fadeIn = far - Math.min(40, (far - near) * 0.45);
     const tallCap = H * layout.maxHeight * 1.16;
     const shortCap = H * layout.maxHeight;
     const foregroundDepth = layout.foreground;

@@ -28,7 +28,7 @@ import {
   hdrTargetType,
   transmissionTargetSupport,
 } from '../lib/three/hdrTarget';
-import { gfxAllows, gfxRecord, trackRenderer } from '../lib/three/gfx';
+import { gfxAllows, gfxRecord, gfxRelease, trackRenderer } from '../lib/three/gfx';
 import { appleSafePath, presumeAppleSafePath } from '../lib/three/appleSafePath';
 import { createQualityLadder } from '../lib/three/qualityLadder';
 import { createOceanWorld, type OceanWorld } from '../lib/ocean/scene';
@@ -449,19 +449,44 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
 
     /* One place decides this now, for every canvas on the site. See
        `lib/three/deviceTier.ts` for why the retina ceiling came down. */
-    const maxPixelRatio = presumedSafe.active
-      /* Capped harder on the driver family that corrupts. Two full-viewport
-         targets at retina is the largest allocation on the page, and tile
-         memory pressure is the one thing every reported artefact here has in
-         common. 1.0 is one buffer pixel per CSS pixel — not soft, just not
-         supersampled. */
-      ? Math.min(pixelRatioCap('cinema'), 1)
-      : pixelRatioCap('cinema');
+    /*
+     * The safe path no longer caps resolution, and the reason is that it had
+     * already removed what the cap was protecting.
+     *
+     * The extra `Math.min(…, 1)` was justified by tile memory pressure from
+     * "two full-viewport targets at retina" — the transmission and HDR buffers.
+     * But `SAFE_OFF` turns off `transmission`, `hdr`, `mip`, `bloom` and
+     * `foreground` on this very path, so on the configuration being capped
+     * those targets are not allocated at all. It was charging the reduced
+     * pipeline for the full one's worst allocation.
+     *
+     * What that cost is the defect that was reported as the bee looking broken
+     * and jagged on iOS. `pixelRatioCap('cinema')` already answers 1.15 for a
+     * handheld and 1.45 otherwise, both measured against the FULL pipeline; the
+     * extra cap took a 2x MacBook down to 1.0, so an alpha-cut silhouette was
+     * drawn at one buffer pixel per CSS pixel and then scaled up by the display.
+     * No amount of shader work fixes a staircase introduced after the shader.
+     *
+     * The adaptive ladder below is the backstop it always was: `dprCeiling` is
+     * this number and it steps down on measured frames, so a device that cannot
+     * hold it does not have to.
+     */
+    const maxPixelRatio = pixelRatioCap(presumedSafe.active ? 'cinema-lite' : 'cinema');
     const renderer = new THREE.WebGLRenderer({
-      /* MSAA on a full-viewport buffer that is already resolution-governed pays
-         twice for the same edge. A lean device spends that budget on resolution
-         instead, which helps every pixel rather than only the silhouettes. */
-      antialias: gfxAllows('msaa', !lean && !presumedSafe.active),
+      /*
+       * MSAA on a full-viewport buffer that is already resolution-governed pays
+       * twice for the same edge. A lean device spends that budget on resolution
+       * instead, which helps every pixel rather than only the silhouettes.
+       *
+       * That trade is about the performance tier and nothing else, so it is
+       * asked of `lean` alone now. `presumeAppleSafePath` says so itself —
+       * "MSAA on the default framebuffer is not the surface any of these
+       * defects live on" — and then disabled it anyway, which took antialiasing
+       * away from every Mac: not handheld, not lean, no reason. iPad and iPhone
+       * are unaffected, because `handheld` makes them lean and the resolution
+       * trade above is the right one there.
+       */
+      antialias: gfxAllows('msaa', !lean),
       alpha: false,
       powerPreference: 'high-performance',
     });
@@ -622,7 +647,8 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
     const ensureForeground = () => {
       if (foregroundRenderer) return foregroundRenderer;
       const created = new THREE.WebGLRenderer({
-        antialias: gfxAllows('msaa', !lean && !presumedSafe.active),
+        /* Same tier question as the main context above. */
+        antialias: gfxAllows('msaa', !lean),
         alpha: true,
         premultipliedAlpha: true,
         powerPreference: 'high-performance',
@@ -669,6 +695,11 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
       /* Not just `dispose`: that frees three's own objects but leaves the GL
          context attached to a live canvas, which is exactly the thing this is
          here to give back. */
+      /* Chapter-scoped by design — see `dropForeground` above — so its ending
+         is housekeeping, not a fault. Unannounced it did the same damage the
+         thumbnail baker's did: one deliberate teardown, and every renderer the
+         visitor scrolled into afterwards was built on the fallback path. */
+      gfxRelease(foregroundRenderer.domElement);
       foregroundRenderer.forceContextLoss();
       /* The element goes with it. A canvas whose context has been released
          composites as nothing, and a transparent full-viewport rectangle over
@@ -790,7 +821,12 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
       hdrTargets: safeTargetType === THREE.UnsignedByteType ? '8bit' : 'half-float',
       foreground: wantForeground,
       bloom: bloomEnabled,
-      msaa: gfxAllows('msaa', !lean && !presumedSafe.active),
+      /* Must mirror the constructor argument exactly. A report that states
+         a decision the renderer did not make is worse than no report: this file
+         has just spent a round chasing a fallback nobody could see, because the
+         number that drove it was not the number being published. */
+      msaa: gfxAllows('msaa', !lean),
+      pixelRatioCeiling: maxPixelRatio,
       liquidSim: gfxAllows('liquid', !reduceMotion && !lean && !safePath.active),
     });
     const oceanBloom = createOceanBloomPass(lean, safeTargetType);
@@ -1340,6 +1376,14 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
     /* ---------------------------------------------------------------- resize --- */
     let viewportWidth = 1;
     let viewportHeight = 1;
+    /**
+     * Whether the hero copy sits UNDER the stage rather than beside it.
+     *
+     * Read from `--story-stacked`, which the stylesheet sets in the same query
+     * that does the stacking — see the note there. The fallback matches that
+     * query, and exists only for the frame before the stylesheet has applied.
+     */
+    let storyStacked = false;
     /* Sizing the bee pass is its own step because it now has two callers: the
        shared resize, and `ensureForeground` when it builds a fresh context that
        has never been sized. A `function` declaration, so it is available to
@@ -1356,6 +1400,9 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
     const resize = () => {
       viewportWidth = Math.max(host.clientWidth, 1);
       viewportHeight = Math.max(host.clientHeight, 1);
+      const stacked = getComputedStyle(document.documentElement)
+        .getPropertyValue('--story-stacked').trim();
+      storyStacked = stacked === '' ? window.innerWidth <= 1000 : stacked === '1';
       const aspect = viewportWidth / viewportHeight;
       landCamera.aspect = aspect;
       landCamera.updateProjectionMatrix();
@@ -1529,7 +1576,9 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
       const paletteA = LAND_PALETTES[lower];
       const paletteB = LAND_PALETTES[lower + 1];
 
-      const mobileFrame = viewportWidth < 780 ? 0.22 : 1;
+      /* The camera aims off-centre only while there is a copy column beside the
+         creature to aim away from. */
+      const mobileFrame = storyStacked ? 0.22 : 1;
       shotPosition.copy(shotA.position).lerp(shotB.position, mix);
       shotTarget.copy(shotA.target).lerp(shotB.target, mix);
       const shotFov = shotA.fov + (shotB.fov - shotA.fov) * mix;
@@ -1612,7 +1661,7 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
         beeMaterialSet.optical.uLightDir.value.copy(keyLight.position).normalize();
       }
 
-      const mobile = viewportWidth < 780;
+      const mobile = storyStacked;
       const landFrameH = 2 * Math.tan((cameraFov * Math.PI) / 360) * cameraPosition.distanceTo(cameraTarget);
       const landFrameW = landFrameH * landCamera.aspect;
 
@@ -1907,6 +1956,26 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
       const visibility = 1 - smoothstep(0.04, 0.3, dive);
       const wanted = wantForeground
         && !!bee && !!beeMaterialSet && beePresence >= 0.006 && visibility >= 0.006;
+
+      /*
+       * Tell the flower field whether it still has to guard the bee.
+       *
+       * This pass and the field's exclusion rect are alternatives, and until now
+       * nothing said so: `withMeasured` in the flower renderer dropped every
+       * authored `subject` zone outright on the grounds that "the Bee now owns a
+       * real WebGL foreground pass". It does not always own one. `wantForeground`
+       * is false on every lean device and on every machine that trips the Apple
+       * safe path — which is every Mac and every iPad, because the check matches
+       * `Apple GPU` under WebKit and `ANGLE (Apple, …)` under Chromium alike. On
+       * all of those the bee was drawn only into the main canvas at z-index -4,
+       * the field composited over it at -3, and the flower band along the bottom
+       * of the frame printed straight across the creature's legs.
+       *
+       * A float rather than a flag because the pass fades out across the dive
+       * rather than switching off, and the hole has to fade in exactly as fast
+       * or the swap is a visible pop.
+       */
+      subjectRect.covered = wanted ? visibility : 0;
 
       /*
        * The context's whole lifecycle, decided here.

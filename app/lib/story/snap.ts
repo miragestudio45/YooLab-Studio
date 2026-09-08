@@ -95,6 +95,37 @@ const FORWARD_BIAS = 0.32;
  * Which gaps are restable is `targetFor`'s question, not this constant's.
  */
 const CAPTURE = 0.2;
+/**
+ * How much taller than the viewport a gap may be and still be one chapter step.
+ *
+ * `measure` admits an anchor only while its section FITS, which is right — but
+ * a section that is dropped does not stop existing, it stops being *mentioned*,
+ * and the two anchors on either side of it become neighbours in a list while
+ * staying thousands of pixels apart in the document. Everything below then
+ * treats that span as a chapter transition, because a chapter transition is the
+ * only thing a gap between adjacent anchors has ever been.
+ *
+ * Measured on a 390x844 phone, where almost everything stops fitting:
+ *
+ *     anchors  0, 820, 1640, 2460, 6065, 10419
+ *                              └ 3605 ┘└ 4354 ┘
+ *
+ * The first of those two holds the bridge (1482 px) and the editor (1303 px);
+ * the second holds Practice (1751 px) and Education (1759 px). All four are
+ * sections a visitor is meant to stop and read, and all four sat inside a gap
+ * that was magnetic end to end: `FORWARD_BIAS` of 3605 px is 1154 px, so the
+ * first thousand pixels of the bridge dragged backwards and everything past it
+ * threw the page 2451 px forward into the Library. There was no resting place
+ * anywhere in either span. That is the report — the scroll gets stuck at the
+ * Library and Practice — and it is a phone-shaped bug for the plain reason that
+ * a phone is where sections stop fitting.
+ *
+ * 1.35 is one viewport plus room for the padding and rounding that make a real
+ * chapter step measure a little over its own height. Above it, the gap is not a
+ * transition between two compositions; it is a stretch of document that happens
+ * to lie between two anchors, and it gets read like one.
+ */
+const CHAPTER_GAP = 1.35;
 
 /**
  * How big a mid-glide wheel has to be to count as a person taking the page back.
@@ -121,6 +152,57 @@ const OVERRIDE_AGAINST = 6;
  * spare, and is far below any movement a person can produce.
  */
 const SELF_PX = 1.5;
+/**
+ * Movement we did not write that outranks a glide, in CSS px per tick.
+ *
+ * Separate from `SELF_PX`, which is about the browser's pixel grid. This one is
+ * about the browser's *momentum*: a settle now begins while a trackpad fling is
+ * still crawling to a halt (see `REST_PER_FRAME`), so for its first frames our
+ * writes and the tail's last pixels land on the same scroll offset and the
+ * difference is not zero. Cancelling on that took the settle away again on
+ * exactly the input it was added for. Six pixels in a tick is far below anything
+ * a hand produces, and every deliberate gesture cancels through its own listener
+ * long before this backstop is consulted.
+ */
+const TAKEOVER_PX = 6;
+/**
+ * The speed at or below which the page counts as stopped, in px per 60 Hz frame.
+ *
+ * Exact stillness is the wrong test on a Mac, and that is where this was
+ * reported. A trackpad fling in Chrome and Safari does not stop, it decays: the
+ * last stretch of the tail moves the page well under a pixel a frame for a few
+ * hundred milliseconds, and `lastMoveAt`-style bookkeeping treats every one of
+ * those as fresh movement. The settle waited out the entire tail and then waited
+ * `IDLE_MS` more, which on a hard fling reads as a snap that simply does not
+ * come — the complaint this constant exists to answer. A wheel mouse never
+ * showed it, because a wheel notch ends in a real stop.
+ *
+ * 1.2 px is chosen against the thing on the other side of it: taking the page
+ * over while the browser is still moving it means two scrollers on one document,
+ * which this module exists to avoid. At 1.2 px a frame the fling has around a
+ * thousandth of its energy left, so what we take over is not a fight.
+ */
+const REST_PER_FRAME = 1.2;
+const REST_V = REST_PER_FRAME / 16.7;
+/** Smoothing for the speed estimate. Long enough to ignore one late frame. */
+const SPEED_TAU_MS = 45;
+/**
+ * A wheel delta big enough to be a person rather than a momentum tail.
+ *
+ * The tail's own events are what make the speed test safe — they are small, and
+ * they are the reason a settle may begin during one. A deliberate notch is not:
+ * Windows sends 100 per detent and a trackpad flick opens far above 20.
+ */
+const WHEEL_DELIBERATE = 20;
+/**
+ * Quiet time after a deliberate wheel before a settle may begin.
+ *
+ * Without it a visitor working down the page one notch at a time gets a settle
+ * started in each gap between notches and cancelled by the next one, which is a
+ * tug rather than a scroll. It has to stay clear of `REST_PER_FRAME`'s job: it
+ * is keyed to LARGE deltas only, so a momentum tail never renews it.
+ */
+const WHEEL_IDLE_MS = 220;
 
 const clamp = (v: number, a: number, b: number) => (v < a ? a : v > b ? b : v);
 /**
@@ -193,8 +275,19 @@ export function createSectionSnap(): SnapController {
 
   /* Observation. */
   let lastY = window.scrollY;
-  let lastMoveAt = performance.now();
+  let lastSampleAt = performance.now();
+  /**
+   * Smoothed scroll speed in px/ms, from movement we did not write.
+   *
+   * This is the whole answer to "has the visitor stopped", and it replaces
+   * asking whether the number changed. See `REST_PER_FRAME`.
+   */
+  let speed = 0;
+  /** When the page last came to rest, or -1 while it is still travelling. */
+  let restSince = performance.now();
   let lastInputAt = 0;
+  /** Last wheel event large enough to be a person. See `WHEEL_DELIBERATE`. */
+  let lastCoarseWheelAt = 0;
   let direction = 1;
 
   /* Animation. "Is a glide running" is `glideEnd > 0` — derived, never stored,
@@ -274,12 +367,36 @@ export function createSectionSnap(): SnapController {
      *
      * `wrote` therefore holds an intent rather than an observation, and the one
      * place that compares against it allows for the quantisation: `SELF_PX`.
+     *
+     * The write is the two-argument form under a forced `scroll-behavior: auto`
+     * — see `holdScrollBehavior` for why that is more portable than asking for
+     * `behavior: 'instant'`.
      */
     wrote = top;
-    window.scrollTo({ top, left: 0, behavior: 'instant' as ScrollBehavior });
+    window.scrollTo(0, top);
   };
 
-  const stopGlide = () => { glideEnd = 0; };
+  /*
+   * `scroll-behavior: auto`, held for exactly as long as a glide runs.
+   *
+   * The stylesheet sets `html { scroll-behavior: smooth }`, and a loop that
+   * writes a position every frame cannot survive the browser animating each of
+   * those writes — the two never converge and the page crawls. That used to be
+   * handled by passing `behavior: 'instant'`, which is right where it is
+   * understood and is a `TypeError` in the WebKit versions that predate it,
+   * thrown once per frame inside the animation loop on the exact platform this
+   * was reported broken on. Forcing the computed value instead needs no new
+   * enum, works the same on every engine, and lets the write below be the plain
+   * two-argument form that has always existed.
+   */
+  let behaviorHeld = false;
+  const holdScrollBehavior = (hold: boolean) => {
+    if (hold === behaviorHeld) return;
+    behaviorHeld = hold;
+    document.documentElement.style.scrollBehavior = hold ? 'auto' : '';
+  };
+
+  const stopGlide = () => { glideEnd = 0; holdScrollBehavior(false); };
 
   const targetFor = (y: number): number | null => {
     if (anchors.length < 2) return null;
@@ -310,30 +427,44 @@ export function createSectionSnap(): SnapController {
       : (f < 1 - FORWARD_BIAS ? lower : upper);
 
     /*
-     * `CAPTURE` limits a GAP, not an anchor.
+     * `CAPTURE` limits a GAP, not an anchor — and a gap earns filmstrip physics
+     * by being one chapter tall, not by being bracketed with anchors.
      *
-     * It was asked of the *chosen* anchor, on the reasoning that the two kinds
-     * are neighbours — the Library is cinematic, Practice below it is assist —
-     * so the gap between them would be magnetic from the Library's side and
-     * capture-limited from Practice's. That is a sound asymmetry to want and the
-     * per-anchor test does not produce it, because the direction bias picks the
-     * anchor BEFORE this line runs. Scrolling down out of the Library the bias
-     * picks Practice; Practice is 290 px away on a 900-tall laptop; `CAPTURE` is
-     * 180; the answer is `null`. Measured: a 540 px band, most of the Library,
-     * in which nothing settled at all. The Library is a full-height cinematic
-     * panel composed to be seen whole, and resting two thirds of the way through
-     * it is the exact failure this module exists to prevent.
+     * Two questions, and both had to be asked here because both were answered
+     * wrong by looking at a single anchor.
      *
-     * A gap is a place to rest only when BOTH its ends are assist. That keeps
-     * the inside of Practice, Proof and Pricing free — which is what `assist`
-     * was added for — and puts the Library's exit back on the filmstrip, where
-     * the visitor lands on the Library or on Practice and never between them.
+     * The first is which anchor the limit applies to. It used to be the *chosen*
+     * one, on the reasoning that the two kinds are neighbours — the Library is
+     * cinematic, Practice below it is assist — so the gap between them would be
+     * magnetic from the Library's side and capture-limited from Practice's. That
+     * is a sound asymmetry to want and a per-anchor test does not produce it,
+     * because the direction bias picks the anchor BEFORE this line runs.
+     * Scrolling down out of the Library the bias picks Practice; Practice is
+     * 290 px away on a 900-tall laptop; `CAPTURE` is 180; the answer was `null`,
+     * and the measurement was a 540 px band — most of the Library — in which
+     * nothing settled at all.
+     *
+     * The second is whether the gap is a chapter step at all. See
+     * `CHAPTER_GAP`: on a phone the sections that do not fit drop out of the
+     * anchor list without leaving the document, and the survivors end up
+     * thousands of pixels apart with four readable sections stranded between
+     * them and no resting place anywhere inside.
+     *
+     * So a gap is a place to rest when it is longer than a chapter, OR when both
+     * its ends are assist. Everything else is the filmstrip, pulling from
+     * anywhere: the four Explore panels on every device, and the Library's exit
+     * on a viewport where the Library and Practice are still adjacent screens.
      */
-    if (lower.assist && upper.assist && Math.abs(chosen.y - y) > window.innerHeight * CAPTURE) return null;
+    const step = upper.y - lower.y;
+    const restable = step > window.innerHeight * CHAPTER_GAP || (lower.assist && upper.assist);
+    if (restable && Math.abs(chosen.y - y) > window.innerHeight * CAPTURE) return null;
     return chosen.y;
   };
 
   let ticks = 0;
+  /* Dev-only diagnostic buffer; `taping` is 0 unless `__snap.record()` armed it. */
+  const tape: Array<Record<string, number>> = [];
+  let taping = 0;
 
   /*
    * One state machine, two clocks.
@@ -359,21 +490,51 @@ export function createSectionSnap(): SnapController {
     ticks += 1;
     if (document.visibilityState === 'hidden') return;
 
+    const dt = now - lastSampleAt;
+    lastSampleAt = now;
+
+    /*
+     * One observation, three answers: which way, how fast, and whose it was.
+     *
+     * `wrote` is the last value this loop pushed, so anything further from it
+     * than the pixel grid allows is the browser, momentum, an anchor link or the
+     * visitor. Only that movement sets direction and feeds the speed estimate —
+     * our own glide must not be read as the visitor still scrolling, or every
+     * settle would extend its own reason to exist.
+     *
+     * A glide is abandoned only for movement bigger than `TAKEOVER_PX`. Small
+     * external movement is the tail of the fling we just took over from, and
+     * yielding to it put the page back exactly where it was stuck before.
+     */
     const y = window.scrollY;
+    let external = 0;
     if (y !== lastY) {
-      /*
-       * Movement we did not cause ends any glide in progress.
-       *
-       * `wrote` is the last value this loop pushed; anything else is the
-       * browser, momentum, an anchor link or the visitor — and all four outrank
-       * us.
-       */
       if (Math.abs(y - wrote) > SELF_PX) {
+        external = Math.abs(y - lastY);
         direction = y > lastY ? 1 : -1;
-        lastMoveAt = now;
-        if (glideEnd) stopGlide();
+        if (glideEnd && Math.abs(y - wrote) > TAKEOVER_PX) stopGlide();
       }
       lastY = y;
+    }
+    if (dt > 0) {
+      const instant = external / dt;
+      speed += (instant - speed) * (1 - Math.exp(-dt / SPEED_TAU_MS));
+    }
+    if (speed > REST_V) restSince = -1;
+    else if (restSince < 0) restSince = now;
+
+    if (taping) {
+      if (now > taping) taping = 0;
+      else if (tape.length < 900) {
+        tape.push({
+          t: Math.round(now),
+          y: Math.round(y),
+          ext: Math.round(external * 10) / 10,
+          pxf: Math.round(speed * 16.7 * 100) / 100,
+          rest: restSince < 0 ? -1 : Math.round(now - restSince),
+          glide: glideEnd ? 1 : 0,
+        });
+      }
     }
 
     if (glideEnd) {
@@ -403,8 +564,20 @@ export function createSectionSnap(): SnapController {
     if (needsMeasure) { needsMeasure = false; measure(); }
 
     if (!enabled) return;
-    if (now - lastMoveAt < IDLE_MS) return;
+    if (restSince < 0 || now - restSince < IDLE_MS) return;
     if (now - lastInputAt < INPUT_IDLE_MS) return;
+    if (now - lastCoarseWheelAt < WHEEL_IDLE_MS) return;
+    /*
+     * Elastic overscroll belongs to the browser.
+     *
+     * macOS and iOS let the document travel past both ends and spring back, and
+     * during that spring `scrollY` is out of range and being animated by the
+     * compositor. Writing into it is the two-scrollers failure in its purest
+     * form, and the visitor is nowhere near an anchor anyway — they are at the
+     * top of the page pulling down.
+     */
+    const overscroll = document.documentElement.scrollHeight - window.innerHeight;
+    if (y < 0 || y > overscroll) return;
 
     const to = targetFor(y);
     if (to === null) return;
@@ -416,7 +589,7 @@ export function createSectionSnap(): SnapController {
          broken half-state — it just does not get the travel. */
       jump(to);
       lastY = window.scrollY;
-      lastMoveAt = now;
+      restSince = now;
       return;
     }
     /*
@@ -436,6 +609,7 @@ export function createSectionSnap(): SnapController {
     glideTo = to;
     glideStart = now;
     glideEnd = now + clamp(240 + span * 520, 240, 720);
+    holdScrollBehavior(true);
   };
 
   /** When rAF last ran, so the liveness interval can stay out of its way. */
@@ -454,21 +628,33 @@ export function createSectionSnap(): SnapController {
   };
 
   /*
-   * Wheel is the ambiguous one.
+   * Wheel is the ambiguous one, and it is four different devices.
    *
-   * Chromium keeps delivering wheel events through a trackpad's momentum tail,
-   * and treating those as "the visitor is steering again" cancelled every glide
-   * the moment it began. A deliberate override is a real delta arriving while a
-   * glide is actually running; the tail is not. It deliberately does not touch
-   * `lastMoveAt` — that means "the page is still travelling", which only the
-   * observed position can say, and a momentum wheel that scrolls nothing is not
-   * movement.
+   * A wheel mouse sends one large delta per detent and nothing between them. A
+   * Mac trackpad and a Magic Mouse send a burst and then a decaying momentum
+   * tail that can run for a second, and Chromium delivers every frame of it.
+   * Firefox measures in lines rather than pixels. Treating all of that as "the
+   * visitor is steering again" cancelled every glide the moment it began.
+   *
+   * So the size is normalised first — a `deltaMode` of 1 is lines and 2 is
+   * pages, and 3 lines is not a smaller gesture than 100 pixels — and then it is
+   * asked two different questions. Is it big enough to be a person, which holds
+   * the settle off for `WHEEL_IDLE_MS` so that notch-by-notch scrolling is never
+   * interrupted by one. And, only while a glide is actually running, is it big
+   * enough to take the page back.
+   *
+   * It deliberately does not touch `restSince`: that means "the page is still
+   * travelling", which only the observed position can say, and a momentum wheel
+   * that scrolls nothing is not movement.
    */
   const onWheel = (event: WheelEvent) => {
-    if (!glideEnd) return;
     const delta = event.deltaY;
+    const size = Math.abs(delta)
+      * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? window.innerHeight : 1);
+    if (size >= WHEEL_DELIBERATE) lastCoarseWheelAt = performance.now();
+    if (!glideEnd) return;
     const against = Math.sign(delta) !== Math.sign(glideTo - glideFrom);
-    if (Math.abs(delta) < (against ? OVERRIDE_AGAINST : OVERRIDE_WITH)) return;
+    if (size < (against ? OVERRIDE_AGAINST : OVERRIDE_WITH)) return;
     lastInputAt = performance.now();
     stopGlide();
   };
@@ -500,6 +686,16 @@ export function createSectionSnap(): SnapController {
   window.addEventListener('pointerdown', onInput, { passive: true });
   window.addEventListener('keydown', onKey);
   window.addEventListener('resize', onViewportResize, { passive: true });
+  /*
+   * iOS collapses its browser chrome without firing `resize` on `window`.
+   *
+   * The panels are sized in `svh`, so that collapse moves every anchor on the
+   * page — and it happens on the visitor's first downward swipe, which is
+   * precisely when a stale anchor settles them somewhere that no longer exists.
+   * `visualViewport` is the event that does fire, on iPad as well as iPhone.
+   */
+  const viewport = window.visualViewport;
+  viewport?.addEventListener('resize', onViewportResize);
   frame = requestAnimationFrame(tick);
   /*
    * Liveness, and only liveness.
@@ -535,12 +731,28 @@ export function createSectionSnap(): SnapController {
       state: () => ({ y: window.scrollY, gliding: glideEnd > 0, to: glideTo, direction }),
       debug: () => ({
         now: Math.round(performance.now()),
-        sinceMove: Math.round(performance.now() - lastMoveAt),
+        atRest: restSince >= 0,
+        sinceRest: restSince < 0 ? -1 : Math.round(performance.now() - restSince),
         sinceInput: Math.round(performance.now() - lastInputAt),
+        sinceWheel: Math.round(performance.now() - lastCoarseWheelAt),
+        pxPerFrame: Math.round(speed * 16.7 * 100) / 100,
         enabled, lastY, wrote, anchors: anchors.length,
         target: targetFor(window.scrollY),
         ticks,
       }),
+      /*
+       * A recorder, for the machines this cannot be run on.
+       *
+       * The input model above is the same code on a Mac trackpad, a wheel mouse
+       * and an iPad, but the numbers arriving at it are not, and a device that
+       * behaves differently can only be diagnosed with its own numbers. Call
+       * `__snap.record()`, scroll the way that felt wrong, then `__snap.tape()`.
+       */
+      record(ms = 4000) {
+        tape.length = 0;
+        taping = performance.now() + ms;
+      },
+      tape: () => tape.slice(),
     };
     (window as unknown as { __snap?: typeof seam }).__snap = seam;
   }
@@ -557,6 +769,8 @@ export function createSectionSnap(): SnapController {
       window.removeEventListener('pointerdown', onInput);
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('resize', onViewportResize);
+      viewport?.removeEventListener('resize', onViewportResize);
+      holdScrollBehavior(false);
       if (process.env.NODE_ENV !== 'production') delete (window as unknown as { __snap?: unknown }).__snap;
     },
   };

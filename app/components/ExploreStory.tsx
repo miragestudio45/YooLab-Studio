@@ -69,8 +69,36 @@ export function ExploreStory() {
       });
     };
 
+    /*
+     * The cue is an instruction, and an instruction that has been followed is
+     * clutter.
+     *
+     * It lives at the bottom of the hero panel, so scrolling does eventually
+     * carry it off screen — but the hero is the tallest thing on the page and
+     * the pill tracked the whole first chapter down before it went, sitting over
+     * the meadow and, at the crossing, over the copy plate. Review read it as
+     * following the section rather than belonging to its foot.
+     *
+     * A class, not a style, and written only when it changes: this runs on the
+     * same rAF as the stage clock, and an inline assignment invalidates computed
+     * style whether or not the value moved.
+     */
+    const cue = document.querySelector<HTMLElement>('.scroll-cue');
+    let cueGone = false;
+    const retireCue = () => {
+      /* An eighth of a viewport. Far enough that a trackpad's smallest nudge
+         does not blink it, near enough that it is gone before the visitor has
+         read anything below the fold. */
+      const gone = window.scrollY > window.innerHeight * 0.12;
+      if (gone === cueGone) return;
+      cueGone = gone;
+      cue?.toggleAttribute('data-retired', gone);
+    };
+    retireCue();
+
     const sample = () => {
       frame = 0;
+      retireCue();
       if (!centres.length) return;
       const focus = window.scrollY + window.innerHeight * 0.5;
       const last = centres.length - 1;
