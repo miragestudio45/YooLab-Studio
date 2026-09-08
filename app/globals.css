@@ -20,6 +20,8 @@
  * now own a file, so a change to the molecule viewer cannot move the hero.
  * Everything above the partials is tokens + page chrome, which is shared.
  */
+/* The workspace glass, before the two sections that set its variables. */
+@import './styles/glass.css';
 @import './styles/library.css';
 @import './styles/sections.css';
 @import './styles/practice.css';
@@ -129,6 +131,14 @@
   /* Soft accents. Present for tinting and for subject colour-coding, never as
      a page-level background. */
   --color-lavender: #8d6bcc;
+  /* The same lavender, dark enough to be read rather than seen — the convention
+     `--color-accent-readable` sets above, for the same reason. `#8d6bcc` on the
+     Library's pane surface (a measured rgb(253, 249, 244)) is 3.92:1, which is
+     under the 4.5 a 12 px italic needs; this is 4.78. Split into its own token
+     rather than darkened in place because the base value is also used as a
+     *swatch* — the incline and wave legends in `exp-physics.css` fill 8 px
+     squares with it, where luminance is identity and not legibility. */
+  --color-lavender-readable: #8159bf;
   --color-lavender-soft: #ddd2f2;
   --color-cyan: #5fb6c4;
   --color-cyan-soft: #cfe9ee;
@@ -660,35 +670,37 @@ button:focus-visible, a:focus-visible, input:focus-visible {
      the last of those landed in the flower band where the student CTA was
      effectively unreadable. */
   margin-top: clamp(88px, 11.5vh, 138px);
-  /* A legibility ground, not a card.
-     The copy column sits over a meadow whose colour is unpredictable and moves,
-     and viewport height decides how much of it is behind the text. A soft wash
-     in the page's own cream keeps every line readable at any height without
-     putting a panel on the hero. */
+  /*
+   * No legibility wash here, and that is a deletion rather than an omission.
+   *
+   * This carried a `::before` radial wash in the page's cream, on the argument
+   * that the copy sits over a meadow whose colour moves. It does not: the flower
+   * field keeps a corridor under this column on purpose — the exclusion zone in
+   * `flowerValley/composition.ts` is centred at `v: 0.46` with a soft rim — so at
+   * every width where the copy is beside the specimen rather than over it, the
+   * text is already on clean cream and the wash was covering nothing.
+   *
+   * What it did instead was draw a rectangle. Its box was `-170px` on the left
+   * and `-46%` on the right, so the ellipse — 62% of a 1385 px box, centred at
+   * 27% of it — reached its zero contour 484 px *past* its own left edge and was
+   * clipped there at alpha 0.68. That is a straight vertical line with a
+   * near-white fill, which is exactly the "translucent panel" its own comment
+   * said it must never become. It was invisible up to about 1920 only because
+   * the backdrop behind it is near-white there; on a 2560×1440 display the hero
+   * ground is a warmer beige at that height and the box appeared, which is how
+   * review found it.
+   *
+   * Verified without it at 1194×834 and 1366×768 — the shortest viewports in
+   * this regime, where the copy sits closest to the flowers — and every line
+   * reads. The one-column regime below 1001px is a different composition, with
+   * the creature *behind* the words, and it keeps its own plate.
+   *
+   * `position: relative` and `isolation` stay: that plate is absolute inside
+   * this box and needs both.
+   */
   position: relative;
   isolation: isolate;
 }
-.hero-copy::before {
-  content: '';
-  position: absolute;
-  z-index: -1;
-  /* The box is deliberately far bigger than the gradient needs. The first
-     version sized it to the copy and the ellipse still had ~0.5 alpha where the
-     box ended, which drew a straight edge across the meadow — a translucent
-     panel, which is the one thing this must not look like. Oversizing lets the
-     falloff reach zero well inside the element, so there is no boundary to see. */
-  inset: -190px -46% -170px -170px;
-  background: radial-gradient(
-    62% 52% at 27% 52%,
-    rgba(255, 253, 249, 0.93) 0%,
-    rgba(255, 253, 249, 0.8) 34%,
-    rgba(255, 253, 249, 0.44) 62%,
-    rgba(255, 253, 249, 0.12) 84%,
-    rgba(255, 253, 249, 0) 100%
-  );
-  pointer-events: none;
-}
-
 .hero h1 {
   /* Compact on wide frames and allowed to wrap once more on phones. Height joins
      width in the clamp so a short laptop never lets type dominate the specimen. */
@@ -1585,15 +1597,12 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 
 .bee-pin {
   position: absolute;
-  /* The element's origin IS the joint — 0,0 is the point being named — and
-     every piece below is placed from it in plain pixels. The first pass hung
-     the leader and the ring off the *label* instead, which meant every offset
-     was measured from a box whose width depends on its own text: the thorax
-     ring landed 12 px from its dot with the hairline invisible between them. */
-  color: rgba(45, 36, 32, 0.8);
+  /* The element's origin IS the joint — 0,0 is the point being named — and every
+     piece below is placed from it in plain pixels. */
+  color: rgba(30, 24, 21, 0.9);
   font-size: 9.5px;
-  font-weight: 620;
-  letter-spacing: 0.07em;
+  font-weight: 650;
+  letter-spacing: 0.08em;
   line-height: 1;
   white-space: nowrap;
   text-transform: uppercase;
@@ -1601,29 +1610,41 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 }
 
 /*
- * The anatomy dot. Small, filled, and the only thing that touches the animal.
+ * ## Matching the reference, on its own terms
  *
- * Teal rather than the reference's white because this page has one accent and a
- * white dot on a white-highlighted glass shell disappears; the cream ring around
- * it is what holds its edge where the body goes dark.
+ * The client pointed at a demo whose callouts are the reason this looks the way
+ * it does, and the first attempt at it missed by being *polite*: warm ink at
+ * 55%, a 1 px hairline, a 9 px ring at 58%. On cream at 9.5 px that reads as a
+ * smudge, and the review was right that it was not the reference.
+ *
+ * What the reference actually does is commit: near-black, a line you can see,
+ * and a ring big enough to be a mark rather than a dot. Three numbers carry it —
+ * **0.9 ink, 1.5 px line, 14 px ring** — and it is monochrome, which is the
+ * other half. The teal dot the earlier pass used was this project's accent doing
+ * a job the accent is not for: a callout is drafting, and drafting is one
+ * colour. The brand still owns every control on the page; it does not need to
+ * own the anatomy labels too.
  */
+
+/* The anatomy dot. Solid, dark, small — the only thing that touches the animal,
+   with a cream ring so it holds its edge where the body goes to full red. */
 .bee-pin i {
   position: absolute;
-  top: -3px;
-  left: -3px;
-  width: 6px;
-  height: 6px;
+  top: -3.5px;
+  left: -3.5px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  background: var(--color-accent-strong, #00aaab);
-  box-shadow: 0 0 0 1.5px rgba(251, 248, 244, 0.92);
+  background: rgba(30, 24, 21, 0.92);
+  box-shadow: 0 0 0 1.5px rgba(251, 248, 244, 0.9);
 }
 
 /*
  * The leader and the ring, both drawn from the dot.
  *
- * `::before` is the hairline, rotated about its own dot end so one length and
- * one angle place it; `::after` is the hollow ring that terminates it. Warm ink
- * with a cream outline, because the line's whole job is to survive crossing the
+ * `::before` is the line, rotated about its own dot end so one length and one
+ * angle place it; `::after` is the hollow ring that terminates it. Each carries
+ * a cream outline, because the line's whole job is to survive crossing the
  * darkest part of a transmissive body on its way out to clear ground.
  */
 .bee-pin::before,
@@ -1632,32 +1653,30 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   position: absolute;
 }
 .bee-pin::before {
-  height: 1px;
-  /* Rotated about the end nearest the dot, so `width` is the reach and the
-     rotation swings the far end to where the ring and label are. */
+  height: 1.5px;
   transform-origin: 100% 50%;
-  background: rgba(45, 36, 32, 0.55);
-  box-shadow: 0 0 0 1px rgba(251, 248, 244, 0.62);
+  background: rgba(30, 24, 21, 0.82);
+  box-shadow: 0 0 0 1px rgba(251, 248, 244, 0.55);
 }
 .bee-pin::after {
-  width: 9px;
-  height: 9px;
-  border: 1.2px solid rgba(45, 36, 32, 0.58);
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid rgba(30, 24, 21, 0.85);
   border-radius: 50%;
-  background: rgba(251, 248, 244, 0.78);
+  background: rgba(251, 248, 244, 0.9);
+  box-shadow: 0 0 0 1px rgba(251, 248, 244, 0.55);
 }
 
-/* The label. Placed at the ring's outer side by each variant; the halo is two
-   stops of the page's own cream, which on the ivory the ring reaches is all the
-   separation 9.5 px uppercase needs — and unlike a plate it leaves the
-   composition unboxed. */
+/* The label, outside the ring. The halo is two stops of the page's own cream,
+   which on the ivory the ring reaches is all the separation 9.5 px uppercase
+   needs — and unlike a plate it leaves the composition unboxed. */
 .bee-pin b {
   position: absolute;
   font-weight: inherit;
   text-shadow:
-    0 0 3px rgba(251, 248, 244, 0.96),
-    0 0 9px rgba(251, 248, 244, 0.9),
-    0 0 18px rgba(251, 248, 244, 0.65);
+    0 0 3px rgba(251, 248, 244, 0.98),
+    0 0 9px rgba(251, 248, 244, 0.92),
+    0 0 18px rgba(251, 248, 244, 0.7);
 }
 
 /*
@@ -1665,31 +1684,31 @@ button:focus-visible, a:focus-visible, input:focus-visible {
  *
  * Each leader is a length L at an angle θ off horizontal, swinging left; the
  * ring sits at its far end, which is (−L·cos θ, ∓L·sin θ) from the dot, and the
- * label sits just outside the ring. Every one of them goes up or left, never
- * right, because the copy column owns the right half of this chapter — and
- * `PIN_SAFE` in `ExploreCanvas` hides any pin whose dot has drifted far enough
- * that its ring would leave the frame or reach the type.
+ * label sits just outside the ring. Every one goes up or left, never right,
+ * because the copy column owns the right half of this chapter — and `PIN_SAFE`
+ * in `ExploreCanvas` hides any pin whose dot has drifted far enough that its
+ * ring would leave the frame or reach the type.
  *
  * The three joints are within about 130 px of each other on the animal, so the
- * angles are chosen to fan the rings apart rather than to look tidy on their
- * own: 38° up, flat, and 26° down.
+ * angles fan the rings apart rather than looking tidy on their own: 38° up,
+ * flat, and 26° down.
  */
 
 /* Wing root — up and left. 126 at 38°: far end −99, −78. The longest reach of
    the three, because this joint sits deepest inside the body. */
-.bee-pin--up::before { right: 6px; top: 0; width: 126px; transform: rotate(-38deg); }
-.bee-pin--up::after { right: 95px; top: -82px; }
-.bee-pin--up b { right: 112px; top: -84px; }
+.bee-pin--up::before { right: 7px; top: -0.75px; width: 126px; transform: rotate(-38deg); }
+.bee-pin--up::after { right: 92px; top: -85px; }
+.bee-pin--up b { right: 114px; top: -82px; }
 
 /* Thorax — straight left. 104 flat. */
-.bee-pin--left::before { right: 6px; top: 0; width: 104px; }
-.bee-pin--left::after { right: 101px; top: -4px; }
-.bee-pin--left b { right: 118px; top: -4px; }
+.bee-pin--left::before { right: 7px; top: -0.75px; width: 104px; }
+.bee-pin--left::after { right: 98px; top: -7px; }
+.bee-pin--left b { right: 120px; top: -4px; }
 
 /* Abdomen — down and left. 118 at 26°: far end −106, +52. */
-.bee-pin--down::before { right: 6px; top: 0; width: 118px; transform: rotate(26deg); }
-.bee-pin--down::after { right: 102px; top: 48px; }
-.bee-pin--down b { right: 119px; top: 48px; }
+.bee-pin--down::before { right: 7px; top: -0.75px; width: 118px; transform: rotate(26deg); }
+.bee-pin--down::after { right: 99px; top: 45px; }
+.bee-pin--down b { right: 121px; top: 48px; }
 
 /* Annotation halos invert with the ground: dark letterforms lifted off ivory
    become light letterforms lifted off deep water. */
@@ -1815,12 +1834,40 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
  * layer for the whole session, which on a page running three WebGL contexts is
  * exactly the cost the effect is trying to stay inside.
  */
-[data-kinetic] {
-  /* The mask wrappers SplitText inserts are `overflow: hidden` and inherit
-     nothing, so the heading's own line-height has to survive being re-boxed —
-     without this a display line at 1.08 clips its own descenders and the
-     Vietnamese tone marks stacked above them. */
-  padding-bottom: 0.06em;
+/*
+ * The mask has to be taller than the line box, and this is the bug that shipped.
+ *
+ * `mask: 'lines'` wraps each split line in a div with `overflow: clip`, and that
+ * div is exactly as tall as the line box — measured on the bridge heading: mask
+ * 53 px, line 53 px, at `font-size: 49.14px` with `line-height: 1.08`. A 49 px
+ * face needs about 62 px for its full ascent and descent, so **6-13 px of every
+ * line was being clipped**, and Vietnamese pays for that twice: the dot under
+ * `ạ`, the tail of `g`, `y`, `ạ`, `ợ` at the bottom, and a tone mark stacked
+ * over a circumflex at the top. Review caught it on three separate headings.
+ *
+ * `overflow: clip` clips at the **padding box**, so padding on the mask enlarges
+ * the visible region, and an equal negative margin puts the box back where it
+ * was. Net layout is identical — content lands on the same pixel it did before —
+ * and the clip region now extends past the glyphs on all four sides.
+ *
+ * Values, and why each one:
+ *
+ *   0.26em bottom  the descender depth these faces actually use. It also means
+ *                  the rising line becomes visible a quarter of an em earlier in
+ *                  its travel, which softens the start of the wipe rather than
+ *                  hurting it.
+ *   0.14em top     tone marks. Smaller than the bottom because the line box
+ *                  already contains most of the ascent.
+ *   0.06em sides   the italic `em` in every one of these headings overhangs its
+ *                  own line box on the right; without this the final full stop
+ *                  of "khó thực hiện trong lớp học." loses its edge.
+ *
+ * `em`, not `px`, so it tracks a heading whose size is a `clamp()` across nine
+ * viewports.
+ */
+.kinetic-line-mask {
+  padding: 0.14em 0.06em 0.26em;
+  margin: -0.14em -0.06em -0.26em;
 }
 /* A split line is a block that must not pick up the heading's `text-wrap:
    balance` a second time: SplitText has already decided where this line breaks,
@@ -3857,6 +3904,11 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
   .lab-readout,
   .lab-pad button,
   .tool-story,
+  .library-rail,
+  .library-viewer,
+  .library-knowledge,
+  .library-subject,
+  .library-search,
   .studio-canvas-menu,
   .studio-canvas-side button,
   .studio-playbar,

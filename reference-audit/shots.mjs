@@ -29,6 +29,7 @@ import net from 'node:net';
 import http from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { devUrl } from './dev-url.mjs';
 
 const CHROME_CANDIDATES = [
   'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
@@ -38,6 +39,19 @@ const CHROME_CANDIDATES = [
 /* -------------------------------------------------------------------- shots --- */
 
 const VIEWPORTS = {
+  /*
+   * Above 1920, which is where this page had no tested regime at all and a real
+   * defect shipped: the hero's legibility wash drew a visible rectangle on a
+   * 2560x1440 display, because its falloff is sized in a mix of fixed pixels and
+   * percentages that only reached zero inside the element up to about 1920.
+   *
+   * 2560x1440 is the common 27" desktop panel; 3440x1440 is the 21:9 ultrawide,
+   * which is the widest aspect the page is likely to meet and the one that
+   * stretches a 12-column shell furthest from the type inside it. Both are here
+   * because a regime nobody measures is a regime that breaks.
+   */
+  'w3440': { width: 3440, height: 1440 },
+  'w2560': { width: 2560, height: 1440 },
   'w1920': { width: 1920, height: 1080 },
   'w1512': { width: 1512, height: 982 },
   'w1440': { width: 1440, height: 900 },
@@ -757,7 +771,7 @@ const readFlag = (flag, fallback) => {
   return value;
 };
 
-const url = readFlag('--url', 'http://localhost:3000');
+const url = await devUrl(readFlag('--url', null));
 const outDir = readFlag('--out', 'reference-audit/shots');
 const viewportKey = readFlag('--viewport', 'w1512');
 const only = args.filter((value) => !value.startsWith('-'));

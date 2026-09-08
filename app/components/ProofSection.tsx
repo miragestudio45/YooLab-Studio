@@ -58,14 +58,34 @@ import type { ExperienceManifest } from '../lib/library/types';
  *
  * The first is **pictures over diagrams**. The belt shipped as sixteen drawn
  * `LibraryMark` line diagrams and came back from review as ugly, which it was:
- * they are drawings of objects this repository owns the actual meshes for. Nine
+ * they are drawings of objects this repository owns the actual meshes for. Eight
  * of the sixteen below are now pre-baked renders of those meshes — see
  * `scripts/bake-library-covers.mjs` and the `cover` field in `types.ts` — and
- * one is a photograph. The remaining six are entries with **nothing to render**:
+ * one is a photograph. The remaining seven are entries with **nothing to render**:
  * the periodic table is a DOM grid, the physics labs are simulations and the
  * molecules are generated from bond tables at runtime. A drawn mark is the
  * honest picture of those, and dropping them would make the belt claim the
  * library is only biology.
+ *
+ * A third rule arrived with the second review of the pictures: **a mesh existing
+ * is not a reason to put it on the belt.** The lungs, the brain and the eye are
+ * near-white HuBMAP meshes, anatomy may not be repainted to look better, and at
+ * 240 px they read as pale smudges next to a bee. They are still in the Library,
+ * where they are rendered live at full size and their pallor is the specimen
+ * rather than the picture. The belt takes the covers that carry — the four
+ * creatures, the heart, the liver, the kidney and the gallbladder — and leaves the
+ * rest to the section that can show them properly. Eight, not the nine an
+ * earlier draft of this note claimed: the paint jar is white on white and failed
+ * exactly the same test as the lungs.
+ *
+ * The bacterial wall was on this list for one round, kept on the argument that a
+ * peptidoglycan lattice is structurally distinctive in a way a pale organ is not.
+ * Once the covers were relit as product shots the argument stopped holding: a
+ * near-white lattice on cream is still a near-white shape on cream, and it was
+ * the only cover in the set with no visible contact shadow, because it is flat
+ * on the ground and hides its own. `organ-gallbladder` took the slot — it is the
+ * one organ in the anatomy set that is genuinely *green*, so it carries at 240 px
+ * and it is the only hue on a belt that is otherwise pink, red, blue and purple.
  *
  * The second is **colour rhythm**: grouped by subject the belt reads as four
  * blocks of one tint sliding past, so the order interleaves. But only Sinh học
@@ -82,11 +102,11 @@ const BELT = [
   'projectile-lab',     // diagram — a simulation
   'trex',               // render
   'globe-explorer',     // diagram — a canvas
-  'organ-brain',        // render
+  'organ-liver',        // render
   'molecule-caffeine',  // diagram — generated from a bond table
   'jellyfish',          // render
   'circuit-lab',        // diagram — a simulation
-  'organ-lungs',        // render
+  'organ-gallbladder',  // render
   'earth-layers',       // diagram — a cross-section
   'clownfish',          // render
   'molecule-nacl',      // diagram — a generated lattice
@@ -169,7 +189,7 @@ function BeltCard({ card, clone }: { card: Card; clone?: boolean }) {
 
 export function ProofSection() {
   return (
-    <section className="proof" id="bai-hoc-mau" data-snap aria-labelledby="proof-title">
+    <section className="proof" id="bai-hoc-mau" data-snap="assist" aria-labelledby="proof-title">
       <div className="shell-editorial">
         <div className="section-heading section-heading--split" data-reveal>
           <div>

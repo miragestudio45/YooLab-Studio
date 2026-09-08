@@ -128,7 +128,7 @@ export function PricingSection() {
   const [cycle, setCycle] = useState<BillingCycle>('month');
 
   return (
-    <section className="pricing-section" id="bang-gia" data-snap aria-labelledby="pricing-title">
+    <section className="pricing-section" id="bang-gia" data-snap="assist" aria-labelledby="pricing-title">
       {/* Two washes, drawn once and never animated. They are what stops four
           white cards on ivory from reading as a spreadsheet. */}
       <div className="pricing-aura" aria-hidden="true" />

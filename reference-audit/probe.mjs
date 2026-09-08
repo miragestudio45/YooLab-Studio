@@ -6,6 +6,7 @@ import net from 'node:net';
 import http from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { devUrl } from './dev-url.mjs';
 
 const CHROME_CANDIDATES = [
   'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
@@ -13,6 +14,10 @@ const CHROME_CANDIDATES = [
 ];
 
 const VIEWPORTS = {
+  /* Above 1920, where the page had no tested regime and a real defect shipped —
+     see the same table in shots.mjs. */
+  w3440: [3440, 1440],
+  w2560: [2560, 1440],
   w1920: [1920, 1080],
   w1512: [1512, 982],
   w1440: [1440, 900],
@@ -148,7 +153,7 @@ const flag = (name, fallback) => {
   argv.splice(index, 2);
   return value;
 };
-const url = flag('--url', 'http://localhost:3000');
+const url = await devUrl(flag('--url', null));
 const key = flag('--viewport', 'w1366');
 /* `--reduced` emulates `prefers-reduced-motion: reduce`. The only way to check a
    reduced-motion path is in a browser that claims it, and Chrome will not take it

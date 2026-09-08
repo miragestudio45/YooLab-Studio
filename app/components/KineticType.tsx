@@ -124,6 +124,52 @@ export function KineticType() {
 
       for (const element of document.querySelectorAll<HTMLElement>(TARGETS)) {
         /*
+         * Work out the accessible name here, and re-stamp it after every split.
+         *
+         * `SplitText` runs its own `aria: 'auto'` pass: it marks every line and
+         * mask it creates `aria-hidden` — which is right, a screen reader must
+         * not read a heading one clipped fragment at a time — and then writes an
+         * `aria-label` on the heading itself so the name survives. Five of these
+         * eight headings are the target of an `aria-labelledby` on their own
+         * `<section>`, so without that the page would lose five landmark names.
+         *
+         * The problem is *which* name GSAP writes: it reads `textContent`, and
+         * every heading here sets its own line break. `textContent` concatenates
+         * straight across a break, so GSAP's pass shipped "Những bài họcbạn có
+         * thể mở ngay", "Một nền tảng,ba vai trò" and "…một bài học YooLab.Và
+         * chính bạn…". Measuring this cost two wrong diagnoses in a row: setting
+         * the label *before* `new SplitText()` looks like it works and is then
+         * silently overwritten, so the walk below has to be re-applied from
+         * inside `onSplit` — which is also what makes it survive an `autoSplit`
+         * re-split, since GSAP redoes its aria pass each time.
+         *
+         * Two kinds of break have to become a space and neither is `textContent`
+         * material. Four headings use `<br />`; the bridge heading uses a
+         * `<span>` and an `<em>` that the stylesheet makes blocks. So: replace
+         * the breaks with spaces, join the top-level children with one more, and
+         * collapse. `innerText` would give the same answer through layout, but
+         * it falls back to `textContent` whenever the element is not being
+         * rendered — and these eight are spread down a very long page, mostly
+         * off screen when this runs, so a layout-derived name would be right on
+         * some loads and wrong on others.
+         *
+         * The join is safe for this set because every child boundary here is
+         * also a word boundary. A heading that wrapped a suffix — `<em>x</em>s`
+         * — would gain a space it should not have; the fix then is an authored
+         * `aria-label`, which the check below leaves alone.
+         */
+        const authored = element.getAttribute('aria-label');
+        const copy = element.cloneNode(true) as HTMLElement;
+        for (const br of copy.querySelectorAll('br')) br.replaceWith(' ');
+        const name =
+          authored ??
+          Array.from(copy.childNodes)
+            .map((node) => node.textContent ?? '')
+            .join(' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        /*
          * `autoSplit` re-splits on a resize that changes the line breaks and
          * calls `onSplit` again, which is why the timeline is *built inside*
          * `onSplit` and returned from it: returning an animation hands GSAP
@@ -148,28 +194,52 @@ export function KineticType() {
              mask, not as leading, so it costs nothing in layout. */
           reduceWhiteSpace: false,
           onSplit(self: { lines: Element[] }) {
+            /* After GSAP's aria pass, every time it runs. See above. */
+            if (name) element.setAttribute('aria-label', name);
             return gsap.fromTo(
               self.lines,
               {
-                yPercent: 118,
+                /*
+                 * 104, not 118. The mask is now a quarter of an em taller than
+                 * the line box (see `.kinetic-line-mask`), so 118% overshot into
+                 * territory the mask no longer hides *and* gave the line further
+                 * to travel than the wipe needs. Just past 100 is the whole
+                 * distance: the line starts exactly below its own clip edge.
+                 */
+                yPercent: 104,
                 opacity: 0,
-                filter: 'blur(9px)',
+                /*
+                 * 5 px, not 9. Nine on a 49 px display face is a smear rather
+                 * than a focus pull — which is most of what review meant by
+                 * "chưa đẹp" once the clipping was accounted for — and blur is
+                 * the one property here that costs a fresh rasterisation of the
+                 * layer on every frame it changes.
+                 */
+                filter: 'blur(5px)',
               },
               {
                 yPercent: 0,
                 opacity: 1,
                 filter: 'blur(0px)',
-                duration: 0.92,
+                duration: 0.8,
                 /*
-                 * Exponential ease-out, per the craft floor: it moves on the
-                 * first frame and spends its whole budget decelerating, which
-                 * is what makes a slide read as arriving rather than as
-                 * travelling. `power4` rather than `expo` because `expo` on a
-                 * 118% translate overshoots the eye's expectation and reads as
-                 * a snap.
+                 * Ease-out, per the craft floor: it moves on the first frame and
+                 * spends its budget decelerating, which is what makes a slide
+                 * read as arriving rather than as travelling.
+                 *
+                 * `power3`, not the `power4` this shipped with. On a travel this
+                 * short the steeper curve puts almost the whole distance in the
+                 * first sixth, so the line is effectively already there before
+                 * the eye registers it moving — the motion reads as a pop.
+                 * `power3` keeps the ease-out character with enough of the
+                 * distance spread across the middle to be seen.
                  */
-                ease: 'power4.out',
-                stagger: 0.075,
+                ease: 'power3.out',
+                /* Just under a tenth of a second. At 0.075 a three-line heading
+                   resolved within 0.15 s of itself, which is not a stagger
+                   anybody perceives; at 0.09 the lines read as following one
+                   another. */
+                stagger: 0.09,
                 scrollTrigger: {
                   trigger: element,
                   /*

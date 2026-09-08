@@ -224,28 +224,17 @@
 .tool-feature-shell { grid-area: story; min-width: 0; min-height: 0; }
 
 /*
- * One glass, two panes — and no bezel.
+ * The glass this band is made of lives in `styles/glass.css`.
  *
- * The editor was mounted inside a separate glass frame (`.tool-frame`, a 6-12 px
- * rim around the card) while the narrative column beside it was its own pane, so
- * the row read as a framed device next to a card. The frame is gone: the editor
- * now carries the material directly, in the same declaration as the column, at the
- * same radius. Two panes, one set.
+ * It was defined here, and its own note argued that a material has to be defined
+ * once or the copies drift. Review then asked for the Library workspace to read
+ * as the same material — exactly the case that note was written against — so the
+ * declaration moved to a file that owns it, and both sections now add their panes
+ * to it. Nothing about this band's appearance changed: the four variables below
+ * are still what decide how the material reads here.
  *
- * Defining the material once and letting each surface set its own intensity is the
- * only way "the same" stays true — copy-pasted gradient stacks drift apart the
- * moment one of them is tuned.
- *
- *   --glass-radius  the pane's corner
- *   --glass-tint    alpha of the top stop — how much sheet there is to see
- *   --glass-blur    how hard the ground behind it bends
- *   --glass-lift    multiplier on the outer shadows; 0 keeps a pane flat on the
- *                   paper, 1 lifts it into the room
- *
- * The heading band is deliberately NOT one of them. It was tried and taken back
- * out: a pane behind 54 px display type greys out the gradient it exists to show,
- * and a rim there either pads the type off the shell edge that DESIGN.md holds
- * every band to, or has to bleed into the gutter to avoid doing so.
+ * `.studio::after` stayed, because it is not the material. It repaints the top
+ * edge highlight ABOVE every panel in the card, which only the editor needs.
  */
 .tool-stage {
   --glass-radius: clamp(14px, 1.15vw, 22px);
@@ -254,28 +243,6 @@
   --glass-lift: 1;
 }
 
-.studio,
-.studio-gate,
-.tool-story {
-  position: relative;
-  border-radius: var(--glass-radius);
-  background: linear-gradient(178deg,
-    rgba(255, 255, 255, var(--glass-tint)) 0%,
-    rgba(255, 255, 255, calc(var(--glass-tint) * 0.47)) 38%,
-    rgba(214, 236, 234, calc(var(--glass-tint) * 0.42)) 100%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, calc(0.85 * var(--glass-tint) / 0.72)),
-    inset 0 -1px 0 rgba(255, 255, 255, calc(0.4 * var(--glass-tint) / 0.72)),
-    inset 0 0 0 1px rgba(255, 255, 255, calc(0.4 * var(--glass-tint) / 0.72)),
-    0 0 0 1px rgba(23, 78, 79, calc(0.055 * var(--glass-lift))),
-    0 26px 60px -30px rgba(28, 62, 61, calc(0.16 * var(--glass-lift))),
-    0 60px 120px -76px rgba(16, 88, 90, calc(0.3 * var(--glass-lift)));
-  backdrop-filter: blur(var(--glass-blur)) saturate(150%);
-}
-
-/* The specular sweep. It sits over the tint and under the content, and is masked
-   to the top third so it reads as a highlight on a curved edge rather than as a
-   gradient poured over the whole pane. */
 /*
  * The editor's pane before the editor's code has arrived.
  *
@@ -307,28 +274,6 @@
   height: 15px;
   border-color: rgba(24, 62, 61, 0.18);
   border-top-color: var(--color-accent-strong, #00aaab);
-}
-
-.studio::before,
-.tool-story::before {
-  position: absolute;
-  z-index: 0;
-  inset: 0;
-  border-radius: inherit;
-  background: linear-gradient(102deg, rgba(255, 255, 255, 0.86) 0%, rgba(255, 255, 255, 0) 26%, rgba(255, 255, 255, 0) 74%, rgba(255, 255, 255, 0.6) 100%);
-  content: '';
-  mask-image: linear-gradient(180deg, #000 0%, transparent 34%);
-  opacity: calc(var(--glass-tint) / 0.72);
-  pointer-events: none;
-}
-
-.tool-story > * { position: relative; z-index: 1; }
-
-
-@supports not (backdrop-filter: blur(2px)) {
-  .studio,
-  .studio-gate,
-  .tool-story { background: linear-gradient(178deg, rgba(255, 255, 255, 0.9), rgba(226, 240, 238, 0.75)); }
 }
 
 /* ======================================================== the editor card === */

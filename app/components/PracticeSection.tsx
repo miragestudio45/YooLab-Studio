@@ -85,7 +85,7 @@ export function PracticeSection() {
   const experience = findExperience(active);
 
   return (
-    <section className="practice" id="thuc-hanh" data-snap aria-labelledby="practice-title">
+    <section className="practice" id="thuc-hanh" data-snap="assist" aria-labelledby="practice-title">
       <div className="shell">
         <div className="section-heading section-heading--split practice-head" data-reveal>
           <div>

@@ -541,7 +541,7 @@ export function EducationSection() {
   const active = ROLES.find((entry) => entry.id === role) ?? ROLES[0];
 
   return (
-    <section className="education" id="giao-duc" data-snap aria-labelledby="education-title">
+    <section className="education" id="giao-duc" data-snap="assist" aria-labelledby="education-title">
       {/*
         One screen-tall grid whose rows measure themselves.
         DESIGN.md: "Never estimate a head band. Make the layout subtract it."

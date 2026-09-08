@@ -213,11 +213,20 @@ report says `scrolls` rather than `CUT`:
 | Product bridge | 700 px | The two states stack; the arrow turns vertical |
 | YooStudio | 700 px | Editor keeps its height, the section scrolls |
 | Practice & STEM | 1180 px | Rail becomes a row of tabs above the stage; below 1000 the brief column moves under it |
-| Education | **1180 px** | Lesson player stacks under the brief card; the capability row goes to two columns |
+| Education | **1180 px** wide, any tested height | Lesson player stacks under the brief card; the capability row goes to two columns. On screens under 860 px tall the numbered list tightens rather than the panel overflowing — see DESIGN.md §12 |
 | Bảng giá | 900 px tall **and** 1181 px wide | Shorter: the four cards' CTA row falls under the fold — head, switch and 89% of a card stay above it. Narrower: the grid goes two-up and the row's height doubles |
 
 Library, the hero, the three creature chapters, the sample lessons and the CTA
 compose in one viewport at **every** tested size, 390 to 1920.
+
+> **The numbers in this table were re-measured after `measure.mjs` was fixed.**
+> Until this pass the probe read viewport-relative rects 260 ms after scrolling,
+> which is inside the page's own 300–620 ms settle, so it was reporting where
+> things happened to be mid-flight. It claimed the practice hub was 329 px past
+> the fold at 1366×768 (it has 28 px to spare) and flagged the YooStudio heading
+> as covered by the header at three viewports (it is not). Both readings are now
+> differences between two rects inside the same section and cannot be moved by a
+> scroll — DESIGN.md §9. Every row above is a post-fix number.
 
 **Sample lessons left this table.** It was a four-column grid that reflowed to
 two columns and then to one, so at 390 px it overran the fold by 926 px — the
@@ -244,6 +253,21 @@ two.
 
 ## Rendering that is right but not beautiful
 
+- **The near-white subjects still bake pale, and none of them is on the belt any
+  more.** The 18 covers under `public/asset/Library/cover/` are now lit as
+  product shots with a real contact shadow (DESIGN.md §11b), which fixed the
+  floating cut-out problem for every subject that has colour. It does not fix
+  colour: `gram-wall`, `toolkit`, the lungs, the brain, the eye, the pancreas and
+  the thymus are near-white meshes, and anatomy may not be repainted to look
+  better (THIRD_PARTY_ASSETS.md). `gram-positive-wall` survived one round on the
+  belt on the argument that a peptidoglycan lattice is structurally distinctive
+  in a way a pale organ is not; relighting withdrew the argument, because it was
+  also the only cover in the set with no visible shadow — it is flat on the
+  ground and hides its own. `organ-gallbladder` took the slot, being the one
+  genuinely green organ in the set. All of these covers are still used where the
+  Library shows them larger and live. Fixing them properly means authored
+  materials for subjects that currently have none, which is a change to those
+  entries rather than to the bake.
 - **The eight hand tools** (`KHCN & STEM → Bộ dụng cụ mô hình`) ship with no
   textures at all — every mesh carries the same flat 0.8 grey. They are rendered
   with authored materials (steel, matte plastic, rubber) so the silhouettes read,

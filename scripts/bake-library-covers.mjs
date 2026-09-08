@@ -72,16 +72,34 @@ const URL_BASE = process.argv.includes('--url')
  * tentacle and the T-rex mostly tail, and both need `targetY` to put the part
  * worth looking at in the middle of the frame.
  */
-const ORGAN = { preset: 'natural', yaw: 0.72, pitch: 0.2, zoom: 1.12 };
+/*
+ * `organ`, not `natural`, and a closer camera than the first pass used.
+ *
+ * Two faults produced the review note that the covers were not good enough, and
+ * both are here. `natural` renders these meshes under a standard material with
+ * no specular life, so the pale ones — lungs, brain, eye — came out as ghosts on
+ * the belt's blush plate; `organ` (added to `thumbnails.ts` for this) keeps the
+ * mesh's own anatomical colour and adds the clearcoat and sheen that make it
+ * read as living tissue. And `zoom` is a *distance* multiplier, so 1.12 was
+ * framing each organ with 12% of dead margin on top of the fit's own — at a
+ * 240 px card that is the difference between a specimen and a speck.
+ *
+ * 0.8 after a second look at the output: `createSubjectFit` frames the bounding
+ * *sphere*, which for anything that is not a ball reserves the radius of its
+ * longest axis in every direction, so even at 0.94 a heart sat in a third of the
+ * plate it could have filled. 0.8 crops nothing on a compact organ and fills the
+ * frame; the elongated subjects carry their own values.
+ */
+const ORGAN = { preset: 'organ', yaw: 0.72, pitch: 0.2, zoom: 0.8 };
 const ANATOMY = '/asset/Library/Biology/anatomy';
 
 const COVERS = [
   /* ---------------------------------------------------------- creatures --- */
-  { slug: 'bee', url: '/asset/bee/bee_fixed.glb', preset: 'ruby', yaw: 0.62, pitch: 0.16, zoom: 1.06, poseTime: 0.4 },
-  { slug: 'trex', url: '/asset/T-rex/T-rex.glb', preset: 'natural', yaw: 0.86, pitch: 0.18, zoom: 1.02, poseTime: 1.4, targetY: 0.62 },
-  { slug: 'clownfish', url: '/asset/fish/Fish.glb', preset: 'natural', yaw: 1.5, pitch: 0.12, zoom: 1.06, poseTime: 0.9 },
-  { slug: 'jellyfish', url: '/asset/fish/jellyfish.glb', preset: 'opal', yaw: 0.5, pitch: 0.1, zoom: 0.82, poseTime: 1.4, targetY: 0.58 },
-  { slug: 'gram-wall', url: '/asset/Library/Biology/gram-positive-wall.glb', preset: 'tissue', yaw: 0.66, pitch: 0.22, zoom: 1.08 },
+  { slug: 'bee', url: '/asset/bee/bee_fixed.glb', preset: 'ruby', yaw: 0.62, pitch: 0.16, zoom: 0.82, poseTime: 0.4 },
+  { slug: 'trex', url: '/asset/T-rex/T-rex.glb', preset: 'natural', yaw: 0.86, pitch: 0.18, zoom: 0.84, poseTime: 1.4, targetY: 0.58 },
+  { slug: 'clownfish', url: '/asset/fish/Fish.glb', preset: 'natural', yaw: 1.5, pitch: 0.12, zoom: 0.84, poseTime: 0.9 },
+  { slug: 'jellyfish', url: '/asset/fish/jellyfish.glb', preset: 'opal', yaw: 0.5, pitch: 0.1, zoom: 0.74, poseTime: 1.4, targetY: 0.6 },
+  { slug: 'gram-wall', url: '/asset/Library/Biology/gram-positive-wall.glb', preset: 'tissue', yaw: 0.66, pitch: 0.22, zoom: 0.8 },
 
   /* ------------------------------------------------------------- organs --- */
   { slug: 'organ-heart', url: `${ANATOMY}/heart.glb`, ...ORGAN },
@@ -103,13 +121,22 @@ const COVERS = [
      fit — which measures the bounding sphere — frames 200 mm of nothing and the
      tool arrives as a 3 px sliver. A cylinder reads at 240 px. Both are in the
      same eight-piece kit the entry is about. */
-  { slug: 'toolkit', url: '/asset/Library/Car/paintJar.glb', preset: 'plastic', yaw: 0.78, pitch: 0.24, zoom: 1.14 },
+  { slug: 'toolkit', url: '/asset/Library/Car/paintJar.glb', preset: 'plastic', yaw: 0.78, pitch: 0.24, zoom: 0.84 },
 ];
 
 /* Rendered larger than they ship, then downsampled: a 240 px card on a retina
    display asks for 480, and supersampling the render is cheaper than asking
    three.js for antialiasing it does not do well at small sizes. */
-const RENDER = { width: 900, height: 675 };
+/*
+ * `ground` is the contact-shadow opacity, and passing it also switches
+ * `thumbnails.ts` to its studio light rig — see `ThumbnailRequest.ground`.
+ *
+ * 0.34 rather than a heavier value because the shadow lands on a cream plate,
+ * not on white: at 0.5 the ellipse read as a grey stain around the subject, and
+ * below about 0.25 it stopped doing the one job it has, which is to say the
+ * object is resting on something.
+ */
+const RENDER = { width: 900, height: 675, ground: 0.34 };
 /* 4:3, matching the plate's own aspect, so `object-fit: cover` trims nothing. */
 const SHIP = { width: 480, height: 360 };
 

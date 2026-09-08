@@ -797,7 +797,24 @@
  */
 .proof-belt {
   position: relative;
-  margin-top: clamp(20px, 3vh, 40px);
+  margin-top: clamp(12px, 2.2vh, 32px);
+  /*
+   * Room for the hover, which this did not have.
+   *
+   * `overflow: hidden` clips to the padding box, and with no padding the cards
+   * sat flush to it: measured, the belt was 234 px tall and a card was 234 px
+   * tall at the same top. So `:hover` — which lifts a card 3 px and gives it a
+   * `0 26px 66px` shadow — had its lift sliced off the top edge and its shadow
+   * clipped away entirely. Hovering a card visibly cut its rounded top corner
+   * off, which is the hover bug review reported.
+   *
+   * The clipping itself has to stay: it is what keeps the moving track from
+   * spilling into the section. Only the vertical room was missing. 34 px at the
+   * bottom is the shadow's offset plus half its blur, which is where it has
+   * faded to nothing; the `margin-top` above gives back what the 8 px costs so
+   * the section's rhythm does not change.
+   */
+  padding: 8px 0 34px;
   overflow: hidden;
   /* Cards enter and leave through a fade rather than a cut. Without it the strip
      has two hard vertical edges at the viewport bounds, which is what makes a
@@ -892,23 +909,100 @@
  * colour-codes the belt by subject as it moves — the same job the marks' wash
  * does, at the strength a photographic subject needs rather than a line drawing.
  */
+/*
+ * A backdrop, not a tinted plate — which is what review asked for in as many
+ * words: *"cho nó tý nền sau các model đc k"*.
+ *
+ * The plate was a single dome from `--color-surface-raised` to `--color-bg`.
+ * Read as a picture that is an even light field, and an object photographed
+ * against an even field has nowhere to be: the renders came back looking like
+ * cut-outs laid on cream however well they were lit, which is why "hình ảnh
+ * chưa đẹp" survived two rounds of fixing the renders themselves. The renders
+ * were not the whole problem. They had no set.
+ *
+ * So this is a small studio, in four layers, and each one does a job a
+ * photographer would recognise:
+ *
+ *   1. **the pool** — a soft key spilling onto the backdrop behind the subject,
+ *      brightest just above where it stands, so the silhouette has light behind
+ *      it to separate from.
+ *   2. **the floor** — a warm band across the bottom third. This is the layer
+ *      that matters most: it is what turns the bake's contact shadow from a grey
+ *      ellipse floating in a field into a shadow *on* something. A subject with
+ *      a shadow and no floor still reads as a cut-out.
+ *   3. **the cove** — the vignette where the backdrop curves away at the edges.
+ *      It closes the frame and stops the plate reading as a crop of a larger
+ *      white space.
+ *   4. **the paper** — the warm base, a touch deeper than the card around it so
+ *      the picture is a window rather than a hole.
+ *
+ * The subject's own tint still arrives on `::before`, so the belt keeps
+ * colour-coding itself by subject as it moves.
+ */
 .proof-belt-plate--cover {
-  background: radial-gradient(118% 118% at 34% 20%, var(--color-surface-raised) 0%, var(--color-surface-2) 100%);
+  background:
+    radial-gradient(56% 42% at 50% 44%, rgba(255, 253, 249, 0.97) 0%, rgba(255, 253, 249, 0) 74%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0) 50%, rgba(122, 94, 66, 0.08) 74%, rgba(122, 94, 66, 0.2) 100%),
+    radial-gradient(124% 94% at 50% 42%, rgba(255, 255, 255, 0) 40%, rgba(98, 74, 54, 0.16) 100%),
+    linear-gradient(168deg, #fbf4ec 0%, #f2e6da 100%);
 }
+/*
+ * 0.11 — down from 0.17, which was compensating for two things that are fixed.
+ *
+ * 17% of a subject tint was the answer to a belt half full of near-white meshes:
+ * anatomy may not be repainted to look better (THIRD_PARTY_ASSETS.md), so the
+ * contrast had to come from the surface behind them and the plate had to carry
+ * it alone. Two changes since removed that burden. The pale meshes are off the
+ * belt — the lungs, brain, eye and bacterial wall are in the Library, where they
+ * are rendered live at full size — and every remaining cover is lit as a product
+ * shot with its own contact shadow, so definition now comes from the render.
+ *
+ * At 17% the tint was fighting that: it greyed the baked shadow, which is a warm
+ * neutral, and pulled the gallbladder's green toward the plate's own hue. 11% is
+ * enough to keep colour-coding the belt by subject as it moves — the job the
+ * marks' wash does at 6% — without tinting the photograph on top of it.
+ */
 .proof-belt-plate--cover::before {
   content: '';
   position: absolute;
   inset: 0;
   background: var(--proof-tint, var(--color-accent-strong));
+  /* 0.09 now the backdrop below carries the depth. The tint's only remaining
+     job is to say which subject the card belongs to as it slides past, and a
+     flat wash over a lit set is the one thing that can undo the set — at 0.11 it
+     was greying the floor it sits on. */
   opacity: 0.09;
 }
-/* `contain`, not `cover`: the render already has its own margin and the plate
-   is the same 4:3 the bake ships, so filling would crop a wingtip to hide a
-   background that is not there. Inset so nothing touches the plate's edge. */
+/*
+ * `contain`, not `cover`: the render is a subject on transparency and the plate
+ * is the same 4:3 the bake ships, so filling would crop a wingtip to hide a
+ * background that is not there.
+ *
+ * The inset went from 88% to 96%. Review's note that the pictures were not good
+ * enough was two problems stacked: the bake framed each subject 12% too far away
+ * *and* the plate then inset it another 12%, so a lungs render arrived at about
+ * three quarters of the size it should be, on a card 240 px wide. The bake is
+ * closer now (see `scripts/bake-library-covers.mjs`) and this gives back most of
+ * the rest — 4% is enough that nothing touches the plate's rounded corner.
+ *
+ * No `drop-shadow` here any more, and that is the point rather than a cleanup.
+ *
+ * This carried `drop-shadow(0 10px 12px …)` on the argument that the renders had
+ * no ground plane, so a heart was a cut-out pasted on a gradient. True at the
+ * time; the renders have a real one now — a shadow-catching plane under a
+ * dedicated overhead caster, see `ThumbnailRequest.ground` — so the same
+ * declaration became a *second* shadow, offset from the first and traced around
+ * the whole PNG rather than sitting under the subject. Two shadows from two
+ * directions is worse than none.
+ *
+ * The baked one is also the better shadow for a reason CSS cannot reach: it is
+ * cast *by the geometry*, so the trex's shadow has legs in it and the jellyfish's
+ * is a small pool far below a floating bell.
+ */
 .proof-belt-plate--cover img {
   position: relative;
-  width: 88%;
-  height: 88%;
+  width: 96%;
+  height: 96%;
   object-fit: contain;
 }
 
@@ -918,8 +1012,21 @@
  * is what stops a line drawing from reading as a missing image beside a
  * photograph, and it is what colour-codes the belt by subject as it moves.
  */
+/*
+ * The same set, at a fraction of the contrast.
+ *
+ * A line diagram is not a photographed object: it has no silhouette to separate
+ * and no shadow to land, so it needs no floor and would look wrong standing on
+ * one. What it does need is to belong to the same belt as the eight cards that
+ * do — a flat plate beside a lit one reads as the missing image, which is the
+ * failure this whole variant exists to avoid. So it keeps the pool and the cove
+ * and drops the floor, at about half the strength.
+ */
 .proof-belt-plate--mark {
-  background: radial-gradient(120% 120% at 32% 22%, var(--color-surface-raised) 0%, var(--color-surface-2) 100%);
+  background:
+    radial-gradient(62% 50% at 50% 42%, rgba(255, 253, 249, 0.9) 0%, rgba(255, 253, 249, 0) 76%),
+    radial-gradient(126% 96% at 50% 44%, rgba(255, 255, 255, 0) 46%, rgba(98, 74, 54, 0.07) 100%),
+    linear-gradient(168deg, #fbf5ee 0%, #f5ece3 100%);
 }
 .proof-belt-plate--mark::before {
   content: '';
@@ -997,6 +1104,42 @@
  * Same four widths as the page chrome — 1180 / 1000 / 860 / 700 — so the whole
  * page changes shape at the same places rather than at seven.
  */
+/*
+ * Short screens, for the one column that could not answer them on its own.
+ *
+ * Everything in the education aside is already height-aware — the display
+ * heading is min(4.1vw, 5.7vh) and comes down to 44 px here on its own, the
+ * gaps are vh clamps — and the column was still 42 px too tall at 1366x768.
+ * The reason is that the five numbered steps are the one part of it made of
+ * fixed sizes: 12.5 px labels over 11.5 px descriptions that wrap to two lines
+ * in this column's measure, so each step is a ~50 px block that no viewport
+ * term touches, times five.
+ *
+ * What was falling off the bottom was not decoration. Both columns of
+ * .education-panel share a bottom edge, and the aside's bottom edge is the
+ * section's call to action, so the last thing off the screen was the button.
+ * Losing the capability row below the panel is the documented trade (see the
+ * header of this section); losing the button is not.
+ *
+ * So this block buys the 42 px back from the rhythm of the list rather than
+ * from its content: tighter row padding, tighter margins around the list, and a
+ * tighter stack between the heading, the tabs and the card. No row is dropped
+ * and no type gets smaller — five steps still read as five even beats, just
+ * closer together, which is the correct response to a short screen.
+ *
+ * 860px, not 900: the panel measures 708 px of content against 666 px of room
+ * at 768, and passes on its own from about 870 up. Sharing pricing's 900 would
+ * compress a composition that already fits.
+ */
+@media (max-height: 860px) and (min-width: 1001px) {
+  .education-aside { gap: clamp(10px, 1.1vh, 24px); }
+  /* The card's own vertical padding, which at 768 was 18 px of the 42. */
+  .education-brief { padding: clamp(13px, 1.8vh, 28px) clamp(16px, 1.5vw, 26px); }
+  .education-points { margin: clamp(8px, 1.1vh, 20px) 0 clamp(10px, 1.4vh, 26px); }
+  .education-points li { padding: clamp(4px, 0.62vh, 10px) 0; }
+}
+
+
 @media (max-width: 1180px) {
   /*
    * The player stacks under the brief. This is the number KNOWN_LIMITATIONS has

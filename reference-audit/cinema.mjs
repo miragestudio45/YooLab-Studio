@@ -38,6 +38,7 @@ import net from 'node:net';
 import http from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { devUrl } from './dev-url.mjs';
 
 const CHROME_CANDIDATES = [
   'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
@@ -504,7 +505,7 @@ const readFlag = (flag, fallback) => {
   return value;
 };
 
-const url = readFlag('--url', 'http://localhost:3000');
+const url = await devUrl(readFlag('--url', null));
 const outDir = readFlag('--out', 'reference-audit/cinema');
 /* `--only hero,fish` captures those states and skips the sweeps and the snap
    cases, which is the difference between a four-minute run and a twenty-second

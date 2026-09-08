@@ -446,6 +446,87 @@ while it moves the browser composites it under the fixed blurred header — the 
 per-frame CSS cost on this page, the same one `data-gpu="lean"` exists to remove.
 Halving the time in that state halves how often it is paid.
 
+### A legibility wash that covers nothing is a rectangle waiting to appear
+
+The hero copy carried a cream radial wash on the argument that it sits over a
+meadow whose colour moves. It does not: the flower field keeps a corridor under
+that column on purpose — the exclusion zone in `flowerValley/composition.ts` is
+centred at `v: 0.46` — so at every width where the copy is *beside* the specimen
+the text was already on clean cream and the wash was covering nothing.
+
+What it did instead was draw a box. Its extent was `-170px` on the left and
+`-46%` on the right, so the ellipse — 62% of a 1385 px box, centred at 27% of it
+— reached its zero stop 484 px *past* its own left edge and got clipped there at
+alpha 0.68: a straight vertical line with a near-white fill, which is exactly the
+"translucent panel" its own comment said it must never become. It stayed
+invisible up to about 1920 only because the backdrop behind it is near-white
+there; on a taller frame the hero ground is a warmer beige at that height and the
+box appeared.
+
+Deleted rather than re-tuned, and that is the general rule worth keeping: **a
+protective layer that protects nothing is not neutral, it is a liability with a
+resolution-dependent trigger.** Every knob that would have kept it — a bigger
+inset, a smaller radius, a moved centre — leaves the same construction one
+viewport away from showing an edge again. The one-column regime below 1001px is
+a different composition, with the creature *behind* the words, and it keeps its
+own plate because there the wash does real work.
+
+### Kinetic type: the mask has to be taller than the line box
+
+`app/components/KineticType.tsx` splits eight display headings into lines and
+wipes each one up out of its own `overflow: clip` mask. The version that shipped
+first cut the glyphs, and review reported it as "rất nhiều lỗi chữ bị cắt" across
+three sections at once — the whole effect read as a rendering bug rather than as
+motion.
+
+The cause is arithmetic, not GSAP. `SplitText`'s mask is exactly the line box:
+at `font-size: 49.14px` with `line-height: 1.08` that is 53 px, and Vietnamese
+display type does not fit in its line box — a tone mark over a circumflex sits
+above the ascender and `ạ ụ ộ` sit below the baseline, together 6–13 px outside
+it. `reduceWhiteSpace: false` does **not** buy that room; it only stops
+whitespace collapsing.
+
+The fix is in the stylesheet, because `overflow: clip` clips at the **padding
+box**:
+
+```css
+.kinetic-line-mask { padding: 0.14em 0.06em 0.26em; margin: -0.14em -0.06em -0.26em; }
+```
+
+Padding enlarges the visible region; an equal negative margin gives the layout
+back, so the heading occupies the same space to the pixel and nothing below it
+moves. In `em`, so it holds at every step of the type scale. With the mask a
+quarter of an em taller than the line, the tween's start also came down from
+`yPercent: 118` to `104`: just past 100 is the whole wipe, and 118 was
+overshooting into room the mask no longer hides.
+
+The second half of "chưa đẹp" was the motion itself: `power4.out` puts almost the
+whole travel in the first sixth of a short distance, so the line is already there
+before the eye registers it moving — it reads as a pop, not a slide. `power3.out`
+over 0.8 s with a 0.09 s stagger, and blur down from 9 px to 5 px, which on a
+49 px face is a focus pull rather than a smear.
+
+### A visual effect that quietly took eight accessible names
+
+Worth recording because it is invisible in a screenshot and cost three wrong
+diagnoses. `SplitText` runs its own `aria: 'auto'` pass: it hides every line it
+creates from assistive technology — correct, a heading must not be read one
+clipped fragment at a time — and writes an `aria-label` on the heading to
+compensate. It builds that label from `textContent`, which concatenates straight
+across a line break, so the page's own headings became "Những bài họcbạn có thể
+mở ngay" and "Một nền tảng,ba vai trò". Five of the eight are `aria-labelledby`
+targets for their `<section>`, so those were the landmark names too.
+
+Three things had to be true to fix it. The name is computed from a **clone** with
+its `<br>`s replaced by spaces and its top-level children joined by one — two
+kinds of break, since the bridge heading breaks with a `<span>` and an `<em>`
+that the stylesheet makes blocks. It is **not** `innerText`, which would give the
+same answer through layout but falls back to `textContent` whenever the element
+is not being rendered, and these headings are mostly off screen when the effect
+runs. And it is re-applied **from inside `onSplit`**, because setting it before
+`new SplitText()` looks like it works and is then overwritten — and `autoSplit`
+redoes GSAP's aria pass on every re-split.
+
 ### The settle is an ease-out, not an ease-in-out
 
 `snap.ts` eased cubic in-out over 420–800 ms. Wrong curve for the job: the
@@ -463,6 +544,29 @@ reverses direction by accident. And the 100 ms liveness interval — which exist
 because rAF ticks about once a second under a software rasteriser — now defers
 whenever rAF has run in the last 70 ms, instead of stepping the scroll a second
 time between frames.
+
+### Not every section deserves to catch the page
+
+The ease-out fixed the *curve* and review still reported the scroll as "chưa
+mượt". The cause was a count, not a feel: making the practice, education and
+pricing sections height-responsive earned them snap anchors, and the page went
+from a few chapter stops to **eleven contiguous ones**. Every anchor that catches
+the page is a decision taken away from the visitor, and eleven in a row turns a
+document into a forced filmstrip — each flick lands in a slot, so the page fights
+a visitor who only wanted to move a little.
+
+Anchors are now two kinds. A cinematic chapter is a hard anchor and catches the
+page from anywhere. A `data-snap="assist"` section only tidies up an arrival that
+is already close — within `CAPTURE = 0.2` of a viewport — and beyond that returns
+`null` and lets the scroll run:
+
+```ts
+if (chosen.assist && Math.abs(chosen.y - y) > window.innerHeight * CAPTURE) return null;
+```
+
+So the editorial half still aligns when the visitor stops near a section edge,
+and never grabs a scroll that was heading somewhere else. Four of the eleven are
+assists; `window.__snap.assists()` reports the count in dev.
 
 ## 9. Verification
 
@@ -486,6 +590,45 @@ kinetic layer appeared to leave a heading hidden on screen; it had not — the
 chapter snap had settled to the previous anchor and the heading was 122% down
 the viewport, where hidden is correct. Any probe of a scroll effect has to record
 `getBoundingClientRect` in the same breath as the property it is checking.
+
+**Above 1920 is a regime, not an edge case.** The viewport tables in `shots.mjs`,
+`measure.mjs` and `probe.mjs` stopped at 1920, so the two most common desktop
+panels above it were never rendered once. A real defect shipped through that gap:
+the hero's legibility wash drew a white rectangle on a 2560×1440 display. Both
+`w2560` (the 27" panel) and `w3440` (21:9 ultrawide, the widest aspect a capped
+12-column shell has to survive) are in all three tables now.
+
+**`node reference-audit/wash-clip.mjs`** is the durable answer to that class of
+bug, because the client's reaction to it was the right question: *how am I
+supposed to check every ratio myself?* A soft wash clipped by its own box is
+decidable without pixels — the gradient's radii, centre and stops are all in the
+computed style and the box is measurable, so the alpha where the box cuts the
+ellipse is arithmetic. The harness runs that per element across all eleven
+viewports and exits non-zero on a finding.
+
+It only flags **washes, never plates**: a card surface is supposed to be filled
+to its own edge, and the signal that separates them is the author's own final
+stop. A gradient ending at alpha 0 was meant to vanish before the box did.
+Elements that end their wash with a `mask-image` instead — `.pricing-aura` fades
+its top and bottom that way — are reported as `masked` rather than as findings,
+so nothing is silently dropped and a clean report means something.
+
+**Measure a section against itself, not against the viewport.** The third lesson
+of the same kind, and the most expensive: `measure.mjs` scrolled each section to
+the top of the screen, waited 260 ms and read viewport-relative rects. The page's
+own settle needs 120 ms of quiet plus 300–620 ms of travel, so every reading was
+taken mid-flight — and a section too tall to hold an anchor is pulled to a
+*neighbour's* anchor, so the error is not even bounded by the section. It
+reported the practice hub 329 px past the fold at 1366×768 (real overflow: none,
+28 px to spare), the education panel 43 px past it (real: 42 px, which happened
+to be close by luck), and three phantom `HEADING UNDER HEADER` flags on the
+YooStudio section. Seven "problems", of which one was real.
+
+Both numbers are now differences between two rects inside the same section, which
+no scroll position can move: `slack = innerHeight - (block.bottom - section.top)`
+and `underHeader = (heading.top - section.top) < header-h`. That is also the
+correct statement of the promise — "composes in one viewport" is a property of
+the layout, and where the visitor happens to be is a different question.
 
 `measure.mjs` is the regression guard for this document's first two sections: it
 reports the shell alignment as one spread across seven bands, and it must read
@@ -578,15 +721,84 @@ drawn at 24 px is soft, and the same stroke at 15 px falls under one device pixe
 and snaps to a hard line, so it is scaled to hold the frame's optical weight
 rather than its literal number.
 
-### The workspace glass
+### The workspace glass — one material, two sections
 
-`.tool-frame` is a 6–12 px bezel around the editor card: a vertical tint, a 1 px
-specular top edge, an inner shade at the bottom and a wide ambient below. The
-blur lives **only in the rim** — the pool of light behind the section bends
-through a band of cover glass at the card's edge while the editor's own surface
-stays crisp. That is what keeps it a material rather than the decorative wash the
-craft floor rejects. Its outer radius is the card's radius plus the bezel, and
-`.tool-story` uses the same sum so the two surfaces on that row share a corner.
+`app/styles/glass.css` owns it, and both product workspaces are made of it: the
+YooStudio editor with its narrative column, and the Library's rail, viewer and
+knowledge panel. A pane is a vertical tint, a 1 px specular top edge, an inner
+shade at the bottom, a hairline, and two wide ambients below; a masked diagonal
+sweep over the tint and under the content gives the top edge its highlight.
+
+The blur lives **only in the rim** — the pool of light behind the section bends
+through a band of cover glass at the pane's edge while the surface inside stays
+crisp, because the content on it is opaque. That is what keeps it a material
+rather than the decorative wash the craft floor rejects, and it is why a section
+using it must put a *ground* behind the pane first (`.tool-section::before`,
+`.library::before`). Glass over an even fill has nothing to refract and is just a
+tinted box.
+
+Four variables, set by the section and never by the material:
+
+| | `--glass-radius` | `--glass-tint` | `--glass-blur` | `--glass-lift` | `--glass-sheen` |
+|---|---|---|---|---|---|
+| `.tool-stage` | `clamp(14px, 1.15vw, 22px)` | 0.72 | 22px | 1 | 1 |
+| `.library-stage` | `--radius-lg` | 0.72 | 18px | 0.66 | 0.5 |
+
+The tint is deliberately identical. It was set higher for the Library first, on
+the theory that text sitting directly on a pane needs more sheet under it than
+YooStudio's opaque editor does — but `.tool-story` also has its text directly on
+the glass at 0.72, the ground behind both is the same near-white pool, and the
+measured surface came out at rgb(253, 249, 244) either way. **A difference has to
+earn itself**; that one bought no contrast and cost the only thing the request
+was about, which was being the same material. The other two are real: three
+narrow panes need a smaller blur, because the same 22 px across a 250 px rail
+reads as a frosted strip rather than a bent edge, and they need two thirds of the
+lift, because three full ambients pool their darkness in the 12 px gaps between
+them and draw exactly the seams the material exists to dissolve.
+
+`--glass-sheen` scales the specular sweep, and it exists because **what sits in
+a pane's top corners decides whether the sweep reads as a lit edge or as a white
+band.** YooStudio puts a dark canvas there. The Library puts its viewer's title
+row and its rail header — thin bands of small type — and with the pane gradient
+at its whitest in the same 40 px, review read the result as *"nó cứ trắng hẳn
+lên"*: brighter than the section containing it. Half the sheen, plus a
+barely-there warm floor on the title row itself, is the fix.
+
+### Chrome too small to be a pane still belongs to the material
+
+The chip and the search field above the Library workspace were
+`--color-surface-raised` behind a `--color-border` hairline: correct on a flat
+page, and once the workspace became glass, the only fully white things in the
+section. Review circled both.
+
+An earlier note here said that chrome was "deliberately excluded" from the
+material because glass on a 34 px pill is a highlight with no room to read. That
+was half right and wrongly concluded — excluding it from the **pane** rule is
+correct, because a 60 px ambient under a 34 px chip is a smudge and an 18 px blur
+across 11 px of type is a frosted strip. Leaving it opaque white was not. Small
+chrome takes the material's *reading* at chip scale instead: a half-transparent
+sheet, a 1 px white top edge, a hairline ring in the page's warm ink rather than
+a grey border, one short shadow, and a 9 px blur — which is real refraction there,
+because these sit directly on the section ground rather than on another pane.
+
+The same logic applies to any band that covers a pane: the rail's footer was an
+opaque `--color-surface-2` strip painting over the one part of the glass gradient
+that carries the cool green — the part that looks like glass where it is
+thickest. It is a 0.34 wash now.
+
+Two things every pane on the list must do. Its children need `position: relative;
+z-index: 1`, or they paint *under* the sweep and come back washed — the first
+pass left `.library-viewer` off that list and its title and tags lost most of
+their contrast. And it must join the `data-gpu="lean"` backdrop-filter list in
+`globals.css`, because a blurred backdrop is the only CSS on this page whose cost
+is per frame.
+
+Neither section's heading band is on the list. Tried in YooStudio and taken back
+out: a pane behind 54 px display type greys out the gradient it exists to show,
+and a rim there either pads the type off the shell edge or bleeds into the
+gutter. The Library's subject tabs and search field are out for a related reason
+— they are chrome above the workspace, and glass on a 28 px pill is a highlight
+with no room to read.
 
 ---
 
@@ -594,6 +806,15 @@ craft floor rejects. Its outer radius is the card's radius plus the bezel, and
 
 The Library is judged as an application, and two shared contracts are what stop it
 reading as twelve loosely related panels.
+
+Its three panes are no longer flat cards. They were a 1 px border, `--color-surface`
+and `--shadow-card`, which read as an app in a box beside the YooStudio band four
+screens earlier; review asked for the same material, so the rail, the viewer and
+the knowledge panel are now made of the workspace glass documented in §10, and
+this section grew the light pool a glass pane needs behind it. The flat chrome was
+**deleted** rather than overridden — `styles/glass.css` is imported before
+`styles/library.css`, so a section can still override a detail and win, and
+nothing here is a reset that has to be fought.
 
 ### Every mark is drawn, on one grid
 
@@ -681,6 +902,22 @@ label on the animal's flank claims the joint is where it is not. Appearance live
 in `library.css` and only `--on` / `--hit` are forwarded inline, which is what lets
 a pin the visitor deliberately opened override the dimming.
 
+### The hero bee's callouts are a drawing, not a UI
+
+The three pins over the bee chapter answer a specific reference the client
+supplied — `lab.patrickheintzmann.com/demo/demoBee`, the same demo
+`lib/three/beeOptics.ts` is rebuilt against — and the first pass missed it by
+being *designed*: rounded chips, a soft leader, a tinted dot. The reference has
+no chips. It is a **1.5 px hairline** from a 7 px filled dot to a 14 px hollow
+ring, with 9.5 px letter-spaced uppercase set beside the ring, all in one ink at
+0.82–0.92 alpha over a cream halo — a technical annotation drawn on a plate, not
+a tooltip floating over a canvas. Three angles only (up at −38°, level, down at
+26°), because a set of leaders that each find their own angle reads as scatter.
+
+Everything is monochrome on purpose: the subject is optical glass throwing a
+dispersion rainbow, and any tint in the annotation competes with the one thing
+the chapter is about.
+
 ### The knowledge panel's content model
 
 Small type throughout — nothing above 12.5 px except the specimen's name — and six
@@ -754,6 +991,131 @@ the main thread nothing.
 It is also the section that stopped overrunning the fold on a phone — see
 KNOWN_LIMITATIONS.md, which it left rather than joined.
 
+### A mesh existing is not a reason to put it on the belt
+
+The belt shipped as sixteen drawn line diagrams of objects this repository owns
+the actual meshes for, which review called ugly, and it was. It is now eight
+pre-baked renders (`scripts/bake-library-covers.mjs` → `public/asset/Library/
+cover/`), one photograph, and seven drawn marks kept because those entries have
+**nothing to render** — the periodic table is a DOM grid, the physics labs are
+simulations, the molecules are generated from bond tables.
+
+Baking every available mesh was the wrong next step and the second review said
+so. Three things had to change together:
+
+- **Frame the subject, not its bounding sphere.** `createSubjectFit` reserves the
+  radius of the longest axis in every direction, so a heart at the Library's own
+  zoom sat in a third of the plate it could have filled. The bake overrides it
+  per subject (organs at 0.8, creatures 0.82–0.84, the jellyfish at 0.62).
+- **Give the contrast to the surface behind them.** Anatomy is the one thing on
+  this page that may not be repainted to look better — the HuBMAP meshes are
+  CC BY 4.0 and their colour is the specimen (THIRD_PARTY_ASSETS.md) — so the
+  plate darkened instead: a three-stop dome with the subject tint at 0.17
+  instead of 0.09, and the image at 96% with a drop shadow.
+- **Then drop what still does not read.** The lungs, the brain and the eye are
+  near-white meshes; at 240 px they are pale smudges next to a bee, and no
+  framing or plate fixes that. They stay in the Library, where they are rendered
+  live at full size and their pallor is the specimen rather than the picture.
+  The belt takes the covers that carry and leaves the rest to the section that
+  can show them properly.
+
+### The covers are lit as product shots, and the shadow is the whole difference
+
+Review's answer to the re-baked covers was that if the page will not use external
+pictures then the renders themselves have to be *wow*. What was missing was not
+resolution or framing — it was that every subject floated. A render on
+transparency composited onto a plate is a cut-out pasted on cream, and no amount
+of tint behind it changes that.
+
+Three things fixed it, and they are all in `thumbnails.ts` behind
+`ThumbnailRequest.ground`, so the Library's 56 px rail chips — where a contact
+shadow is three grey pixels — are untouched:
+
+- **A real ground.** A plane with `ShadowMaterial` paints black at the shadow's
+  own alpha and nothing elsewhere, so on a transparent canvas it contributes
+  exactly one thing to the PNG: a soft pool under the subject. That pool is what
+  tells the eye the object is resting *in* the frame. It is also better than the
+  CSS `drop-shadow` it replaced, for a reason CSS cannot reach — it is cast by
+  the geometry, so the T-rex's shadow has legs in it.
+- **A rig measured in bounding radii.** The old one used fixed coordinates like
+  `(-3, 4.5, 5)` and a point light with a 14-unit falloff, while the models
+  arrive in their own units — the jellyfish's radius is about 32 against the
+  heart's fraction of one. Directional lights only carry a direction so those
+  survived; the point light did not, sitting a few radii away from one subject
+  and buried inside another. A cover set cannot look like one set of photographs
+  while the lights are somewhere different for each subject.
+- **A separate, nearly overhead caster.** Hanging the shadow on the key light
+  displaced it by `sqrt(1.5² + 1.9²) / 2.2 ≈ 1.1` radii, so each animal stood
+  *beside* its own shadow. Steepening the key would have fixed the shadow and
+  flattened the modelling, so the jobs are split: the key keeps its
+  three-quarter position and casts nothing, and a dim second light (0.08) casts
+  at 0.26 radii of displacement. `ShadowMaterial` reads the shadow mask rather
+  than any light's intensity, so a caster too dim to see still lays down a
+  full-strength shadow.
+
+Two rejections worth keeping. **VSM** gives a penumbra that widens with distance,
+which is what a soft light really does — and it also returns small non-zero
+occlusion outside the shadow camera's frustum, which turned the whole ground
+plane faintly visible and put a straight-edged band across the cover. Same defect
+as the hero's clipped wash, reached from the opposite direction, rejected for the
+same reason. PCF returns exactly zero outside the penumbra, and the way to soften
+it is to make each texel bigger: 512 at radius 9 is a pool where 1024 at radius 5
+was an outline. And the organs' **clearcoat** came down from 0.55 to 0.24 with
+roughness up, because a broad highlight over a smooth surface is precisely how
+latex reads — the studio key turned the heart and kidney into party balloons.
+Base colours are still untouched; only the specular is authored.
+
+### The renders needed a set, not better renders
+
+"Hình ảnh chưa đẹp" survived two rounds of fixing the pictures — tighter framing,
+a studio light rig, a real contact shadow — and the third round of it came with
+the answer attached: *"cho nó tý nền sau các model đc k"*. Give the models a bit
+of background.
+
+That was right, and it identifies what the previous two rounds had missed. The
+plate was a single even dome, and **an object photographed against an even field
+has nowhere to be.** A subject can be perfectly lit and still read as a cut-out
+laid on cream, because the thing that says "this is a photograph of an object" is
+not the object's own shading — it is the set behind it. Most of all the floor: a
+contact shadow with no floor to fall on is a grey ellipse in a void, so the whole
+point of baking the shadow was being thrown away by the surface it landed on.
+
+`.proof-belt-plate--cover` is now four layers a photographer would name — the
+pool of key light spilling on the backdrop behind the subject, a warm floor band
+across the bottom third, the cove where the backdrop curves away at the edges,
+and the paper — with the subject's tint dropped from 0.11 to 0.09 on top, because
+a flat wash over a lit set is the one thing that can undo it. The drawn marks
+take the pool and the cove at half strength and **no floor**: a line diagram has
+no silhouette to separate and no shadow to land, and would look wrong standing on
+something, but a flat plate beside a lit one reads as a missing image.
+
+### The hover was clipping itself
+
+Reported in the same round and unrelated to the pictures. `.proof-belt` is
+`overflow: hidden` — which it must be, or the moving track spills into the
+section — and it had no padding, so the cards sat flush to its box: measured, a
+234 px belt holding a 234 px card at the same top. `:hover` lifts a card 3 px and
+gives it a `0 26px 66px` shadow, so the lift was sliced off the top edge and the
+shadow clipped away entirely. Hovering visibly cut the card's rounded corner off.
+`padding: 8px 0 34px` is the whole fix: 34 px is the shadow's offset plus half its
+blur, where it has faded to nothing.
+
+**Why it went unseen.** Every check on this page reads a static frame —
+screenshots, `measure.mjs`, the wash scan. A defect that only exists while a
+pointer is inside an element is invisible to all of them, and the belt is the
+page's most-hovered surface. Worth remembering as a class: `overflow: hidden` on
+a container sized to its content will clip any hover that grows a child.
+
+**Why not external images.** The client asked whether stock or AI-generated
+pictures could be used here instead. They cannot, and the reason is the
+section's own claim: every card says "bấm một thẻ để mở" and opens the thing in
+the picture. A stock photograph of a heart on a card that opens *this* heart mesh
+is the one kind of dishonesty this section exists to avoid — it carries no
+logos, no testimonials and no user counts for the same reason. Renders of the
+real meshes are the only pictures that stay true when the card is clicked, which
+is also why the belt is restricted to entries whose visual costs the page
+nothing new.
+
 ## 12. Education — one player, three lessons
 
 The section's product is the **lesson player**, and the role tabs change its
@@ -823,6 +1185,23 @@ needs 64% of the shell before its own panels stop being narrower than the produc
 they are a picture of. That leaves the brief a 340 px column at 1024, where five
 rows whose bodies each wrap twice are 420 px of content in a 283 px budget. The
 number is recorded in KNOWN_LIMITATIONS.md and asserted by `measure.mjs`.
+
+There is a **height** floor too, and it needed its own answer. Everything in the
+aside is already viewport-aware — the display heading is `min(4.1vw, 5.7vh)` and
+comes down to 44 px on a 768 px screen without being asked — and the column was
+still 42 px too tall at 1366×768. The five numbered steps are the one part of it
+made of fixed sizes: a 12.5 px label over an 11.5 px body that wraps to two lines
+in this measure, so each step is a ~50 px block no viewport term touches, times
+five.
+
+What fell off the bottom was not decoration. Both columns of `.education-panel`
+share a bottom edge and the aside's is the section's call to action, so the
+button was the first thing gone. Losing the capability row *below* the panel is
+the documented trade; losing the button is not. `@media (max-height: 860px)`
+buys the pixels back from the rhythm of the list — tighter row padding, tighter
+margins, tighter card padding — and drops no row and no type size. Slack at
+1366×768 went from −42 px to +13 px, and 860 rather than pricing's 900 because
+the panel passes on its own from about 870 up.
 
 ---
 
