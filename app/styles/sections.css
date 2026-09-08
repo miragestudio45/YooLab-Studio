@@ -77,6 +77,25 @@
 
 .education-head { min-width: 0; }
 .education-head h2 { margin: clamp(8px, 1.2vh, 14px) 0 0; }
+/*
+ * The lede that lets the heading be tight.
+ *
+ * "Một nền tảng, ba vai trò." is a count, and a count on its own reads curt —
+ * which is exactly what review said about the heading it replaced. The warmth
+ * moves here instead: one sentence naming the three verbs the three tabs are
+ * about to demonstrate, on the narrow measure the rest of this column uses so
+ * it reads as part of the heading block rather than as body copy that wandered
+ * up. Capped in `ch` because the column's width is a viewport fraction and a
+ * three-line lede here pushes the tab strip into the brief card.
+ */
+.education-head-lede {
+  max-width: 34ch;
+  margin: clamp(10px, 1.5vh, 16px) 0 0;
+  color: var(--color-muted);
+  font-size: clamp(12.5px, 0.95vw, 14px);
+  line-height: 1.55;
+  text-wrap: pretty;
+}
 
 .education-showcase {
   display: grid;
@@ -860,6 +879,38 @@
 .proof-belt-plate img,
 .proof-belt-plate .model-thumbnail { width: 100%; height: 100%; }
 .proof-belt-plate img { object-fit: cover; }
+
+/*
+ * The baked renders get a deeper plate than the photograph does, and that is a
+ * contrast fix rather than a decoration.
+ *
+ * A cover is a subject on transparency — the bake has no background, on purpose,
+ * so the page can put its own behind it. Half of them are pale: the lungs, the
+ * brain, the eye and the bacterial wall are near-white meshes, and on the blush
+ * plate the photographs use they came out as ghosts. The subject's tint at 9%
+ * over a soft dome gives a pale render something to sit against, and it
+ * colour-codes the belt by subject as it moves — the same job the marks' wash
+ * does, at the strength a photographic subject needs rather than a line drawing.
+ */
+.proof-belt-plate--cover {
+  background: radial-gradient(118% 118% at 34% 20%, var(--color-surface-raised) 0%, var(--color-surface-2) 100%);
+}
+.proof-belt-plate--cover::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--proof-tint, var(--color-accent-strong));
+  opacity: 0.09;
+}
+/* `contain`, not `cover`: the render already has its own margin and the plate
+   is the same 4:3 the bake ships, so filling would crop a wingtip to hide a
+   background that is not there. Inset so nothing touches the plate's edge. */
+.proof-belt-plate--cover img {
+  position: relative;
+  width: 88%;
+  height: 88%;
+  object-fit: contain;
+}
 
 /*
  * The drawn marks get the Library rail's own treatment: the subject's tint as

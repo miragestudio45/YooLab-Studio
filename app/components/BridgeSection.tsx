@@ -234,8 +234,13 @@ export function BridgeSection() {
         <div className="bridge-copy" data-reveal>
           <div className="bridge-intro">
             <p className="bridge-eyebrow">Bài học · Học sinh xem</p>
-            <h2 id="bridge-title">
-              <span>Bạn vừa khám phá một bài học trong YooLab.</span>
+            <h2 id="bridge-title" data-kinetic>
+              {/* "trong YooLab" → "YooLab". The sentence carried a
+                  preposition that added nothing and cost a line: at this
+                  measure the black half set three lines against the teal half's
+                  two, and review read the block as too much text before the
+                  claim. See `.bridge-copy h2 span`. */}
+              <span>Bạn vừa khám phá một bài học YooLab.</span>
               <em>Và chính bạn cũng có thể tạo ra nó.</em>
             </h2>
             <p className="bridge-lede">

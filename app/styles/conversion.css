@@ -74,6 +74,33 @@
 }
 
 /* ================================================ consultation form === */
+/*
+ * The header band.
+ *
+ * Review called the dialog's concept ugly, and the fault was structural: an
+ * eyebrow, a heading, a lede and five identical field boxes on one flat cream
+ * rectangle, with nothing marking where the asking stopped and the answering
+ * began. This gives the top third its own surface — the pricing section's own
+ * teal-and-cream duotone at a smaller radius — so the dialog reads as a question
+ * over a form rather than as a stack of eight similar blocks.
+ *
+ * Bled to the panel's edges with a negative margin rather than inset, because a
+ * washed card inside a card is the nested-container smell; this is the top of
+ * *this* card, and it should meet its corners.
+ */
+.consult-head {
+  margin: -30px calc(clamp(20px, 4vw, 34px) * -1) 22px;
+  padding: 26px clamp(20px, 4vw, 34px) 20px;
+  border-bottom: 1px solid var(--color-border, rgba(24, 32, 34, 0.1));
+  border-radius: var(--radius-lg, 18px) var(--radius-lg, 18px) 0 0;
+  background:
+    radial-gradient(80% 120% at 8% 0%, rgba(0, 170, 171, 0.11) 0%, rgba(0, 170, 171, 0) 100%),
+    radial-gradient(70% 110% at 96% 10%, rgba(226, 190, 138, 0.2) 0%, rgba(226, 190, 138, 0) 100%),
+    var(--color-surface-2, #f7f2ea);
+}
+/* The close button sits over the band now, so it needs the band's own ink
+   rather than the form's. */
+.consult-modal .modal-close { color: var(--ink-2); }
 
 .consult-eyebrow {
   margin: 0 0 8px;
@@ -142,7 +169,7 @@
 
 .consult-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 14px; }
 
-.consult-audience { margin: 16px 0 0; padding: 0; border: none; }
+.consult-audience { margin: 0; padding: 0; border: none; }
 .consult-audience > div { display: flex; gap: 8px; margin-top: 6px; }
 .consult-audience label {
   display: inline-flex;
@@ -210,7 +237,26 @@
   cursor: pointer;
 }
 
-.consult-note { margin: 12px 0 0; color: var(--ink-3, var(--ink-2)); font-size: 12.5px; text-align: center; }
+/*
+ * The reassurance line. Centred under the button, in the accent's readable tone
+ * so it reads as a commitment rather than as fine print — which is what it is,
+ * and it is the same one the sent panel makes.
+ */
+.consult-assure {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin: 12px 0 0;
+  color: var(--color-accent-readable, #00aaab);
+  font-size: 12.5px;
+  font-weight: 560;
+}
+.consult-assure svg { width: 15px; height: 15px; flex: none; }
+
+.consult-submit span { margin-left: 2px; font-size: 12px; opacity: 0.9; }
+
+.consult-note { margin: 8px 0 0; color: var(--ink-3, var(--ink-2)); font-size: 12.5px; text-align: center; }
 .consult-note a { color: var(--color-accent-readable, #00aaab); }
 .consult-done p { margin: 12px 0 0; color: var(--ink-2); font-size: 14px; line-height: 1.6; }
 

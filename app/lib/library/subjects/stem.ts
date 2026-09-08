@@ -70,6 +70,7 @@ export const STEM_EXPERIENCES: ExperienceManifest[] = [
       'Tám mô hình riêng, mỗi cái mở được ở kích thước đầy đủ với đầy đủ điều khiển xoay và phóng. Danh sách chia theo ba bước của một quy trình thật — đo và vẽ, cắt và tách, lắp và hoàn thiện — nên bản thân cái danh sách đã dạy thứ tự thao tác. Mỗi dụng cụ đi kèm một lưu ý kỹ thuật hoặc an toàn, là loại kiến thức chỉ có khi đã làm.',
     view: { type: 'experience', key: 'toolkit-bench' },
     rail: { kind: 'thumbnail', thumb: 'toolkit' },
+    cover: 'toolkit',
     parts: [
       { label: 'Đo và vẽ', body: 'Thước kẻ, bút chì, gôm — đánh dấu trước khi cắt.' },
       { label: 'Cắt và tách', body: 'Kéo, dao rọc, thảm cắt — tách chi tiết khỏi khung nhựa.' },

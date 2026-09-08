@@ -143,6 +143,7 @@ export const BIOLOGY_EXPERIENCES: ExperienceManifest[] = [
       ],
     },
     rail: { kind: 'thumbnail', thumb: 'trex' },
+    cover: 'trex',
     parts: [
       { label: 'Hộp sọ', body: 'Dài tới 1,5 m, nhiều hốc rỗng nên nhẹ hơn vẻ ngoài.' },
       { label: 'Hàm và răng', body: 'Răng hình chuông, cắm sâu — để nghiền xương chứ không để cắt.' },
@@ -209,6 +210,7 @@ export const BIOLOGY_EXPERIENCES: ExperienceManifest[] = [
       framing: { yaw: 0.62, pitch: 0.16, fill: 0.94, animate: true },
     },
     rail: { kind: 'thumbnail', thumb: 'bee' },
+    cover: 'bee',
     parts: [
       { label: 'Đầu', body: 'Râu và mắt kép — cơ quan nhận biết.' },
       { label: 'Ngực', body: 'Nơi gắn cánh và cả sáu chân.' },
@@ -262,6 +264,7 @@ export const BIOLOGY_EXPERIENCES: ExperienceManifest[] = [
       framing: { yaw: 1.42, pitch: 0.1, fill: 0.92, animate: true },
     },
     rail: { kind: 'thumbnail', thumb: 'fish' },
+    cover: 'clownfish',
     parts: [
       { label: 'Thân', body: 'Dẹp hai bên để len qua khe hẹp.' },
       { label: 'Vây lưng', body: 'Giữ thân không lật khi bơi.' },
@@ -310,6 +313,7 @@ export const BIOLOGY_EXPERIENCES: ExperienceManifest[] = [
       framing: { yaw: 0.44, pitch: 0.06, fill: 0.96, roll: -0.05, animate: true },
     },
     rail: { kind: 'thumbnail', thumb: 'jellyfish' },
+    cover: 'jellyfish',
     parts: [
       { label: 'Màng ngoài', body: 'Lớp keo trong suốt bảo vệ cơ thể.' },
       { label: 'Tầng giữa', body: 'Cơ co bóp đẩy nước để di chuyển.' },
@@ -379,6 +383,7 @@ export const BIOLOGY_EXPERIENCES: ExperienceManifest[] = [
       framing: { yaw: 0.75, pitch: 0.24, fill: 0.92 },
     },
     rail: { kind: 'thumbnail', thumb: 'gram-wall' },
+    cover: 'gram-wall',
     parts: [
       { label: 'Peptidoglycan', body: 'Lớp dày đặc trưng của vi khuẩn Gram dương.' },
       { label: 'Màng sinh chất', body: 'Lớp lipid kép nằm bên dưới vách.' },

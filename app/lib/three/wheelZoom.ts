@@ -37,24 +37,26 @@
  *     `ctrlKey: true`, so pinch-to-zoom over a specimen works without a line of
  *     code that mentions pinching, on every stage, on Windows and on macOS.
  *   - When the document cannot scroll, a plain wheel zooms after all. That is
- *     the full-screen case: `PracticeOverlay`, `PracticeModal`, `FormulaGate`
- *     and `ModalShell` all lock `body { overflow: hidden }` while they are
- *     open, and inside a full-screen instrument there is nothing to steal and
- *     nothing to be surprised by, so `DroneLab` and `RobotLab` keep the plain
- *     wheel they have always had.
+ *     the locked case: `PracticeModal`, `FormulaGate` and `ModalShell` all set
+ *     `body { overflow: hidden }` while they are open, and a short standalone
+ *     route may simply have no overflow. Where there is nothing to steal there
+ *     is nothing to be surprised by.
  *
  * The last one is read from the document per event rather than passed in as a
- * flag, and that is the design rather than an economy. `DroneLab` and
- * `RobotLab` each have two mount points — `PracticeSection`'s own modal and
- * `PracticeOverlay` — and the Library's stages are mounted in-page by
- * `LibraryWorkspace` and full-screen by `FormulaGate`. A flag would have to be
- * threaded correctly through every one of those, and a lab that gains a third
- * parent later would inherit whatever the new one forgot to pass. The
- * document's own scroll state cannot be forgotten, and it is the thing the rule
- * is actually about. Verified in a real browser at both mount points: over the
- * bridge viewer, the Library viewer and the editor a plain wheel is left to the
- * page and `ctrl` is claimed; inside the drone lab's overlay, with the body
- * locked, both are claimed.
+ * flag, and that is the design rather than an economy: the Library's stages are
+ * mounted in-page by `LibraryWorkspace`, full-screen behind `FormulaGate`, and
+ * again on the `/thu-vien/…` routes, where the page can be short enough not to
+ * scroll at all. A flag would have to be threaded correctly through every one of
+ * those, and a stage that gains a fourth parent later would inherit whatever the
+ * new one forgot to pass. The document's own scroll state cannot be forgotten,
+ * and it is the thing the rule is actually about.
+ *
+ * Verified in a real browser: over the bridge viewer, the Library viewer and the
+ * YooStudio editor canvas a plain wheel is left to the page and `ctrl` is
+ * claimed; with the body locked, both are claimed. That last check was run
+ * against the drone lab's overlay, which no longer exists — the three practice
+ * experiences are embedded deployments now (`lib/practice/manifest.ts`) and an
+ * iframe's wheel belongs to the iframe.
  *
  * Losing plain-wheel zoom loses an affordance on the in-page stages, so it is
  * replaced rather than dropped. `ModelStage`, `CreatureStage` and

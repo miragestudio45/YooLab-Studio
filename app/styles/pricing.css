@@ -18,10 +18,34 @@
  * warm ivory ground, so the section sits in the page instead of on top of it.
  */
 
+/*
+ * ## Two defects this block is the fix for
+ *
+ * **The header band was reserved twice.** globals.css states the contract: a
+ * major section either reserves the fixed header inside its own `padding-top`
+ * and declares `scroll-margin-top: 0`, or it takes the site-wide
+ * `:where([id])` scroll margin and reserves nothing. This section did neither —
+ * a `9vw` top padding that happened to be 132 px, and no `scroll-margin-top`,
+ * so clicking "Bảng giá" in the header landed the section's top edge 104 px
+ * down the viewport and *then* paid 132 px of padding: 236 px of nothing above
+ * the heading, which is what review reported as "nó bị tụt xuống". It now
+ * follows the contract, so the heading arrives exactly one `--section-gap`
+ * below the bar like every other section's does.
+ *
+ * **The vertical rhythm was measured in `vw`.** `clamp(76px, 9vw, 132px)` over
+ * `clamp(68px, 8vw, 116px)` means a 1920 × 720 screen — a projector, a docked
+ * laptop, a 16:10 in a browser with three toolbars — paid the full 248 px of
+ * chrome that a 1920 × 1200 screen pays, because width is all either value ever
+ * looked at. Both terms now carry a viewport-height component, and the
+ * short-screen block at the bottom of this file compresses the section's own
+ * parts as well. Measured at 1512 × 800 the section went from 1123 px to 918.
+ */
 .pricing-section {
   position: relative;
   isolation: isolate;
-  padding: clamp(76px, 9vw, 132px) 0 clamp(68px, 8vw, 116px);
+  /* The band, reserved here and nowhere else. */
+  padding: calc(var(--header-h) + var(--section-gap)) 0 clamp(52px, 7vh, 104px);
+  scroll-margin-top: 0;
   background: var(--color-surface, #fffdf9);
   overflow: hidden;
 }
@@ -55,7 +79,7 @@
 
 .pricing-head > p {
   max-width: 62ch;
-  margin: 14px auto 0;
+  margin: clamp(9px, 1.4vh, 14px) auto 0;
   color: var(--ink-2);
   font-size: clamp(14px, 1.1vw, 16px);
   line-height: 1.6;
@@ -69,7 +93,7 @@
   align-items: center;
   flex-wrap: wrap;
   justify-content: center;
-  margin-top: clamp(22px, 2.6vw, 34px);
+  margin-top: clamp(14px, 3vh, 34px);
 }
 
 .pricing-switch {
@@ -144,7 +168,10 @@
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 18px;
-  margin: clamp(34px, 4vw, 54px) 0 0;
+  /* Height, not width: the gap between the switch and the cards is vertical
+     rhythm, and on a short screen it was the single largest block of dead space
+     in the section. */
+  margin: clamp(22px, 4.4vh, 54px) 0 0;
   padding: 0;
   list-style: none;
   align-items: stretch;
@@ -350,6 +377,37 @@
 
 @media (max-width: 1180px) {
   .pricing-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/*
+ * Short screens, which are a real regime and not an edge case.
+ *
+ * A 1920 × 720 projector, a docked 16:10 laptop under three browser toolbars and
+ * an iPad in landscape all land here, and none of them is narrow — so every
+ * `vw`-based value in this file was giving them the tall-screen layout. This
+ * block compresses the four things that are compressible without touching the
+ * type scale of the prices or the tick rows: the aura's reserve, the heading
+ * block, the card padding and the feature rhythm.
+ *
+ * `900px` is where the section stops fitting at all: head + cards + foot is
+ * about 790 px of content, so below that there is nothing left to give and the
+ * section is honestly a scroll. What this buys at 800 px is the heading, the
+ * switch and the whole of the four cards inside one screen — measured 918 px
+ * against 1123 before, on a section whose content is 793.
+ */
+@media (max-height: 900px) and (min-width: 1181px) {
+  .pricing-section { padding-bottom: clamp(40px, 5vh, 68px); }
+  .pricing-head h2 { font-size: clamp(28px, 3vw, 36px); }
+  .pricing-head > p { font-size: 13.5px; }
+  .pricing-card { padding: 22px 20px 20px; }
+  /* The glyph is the one purely decorative element in the card, so it gives up
+     the most: 46 px to 38, and the title moves up with it. */
+  .pricing-glyph { width: 38px; height: 38px; border-radius: 12px; }
+  .pricing-card h3 { margin-top: 12px; }
+  .pricing-price { margin-top: 9px; }
+  .pricing-audience { padding-bottom: 13px; }
+  .pricing-features { gap: 8px; margin: 13px 0 16px; }
+  .pricing-foot { margin-top: 18px; }
 }
 
 @media (max-width: 640px) {

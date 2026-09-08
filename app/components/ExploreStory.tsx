@@ -220,9 +220,13 @@ export function ExploreStory() {
               <p className="bee-hint">{beeStates[beeMode].hint}</p>
             </div>
           </div>
-          <div className="annotation annotation--bee-a"><i />Cánh gắn vào ngực</div>
-          <div className="annotation annotation--flip annotation--bee-b"><i />Ngực — trung tâm cơ bay</div>
-          <div className="annotation annotation--bee-c"><i />Bụng chia thành nhiều đốt</div>
+          {/* The bee's three anatomy labels are no longer here. They were grid
+              children placed against the *layout* rather than against the
+              animal, so they pointed at empty air — see `BEE_PINS` in
+              `ExploreCanvas`, which now projects each one from its own joint in
+              the rig. The fish and jelly labels below stay as grid children on
+              purpose: those two creatures fill their half of the frame, so their
+              labels are margin notes with a leader reaching in, not pins. */}
         </div>
       </section>
 

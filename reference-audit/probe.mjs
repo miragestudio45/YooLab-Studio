@@ -156,6 +156,19 @@ const key = flag('--viewport', 'w1366');
 const reduced = argv.includes('--reduced');
 if (reduced) argv.splice(argv.indexOf('--reduced'), 1);
 /*
+ * `--motion` forces `prefers-reduced-motion: no-preference`, and it exists
+ * because the absence of it hid a real bug behind a false pass.
+ *
+ * This harness inherits the host OS's animation setting through Chrome, and on a
+ * Windows machine with "Show animations" off every motion path on the site
+ * correctly switches itself off — `KineticType` does not even import GSAP. A
+ * probe run on that machine reports the opt-out working and says nothing at all
+ * about the thing being opted out of, which is indistinguishable from the effect
+ * being broken. `--reduced` could only ever assert the quiet half.
+ */
+const motion = argv.includes('--motion');
+if (motion) argv.splice(argv.indexOf('--motion'), 1);
+/*
  * `--dpr 2`, because half this project's performance questions are retina
  * questions and this harness could not ask one.
  *
@@ -277,6 +290,7 @@ try {
   });
   const features = [];
   if (reduced) features.push({ name: 'prefers-reduced-motion', value: 'reduce' });
+  if (motion) features.push({ name: 'prefers-reduced-motion', value: 'no-preference' });
   if (handheld) features.push({ name: 'hover', value: 'none' }, { name: 'pointer', value: 'coarse' });
   if (features.length) await send('Emulation.setEmulatedMedia', { features });
   if (handheld) await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });

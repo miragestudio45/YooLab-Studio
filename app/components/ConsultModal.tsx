@@ -177,30 +177,38 @@ function ConsultDialog({ open, source, onClose }: { open: boolean; source?: stri
         </div>
       ) : (
         <form className="consult-form" onSubmit={onSubmit} noValidate>
-          <p className="consult-eyebrow">YooLab</p>
-          <h2 id={`${uid}-title`}>Trao đổi cùng chúng tôi</h2>
-          <p className="consult-lede">
-            Cho chúng tôi biết bạn đang dạy gì hoặc cần triển khai gì — chúng tôi sẽ
-            dựng thử một scene cùng bạn.
-          </p>
+          {/*
+            A header band, not three stacked paragraphs on the same ground.
 
-          <label className="consult-field">
-            <span>Tên của bạn</span>
-            <input
-              type="text"
-              name="name"
-              autoComplete="name"
-              value={lead.name}
-              aria-invalid={invalid('name')}
-              aria-describedby={describe('name')}
-              ref={(node) => { if (touched && errors.name && !firstInvalid.current) firstInvalid.current = node; }}
-              onChange={(event) => field('name', event.target.value)}
-            />
-            {touched && errors.name ? <em id={`${uid}-name-err`}>{errors.name}</em> : null}
-          </label>
+            The dialog came back from review as an ugly concept, and the reason
+            was structural rather than decorative: it was an eyebrow, a heading,
+            a lede and then five identical field boxes, all on one flat cream
+            rectangle, so there was nothing to tell the eye where the asking
+            stopped and the answering began. Giving the top third its own washed
+            surface splits the dialog into a question and a form — which is what
+            it is — and it is the same duotone wash the pricing section uses, so
+            the surface is not a new idea either.
+          */}
+          <div className="consult-head">
+            <p className="consult-eyebrow">YooLab</p>
+            <h2 id={`${uid}-title`}>Trao đổi cùng chúng tôi</h2>
+            <p className="consult-lede">
+              Cho chúng tôi biết bạn đang dạy gì hoặc cần triển khai gì — chúng tôi
+              sẽ dựng thử một scene cùng bạn.
+            </p>
+          </div>
 
+          {/*
+            "Đối tượng" is first now, and that is a form-design fix rather than a
+            reshuffle. It sat between the name and the email — a pill row wedged
+            into a column of text inputs, which broke the rhythm exactly once and
+            for no reason. It is also the answer that changes how the rest of the
+            form is read: a school and a teacher are asking for different things.
+            Asked first, it frames the message field; asked fourth, it is a
+            surprise.
+          */}
           <fieldset className="consult-field consult-audience">
-            <legend>Đối tượng</legend>
+            <legend>Bạn liên hệ với tư cách</legend>
             <div>
               {([['ca-nhan', 'Cá nhân'], ['to-chuc', 'Tổ chức']] as [ConsultAudience, string][]).map(([value, label]) => (
                 <label key={value} className={lead.audience === value ? 'is-on' : undefined}>
@@ -216,6 +224,21 @@ function ConsultDialog({ open, source, onClose }: { open: boolean; source?: stri
               ))}
             </div>
           </fieldset>
+
+          <label className="consult-field">
+            <span>Tên của bạn</span>
+            <input
+              type="text"
+              name="name"
+              autoComplete="name"
+              value={lead.name}
+              aria-invalid={invalid('name')}
+              aria-describedby={describe('name')}
+              ref={(node) => { if (touched && errors.name && !firstInvalid.current) firstInvalid.current = node; }}
+              onChange={(event) => field('name', event.target.value)}
+            />
+            {touched && errors.name ? <em id={`${uid}-name-err`}>{errors.name}</em> : null}
+          </label>
 
           <div className="consult-row">
             <label className="consult-field">
@@ -265,7 +288,29 @@ function ConsultDialog({ open, source, onClose }: { open: boolean; source?: stri
 
           <button type="submit" className="consult-submit" disabled={phase === 'sending'}>
             {phase === 'sending' ? 'Đang gửi…' : 'Gửi yêu cầu tư vấn'}
+            <span aria-hidden="true">↗</span>
           </button>
+
+          {/*
+            One line of reassurance, and it is not a new claim: the `sent` panel
+            in this same component already tells the visitor "chúng tôi sẽ liên hệ
+            trong vòng một ngày làm việc". Saying it *before* the button rather
+            than only after it is the whole point — a promise a visitor reads
+            after submitting is not one that helped them submit.
+
+            The mark is drawn, not a glyph. A ✓ or a clock emoji here would be
+            the one Unicode icon on a page whose icons are all authored SVG.
+          */}
+          <p className="consult-assure">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <g fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="8.4" />
+                <path d="M12 7.6V12l3 1.9" />
+              </g>
+            </svg>
+            Chúng tôi trả lời trong vòng một ngày làm việc.
+          </p>
+
           <p className="consult-note">
             Hoặc viết thẳng tới <a href={`mailto:${CONSULT_MAILBOX}`}>{CONSULT_MAILBOX}</a>.
           </p>

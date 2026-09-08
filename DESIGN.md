@@ -129,11 +129,11 @@ Three things make the replacement more than a compromise:
   pinching.
 - **The exception is read, not passed.** Whether the document can scroll is
   computed per event from `body`/`html` overflow and the document's own scroll
-  height, not handed down as a prop. The labs have two mount points each and the
-  Library's stages have two, so a flag would have to be threaded correctly
-  through all of them and a future third parent would inherit whatever it forgot
-  to pass. The full-screen labs therefore keep the plain-wheel zoom they always
-  had, because their overlay locks the body.
+  height, not handed down as a prop. The Library's stages mount in-page under
+  `LibraryWorkspace`, full-screen behind `FormulaGate`, and again on the
+  `/thu-vien/…` routes where the page can be too short to scroll at all — so a
+  flag would have to be threaded correctly through all of them and a future
+  fourth parent would inherit whatever it forgot to pass.
 - **The affordance is replaced, not dropped.** `ModelStage`, `CreatureStage` and
   `MoleculeViewer` already carry `Gần` / `Xa` buttons in their rails, and every
   hint that read "Cuộn để phóng" now names the modifier through
@@ -144,7 +144,82 @@ Three things make the replacement more than a compromise:
 
 Verified in a real browser: over the bridge viewer, the Library viewer and the
 YooStudio editor canvas a plain wheel is left to the page and `ctrl` is claimed;
-inside the drone lab's overlay, with the body locked, both are claimed.
+with the body locked, both are claimed. That last check was run against the drone
+lab's overlay, which no longer exists — see §12b: the practice experiences are
+embedded builds now, and an iframe's wheel belongs to the iframe.
+
+## 2d. The snap track is measured, not declared
+
+`data-snap` used to mean "settle here". It now means "settle here **while this
+section fits**", and the difference is a `measure()` in `lib/story/snap.ts` that
+reads each marked section's box on every re-measure and skips the ones that
+overflow.
+
+That turns §2b from a convention into a mechanism. The rule §2b states — a
+magnetic anchor on a section whose content continues past the viewport settles
+the visitor onto a boundary they were scrolling *through* — was previously
+enforced by only marking sections that were one screen tall by construction. The
+four sections that became height-responsive (Practice, Education, the lesson
+belt, Pricing) compose in one screen at desktop sizes and deliberately stack at
+1024 × 768 and on a phone, so they could not be marked either way. Now they are
+marked once and qualify per viewport, with nothing to keep in sync.
+
+**What counts as fitting is content, not the box.** Measured at 1512 × 982:
+Practice is 1,017 px tall and 956 of content, Education 1,003 and 979, Pricing
+1,042 and 967. All three overflow by their own bottom padding and nothing else,
+and padding below the fold is not content a visitor is being cut off from — it
+is the gap before the next section. A strict box test would have excluded exactly
+the case this change exists to serve.
+
+**The run has to stay contiguous**, which is why the lesson belt is on the track
+even though it was not asked for. `targetFor` brackets a position between the two
+nearest anchors, so a non-anchor sitting between two anchors is a section the
+visitor cannot rest in — they get pulled to whichever side the direction bias
+picks. Practice, Education, belt and Pricing are adjacent in the document: either
+all four are anchors or the middle two are unrestable.
+
+## 2e. Kinetic type — a second layer, by element
+
+`KineticType` splits the page's eight display headings into lines, masks each
+line, and rises them out of their masks with a blur-to-clear and a per-line
+stagger on a ScrollTrigger that plays forward on the way down and **reverses on
+the way up**.
+
+It is additive to §8's reveal rather than a replacement, and the division is by
+element: the CSS reveal owns the *block* — kicker, heading and lede rise and fade
+together, once, never reversing — and this owns the *lines inside the heading*.
+They share a trigger point and a direction so the compound reads as one gesture,
+and the line opacity resolves in the first third of its tween so the two fades
+are never visibly fighting. Two systems on the same property on the same node is
+how a page gets muddy; two systems on nested nodes in phase is a composition.
+
+Four things about it are load-bearing:
+
+- **It does not write scroll.** §2c's one-owner rule still holds. ScrollTrigger
+  only reads scroll unless given `scrub` + its own `snap`, `normalizeScroll` or a
+  `scrollerProxy` — none of which is used. Every trigger is a plain
+  `toggleActions: 'play none none reverse'`.
+- **Nothing in CSS hides a heading.** The armed state is written by the tween's
+  own `fromTo` after the split succeeds, so a failure to load GSAP leaves every
+  heading visible. A `[data-kinetic] { opacity: 0 }` rule would have made a
+  network hiccup blank the page's typography — the exact failure the `reveal-ready`
+  bootstrap is built to avoid.
+- **Lines, not words.** `mask` wraps every split unit in its own
+  `overflow: hidden` element and blurring one promotes it to its own raster
+  layer. A four-line heading is four layers; the same heading by words is
+  twenty-six, over a canvas that is already the frame's critical path.
+- **Three opt-outs, all silent.** `prefers-reduced-motion`, `data-gpu="lean"`
+  (an animated `filter: blur()` on text is the same class of per-frame cost as
+  the backdrop blurs that flag already drops), and below 720 px, where a heading
+  is three lines at 31 px and the stagger has nothing to stagger. GSAP is behind
+  `await import`, so none of those cases downloads it.
+
+The splits happen after `document.fonts.ready` and are rebuilt by `autoSplit` on
+a resize that changes the line breaks, with the timeline built *inside* `onSplit`
+and returned from it. Both are the standard ways this effect ships broken:
+splitting on the fallback face records the fallback's line breaks and holds them,
+and a timeline built outside `onSplit` keeps animating the previous split's
+orphaned line divs.
 
 ## 3. Type — one family
 
@@ -270,6 +345,69 @@ Creature placement is camera work in `ExploreCanvas`'s `shots` table, and it is
 tuned so the subject never crosses into the copy column and never leaves the frame
 vertically. Annotations live in the creature's half only.
 
+### A label that names a body part is on that body part
+
+The fish and the jellyfish keep grid-placed annotations: those two fill their
+half of the frame, so a label beside them with a leader reaching in is a margin
+note, and a margin note makes no claim about a position.
+
+The bee's three could not do that honestly. It sits right of centre in the hero
+and left of centre in the study chapter, and its labels were grid children on
+rows 1 / 2 / 3 — placed against the *layout*. That was itself a fix, for an
+earlier build that positioned them in viewport percentages and printed all three
+through the headline; the grid stopped the collisions and left the labels
+pointing at empty air. Review named it exactly: "hiện tại nó k bám theo con ong".
+
+They are pins now. `BEE_PINS` in `ExploreCanvas` names one joint each —
+`l_wingroot_jnt`, `thorax_jnt`, `abdomen_jnt02`, all of which the shipped rig
+carries — and the frame loop projects them beside the projection that already
+feeds the flower field, writing `--pin-N-x/y/on` as custom properties. Three
+pins at 60 fps therefore cost no React renders, which is the same trade
+`ModelStage.syncPins` makes for the Library's anatomy pins (§11).
+
+Two decisions inside that are worth keeping:
+
+- **Reach clear ground; do not build a surface.** Three versions got here. The
+  halo the grid annotations use failed, for a reason the grid version never
+  faced: these labels sit *on* a dark red transmissive body and there is no
+  clear ground within a short leader's reach, so 9.5 px uppercase over
+  refracting glass is unreadable at any text-shadow strength. Putting the labels
+  on glass plates fixed that and turned three anatomy callouts into three chips
+  floating over a specimen. The client pointed at a reference that solves it the
+  older and better way: **make the leader long enough to carry the label out of
+  the subject.** A 6 px filled dot marks the anatomy, a hairline runs 38-88 px to
+  a hollow 9 px ring on the clear ivory, and the label sits beside the ring where
+  a halo is all the separation type needs. Nothing is boxed, and the line becomes
+  part of the drawing instead of an apology for one — which is how a plate in an
+  anatomy atlas has always been labelled.
+- **Direction is a collision rule.** The copy column owns the right half, so no
+  label grows rightwards: the wing root goes up, the thorax goes left, the
+  abdomen goes down. `PIN_SAFE` hides any pin whose dot has drifted where its
+  plate would leave the frame or reach the type — an annotation absent for part
+  of a chapter costs nothing, and one printing through a heading costs the
+  composition.
+
+Both label systems are off below 860 px. The bee is scaled to 22% and lifted
+into the top half there, so a callout would be larger than the part it names —
+and `.study-readout` beside it already publishes all four parts as a real `<dl>`,
+which is also why the pin layer is `aria-hidden`.
+
+### The hero's scroll cue is an object
+
+It was bare 9.5 px uppercase at 46% ink over a 1 px hairline, which is fine over
+a flat ground and illegible over the one it has: `FlowerValley` paints a
+photographic meadow across the bottom of the hero, so the label sat on white
+daisies, magenta cosmos and dark foliage at once. No text colour reads over all
+three and a halo needs a quiet background to lift off — it was not a contrast
+value to nudge, it was type with nothing behind it.
+
+It is a pill in the site's own chip material, with the chevron in a teal disc on
+its trailing edge: a pill with a label alone is a badge, and one round accented
+target makes it a control, which is what the element is. Two departures from the
+other chips, both because of what is behind this one — the fill is 0.82 rather
+than 0.42, and the shadow carries a real offset so it sits above the flowers
+rather than in them. The valley itself is untouched.
+
 ## 7. Narrow viewports
 
 Two rules carry the phone and portrait-tablet regimes, and both are the same idea:
@@ -332,6 +470,22 @@ time between frames.
 `node reference-audit/measure.mjs` for numbers, `node reference-audit/probe.mjs`
 for a one-off question. A section is done when the screenshot shows it, not when
 `overflowX === 0`.
+
+**`probe.mjs --motion`** forces `prefers-reduced-motion: no-preference`, and it
+exists because its absence produced a false pass. The harness inherits the host
+OS's animation setting through Chrome, so on a machine with Windows' "Show
+animations" off every motion path on this site correctly switches itself off —
+`KineticType` does not even import GSAP — and the probe then reports the opt-out
+working while asserting nothing whatsoever about the effect. That is
+indistinguishable from the effect being broken. `--reduced` could only ever test
+the quiet half.
+
+**Read position alongside state.** The second lesson from the same round: a
+scroll-triggered animation measured by computed style alone will lie to you. The
+kinetic layer appeared to leave a heading hidden on screen; it had not — the
+chapter snap had settled to the previous anchor and the heading was 122% down
+the viewport, where hidden is correct. Any probe of a scroll effect has to record
+`getBoundingClientRect` in the same breath as the property it is checking.
 
 `measure.mjs` is the regression guard for this document's first two sections: it
 reports the shell alignment as one spread across seven bands, and it must read
@@ -557,14 +711,28 @@ goes wrong.
   drift from the thing it opens, and a mistyped id warns rather than silently
   shortening the belt — which is exactly what `formula-workshop` for `formula`
   did before the warning existed.
-- **The set is chosen by what it costs.** `RailVisual` gives anything with a real
-  mesh a real render and everything else a drawn diagram on its subject's tint,
-  so a picture here is never a decorative stand-in. But a belt that pulled the
-  T-rex, the clownfish and the toolkit into every visitor's scroll would be
-  megabytes spent on a marketing strip, so **only entries whose visual costs this
-  page nothing new are in the list** — fifteen inline-SVG marks, plus a bee bake
-  the section was already paying for. Giving a lesson a `thumbnail` rail is the
-  whole change needed to promote it to a photograph later.
+- **Nine of the sixteen are pre-baked renders of real meshes.** The belt first
+  shipped as sixteen drawn `LibraryMark` diagrams — cheap, and line drawings of
+  objects this repository owns the actual meshes for, which review called ugly
+  and was right to. A live bake was not the answer either: sixteen cards would
+  be sixteen GLB fetches, and the organ set alone is 6.4 MB — the brain is 2.7
+  for a card 240 px wide. So `scripts/bake-library-covers.mjs` renders them
+  **once**, at build time, through this project's own thumbnail pipeline driven
+  by `reference-audit/probe.mjs` in a real Chrome, and the belt ships WebP: 3-22
+  kB a card, ~155 kB for eighteen covers, no geometry fetched.
+
+  The remaining six are entries with **nothing to render** — the periodic table
+  is a DOM grid, the physics labs are simulations, the molecules are generated
+  from bond tables — and a drawn mark is the honest picture of those. Dropping
+  them would make the belt claim the library is only biology. `cover` in
+  `types.ts` is therefore optional, and its absence is information.
+
+  Two notes on the bake. The organ covers derive their slug from the entry's own
+  id, so twelve of them are one line in `organEntry` rather than twelve fields
+  that can drift. And a cover is a subject on **transparency** — the plate in the
+  page carries the ground — which is why `.proof-belt-plate--cover` runs a 9%
+  subject tint under it: half the organ meshes are near-white, and on the blush
+  plate the photographs use they came out as ghosts.
 - **The order is the composition.** Interleaved by subject, so every card
   entering the frame is a different colour from the one leaving it. Grouped, the
   belt would read as four blocks of one colour sliding past.
@@ -657,6 +825,129 @@ rows whose bodies each wrap twice are 420 px of content in a 283 px budget. The
 number is recorded in KNOWN_LIMITATIONS.md and asserted by `measure.mjs`.
 
 ---
+
+## 11c. One platform, three roles — said once
+
+The Education section's heading and the role dialog's heading are now the same
+sentence: **"Một nền tảng, ba vai trò."**
+
+Two faults produced it. `TrialInvite` asked a visitor which role they were under
+"Một nền tảng. Ba cách sử dụng." while the section that answers that question
+was headed "Một nền tảng cho cả trường." — the same claim, introduced with
+different words, two screens apart. And the section's own wording read badly in
+Vietnamese: "cho cả trường" puts a school on the receiving end of a platform,
+which is not how the language hands something over. Review said so bluntly and
+was right.
+
+The count is allowed to be bare here because the **lede** carries the warmth —
+that was the other half of the note, that the heading alone read curt.
+`.education-head-lede` names the three verbs the three tabs are about to
+demonstrate ("Giáo viên soạn bài, học sinh khám phá, nhà trường triển khai"),
+which is the shape every other heading block on this page already uses. A tight
+heading over a sentence that explains it; not a heading trying to be both.
+
+## 11d. The consultation dialog is a question over a form
+
+It was an eyebrow, a heading, a lede and five identical field boxes on one flat
+cream rectangle, and review called the concept ugly. The fault was structural
+rather than decorative: eight similar blocks stacked on one surface, with nothing
+telling the eye where the asking stopped and the answering began.
+
+Three changes, in the order they matter:
+
+- **A header band.** The top third gets its own washed surface — the pricing
+  section's teal-and-cream duotone at a smaller radius — bled to the panel's
+  corners with a negative margin rather than inset, because a washed card inside
+  a card is the nested-container smell. This is the top of *this* card and it
+  should meet its own corners.
+- **"Bạn liên hệ với tư cách" moved first.** It was a pill row wedged between
+  the name and the email, breaking the column's rhythm exactly once and for no
+  reason — and it is the answer that changes how the rest of the form should be
+  read, because a school and a teacher are asking for different things. Asked
+  first it frames the message field; asked fourth it is a surprise.
+- **A reassurance line under the button**, with a drawn clock mark rather than a
+  glyph. It is not a new claim: the dialog's own `sent` panel already promises a
+  reply within one working day. Saying it *before* the button is the point — a
+  promise a visitor reads after submitting is not one that helped them submit.
+
+## 12b. Thực hành & STEM — three embeds, not three labs
+
+The section is a poster wall over a popup, and that was already the design: a
+landing section cannot host a running WebGL lab and stay a landing section, so
+the labs opened into `PracticeModal` — a full-viewport dialog with a body slot,
+a fullscreen button and an exit.
+
+What changed is what is in the slot. Each experience is now its own deployment,
+embedded in that dialog rather than bundled into this page.
+
+| | Before | After |
+|---|---|---|
+| Section cost | 3 posters (~148 kB) | 3 posters (~440 kB) |
+| Bundle | `FormulaLab`, `DroneLab`, `RobotLab` + `lib/formula`, `lib/drone`, `lib/robot` | none |
+| Assets in `public/asset/practice` | **18.7 MB** of GLB | 452 kB of WebP |
+| `practice.css` | 2,136 lines | 907 |
+
+Three things this is not. It is **not** a link-out: the visitor never leaves the
+page, and the dialog keeps its own head, its own Escape and its own fullscreen.
+It is **not** free — an embedded origin cannot be styled, cannot share this
+page's fonts, and owns its own first paint, which is why `.practice-frame`
+starts at `opacity: 0` behind `.lab-status` and fades in on `load`. And it is
+**not** sandboxed: these are first-party YooX builds, and a `sandbox` attribute
+permissive enough for a WebGL simulator grants back everything it would have
+withheld, so it would be theatre. What the frame does carry is a deliberate
+`allow` — fullscreen plus the two motion sensors — because without the
+delegation the embedded build's own fullscreen button is dead *inside* the
+frame, which reads as the dialog being broken.
+
+`Mở tab mới` in the head is a real `<a target="_blank" rel="noopener">`, not a
+button that calls `window.open`, and it is there for the two things an iframe
+genuinely cannot do: fullscreen on iOS Safari, and being the only thing on the
+screen.
+
+Card 01 changed subject with the move. The racing workshop is retired and an
+excavator took its place — a mechanism lesson where the car was an assembly one,
+which also makes all three cards machines you *operate* rather than models you
+inspect. Every capability line in `lib/practice/manifest.ts` is written from that
+build's own interface: the telemetry column, the four camera modes, the boom /
+arm / bucket groups and the shift-cycle mission are all things the simulator
+actually shows.
+
+The QA harness lost thirteen shots with the labs and has three. There is nothing
+this repository can honestly photograph inside the frame — it is another origin's
+first paint, on another origin's schedule — so what is captured is what this page
+is still responsible for: the poster wall on each card, and the dialog's chrome
+around a frame that has reached `load`.
+
+## 12c. Pricing — the anchor contract, and a height regime
+
+Two defects, and the first is a straight violation of §2.
+
+**The header band was reserved twice.** The contract is that a major section
+either reserves the fixed header inside its own `padding-top` and declares
+`scroll-margin-top: 0`, or takes the site-wide `:where([id])` scroll margin and
+reserves nothing. Pricing did neither: a `9vw` top padding that happened to be
+132 px, and no `scroll-margin-top`. So clicking "Bảng giá" in the header landed
+the section's top edge 104 px down the viewport and *then* paid 132 px of
+padding — 236 px of nothing above the heading, which is what review called "nó
+bị tụt xuống". It now follows the contract, and the heading arrives exactly one
+`--section-gap` below the bar like every other section's. Measured at 1366 × 768:
+section top at viewport 0, `h2` at 102, which is 38 px clear of the bar.
+
+**The vertical rhythm was measured in `vw`.** Every spacing value in
+`pricing.css` looked only at width, so a 1920 × 720 projector, a docked 16:10
+laptop under three toolbars and a landscape iPad all got the tall-screen layout
+and paid the full 248 px of section chrome. The paddings and the two internal
+gaps now carry a height term, and a `@media (max-height: 900px)` block
+compresses the four things that compress without touching the price type or the
+tick rows: the aura's reserve, the heading block, the card padding and the
+feature rhythm. At 1366 × 768 the section went from 1,107 px to 902, the card
+from 576 to 523, and on arrival the heading, the switch and 89% of a card are on
+one screen.
+
+`900px` is the floor because it is where there is nothing left to give: head plus
+cards plus foot is about 790 px of content, so below that the section is honestly
+a scroll rather than a composition — the same distinction §9's probe draws
+everywhere else.
 
 ## 13. The GPU budget — `lib/three/deviceTier.ts`
 

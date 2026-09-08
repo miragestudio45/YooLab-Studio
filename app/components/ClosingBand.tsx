@@ -230,7 +230,7 @@ export function FinalCta() {
 
       <div className="cta-inner">
         <p className="section-kicker section-kicker--light" data-reveal>Sẵn sàng để bắt đầu?</p>
-        <h2 id="cta-title" data-reveal>Bắt đầu sáng tạo<br /><em>ngay bài học.</em></h2>
+        <h2 id="cta-title" data-reveal data-kinetic>Bắt đầu sáng tạo<br /><em>ngay bài học.</em></h2>
         <p className="cta-lede" data-reveal>
           Gửi cho chúng tôi môn học bạn đang dạy, chúng tôi sẽ dựng thử một
           scene cùng bạn.

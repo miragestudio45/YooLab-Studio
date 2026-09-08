@@ -44,6 +44,18 @@
  * document top is, by construction, the scroll position at which that chapter's
  * clock reads a whole number — so the anchors are the panel tops, plus the
  * bridge, which is the exit.
+ *
+ * The track then continues through the product half: the editor, the Library,
+ * Practice, Education, the lesson belt and Pricing. Those last four joined once
+ * they became height-responsive, and they are *conditional* — see `measure`,
+ * which admits a `[data-snap]` section only while it actually fits the viewport.
+ *
+ * The run has to stay contiguous, which is why the lesson belt is on it even
+ * though nobody asked for it: `targetFor` brackets a position between the two
+ * nearest anchors, so a non-anchor section sitting between two anchors is a
+ * section the visitor cannot rest in — they get pulled to whichever side the
+ * direction bias picks. Practice, Education, belt, Pricing are adjacent in the
+ * document, so all four are on the track or the middle two are unrestable.
  */
 
 export type SnapController = { dispose(): void };
@@ -114,10 +126,40 @@ export function createSectionSnap(): SnapController {
 
   let enabled = true;
 
+  /*
+   * An anchor is a section that FITS. Measured, not declared.
+   *
+   * `data-snap` used to mean "settle here" outright, and that was safe only
+   * while every marked section was exactly one screen tall by construction —
+   * the four Explore panels, the bridge, the editor and the Library all are.
+   * DESIGN.md §2b states the rule the hard way: a magnetic anchor on a section
+   * whose content continues past the viewport settles the visitor onto a
+   * boundary they were scrolling *through*, which is worse than no snap at all.
+   * The Library could only join the track once its "related" strip was deleted.
+   *
+   * Practice, Education, the lesson belt and Pricing are now height-responsive
+   * and compose in one screen at desktop sizes — but not at 1024 × 768, and not
+   * on a phone, where they deliberately stack. So the qualification is checked
+   * here on every measure instead of being promised in the markup, and the same
+   * three sections are anchors on a 1512 × 982 laptop and ordinary scrolling
+   * document on a tablet, with nothing to keep in sync.
+   *
+   * **What counts as fitting is the section's content, not its box.** A section
+   * is 20-60 px taller than the viewport at these widths purely because of its
+   * own trailing padding, and padding below the fold is not content the visitor
+   * is being cut off from — it is the gap before the next section. Measured at
+   * 1512 × 982: Practice is 1017 px tall and 953 of content, Pricing 1042 and
+   * 973. Excluding those over 35 px of bottom padding would have thrown away
+   * exactly the case this change exists to serve.
+   */
   const measure = () => {
     const found: number[] = [];
+    const limit = window.innerHeight + 8;
     for (const el of document.querySelectorAll<HTMLElement>('[data-snap]')) {
-      found.push(Math.round(el.getBoundingClientRect().top + window.scrollY));
+      const box = el.getBoundingClientRect();
+      const padBottom = parseFloat(getComputedStyle(el).paddingBottom) || 0;
+      if (box.height - padBottom > limit) continue;
+      found.push(Math.round(box.top + window.scrollY));
     }
     found.sort((a, b) => a - b);
     anchors = found;

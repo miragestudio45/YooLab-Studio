@@ -10,6 +10,7 @@ import { ExploreStory } from './components/ExploreStory';
 import { FaqSection, FaqStructuredData } from './components/FaqSection';
 import { FormulaGate } from './components/FormulaGate';
 import { GfxHud } from './components/GfxHud';
+import { KineticType } from './components/KineticType';
 import { LibraryWorkspace } from './components/library/LibraryWorkspace';
 import { PracticeSection } from './components/PracticeSection';
 import { PricingSection } from './components/PricingSection';
@@ -72,6 +73,10 @@ export default function Home() {
       <FormulaGate>
        <ConsultProvider>
         <ScrollReveal />
+        {/* The line-level layer over the block-level reveal above it. Additive,
+            by element, and it does nothing on a phone or under reduced motion —
+            see `KineticType`. */}
+        <KineticType />
         <GfxHud />
         <SectionSnap />
         <SiteHeader />
@@ -96,7 +101,7 @@ export default function Home() {
               */}
               <div className="section-heading tool-heading" data-reveal>
                 <p className="section-kicker section-kicker--light">Công cụ YooLab</p>
-                <h2 id="tool-title">Từ kiến thức <em>thành bài học.</em></h2>
+                <h2 id="tool-title" data-kinetic>Từ kiến thức <em>thành bài học.</em></h2>
                 <p className="tool-heading-lede">Chọn mô hình, thêm nội dung, âm thanh và tương tác — không cần lập trình.</p>
               </div>
             </div>

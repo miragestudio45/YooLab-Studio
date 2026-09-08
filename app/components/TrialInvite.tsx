@@ -98,7 +98,11 @@ export function TrialInvite() {
       </button>
 
       <p className="consult-eyebrow">YooLab</p>
-      <h2 id={`${uid}-title`}>Một nền tảng. <em>Ba cách sử dụng.</em></h2>
+      {/* The same sentence the Education section's heading uses, and that is
+          the point: this dialog and that section both introduce the product as
+          one platform with three audiences, and they were doing it in different
+          words. See the note in `EducationSection`. */}
+      <h2 id={`${uid}-title`}>Một nền tảng, <em>ba vai trò.</em></h2>
       <p className="trial-lede">Bạn đang ở vai nào? Chọn một để bắt đầu đúng chỗ.</p>
 
       <ul className="trial-roles">

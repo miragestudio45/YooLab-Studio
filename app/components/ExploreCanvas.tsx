@@ -316,9 +316,68 @@ const BEE_ENTRY_SECONDS = 2.6;
 /** Where the bee starts: off the right edge, high, and closer to camera. */
 const beeEntry = { x: 6.4, y: 1.35 };
 
+/**
+ * The bee-study chapter's three anatomy labels, and the joints they belong to.
+ *
+ * They used to be CSS-grid children of the bee panel, placed on rows 1 / 2 / 3
+ * of the copy grid — which is to say they were placed against the *layout* and
+ * not against the animal. That was itself a fix: an earlier build positioned
+ * them in viewport percentages and all three printed through the headline and
+ * the readout. Putting them on the grid stopped the collisions and left them
+ * pointing at empty air, which is what review reported: "hiện tại nó k bám theo
+ * con ong".
+ *
+ * A label that names a body part has to be on that body part or not exist. The
+ * shipped rig has exactly the joints needed — `bee_fixed.glb` carries
+ * `thorax_jnt`, `abdomen_jnt01..04` and `l_/r_wingroot_jnt` — so each label is
+ * now projected from its own joint every frame, the same technique
+ * `ModelStage.syncPins` uses for the Library's anatomy pins.
+ *
+ * `stem` is matched with `startsWith` rather than by equality because
+ * `GLTFLoader` runs every node name through `PropertyBinding.sanitizeNodeName`,
+ * which turns `thorax_jnt.36` into `thorax_jnt36`. The stems below are unique
+ * prefixes: `abdomen_jnt02` cannot match `abdomen_jnt01`.
+ *
+ * `side` is where the label sits relative to its dot, and it is the collision
+ * rule rather than a taste. The copy column owns the right half of this
+ * chapter, so no label may ever grow rightwards — two go left of their joint
+ * and one goes above it. Combined with `PIN_SAFE` below, that is what makes
+ * "on the animal" and "never on the type" both true.
+ */
+const BEE_PINS = [
+  { stem: 'l_wingroot_jnt', side: 'up', label: 'Cánh gắn vào ngực' },
+  { stem: 'thorax_jnt', side: 'left', label: 'Ngực — trung tâm cơ bay' },
+  { stem: 'abdomen_jnt02', side: 'down', label: 'Bụng chia thành nhiều đốt' },
+] as const;
+
+/**
+ * The box a pin has to project inside to be drawn at all.
+ *
+ * Fractions of the stage frame, and every bound is about where the *label* ends
+ * up rather than where the dot is — a leader carries its ring 60-108 px away
+ * from the joint, so the dot has to be well inside the frame for the ring and
+ * its text to be.
+ *
+ * The right bound matters most: the study chapter's copy column starts at about
+ * 58% of the width, and the thorax pin's label sits 108 px left of its dot but
+ * the wing pin's sits directly above it, so 0.50 is the last position at which
+ * every variant still clears the type. `minY` is 0.20 because the wing pin
+ * reaches 60 px upward and the header band owns the first 64. Outside any
+ * bound the pin is hidden, which is why they come and go as the animal turns —
+ * a callout that cannot reach clear ground has nothing to say, and one printing
+ * through a heading costs the composition.
+ */
+const PIN_SAFE = { minX: 0.16, maxX: 0.5, minY: 0.2, maxY: 0.78 };
+
 export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const foregroundHostRef = useRef<HTMLDivElement>(null);
+  /* The anatomy labels' own layer. It is written to as custom properties rather
+     than through React — three pins at 60 fps is 180 state writes a second — and
+     it is a sibling of the canvas rather than a child of the bee panel so the
+     projected frame coordinates land in the element's own coordinate space with
+     no conversion. See `BEE_PINS`. */
+  const pinHostRef = useRef<HTMLDivElement>(null);
   const beeModeRef = useRef(beeMode);
   // Held in a ref of our own so the scene effect can stay on an empty dependency
   // list: the renderer, the loaders and the models must survive a prop change,
@@ -799,6 +858,20 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
     /** Root-local bounding-box corners, for the per-frame screen projection. */
     let beeCorners: THREE.Vector3[] = [];
     const cornerScratch = new THREE.Vector3();
+    /** One entry per `BEE_PINS`, `null` where the rig has no such joint. */
+    let beePinJoints: (THREE.Object3D | null)[] = [];
+    const pinScratch = new THREE.Vector3();
+    /* Called on every frame the bee is not being placed — the ocean chapters and
+       the frames before the rig has loaded. Only the opacity is reset: leaving
+       the last position in place means a pin that comes back does not have to
+       travel from 0,0 on its first visible frame. */
+    const clearBeePins = () => {
+      const layer = pinHostRef.current;
+      if (!layer) return;
+      for (let index = 0; index < BEE_PINS.length; index += 1) {
+        layer.style.setProperty(`--pin-${index}-on`, '0');
+      }
+    };
     const mixers: THREE.AnimationMixer[] = [];
 
     let ocean: OceanWorld | null = null;
@@ -863,6 +936,18 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
         new THREE.Vector3(bounds.min.x, bounds.max.y, bounds.max.z),
         new THREE.Vector3(bounds.max.x, bounds.max.y, bounds.max.z),
       ];
+      /* The three anatomy joints, resolved once. A stem that matches nothing is
+         dropped rather than guessed, so a re-export that renames a joint loses
+         its label instead of pinning it to the wrong part of the animal. */
+      beePinJoints = BEE_PINS.map(({ stem }) => {
+        let found: THREE.Object3D | null = null;
+        handle.root.traverse((object) => {
+          if (!found && object.name.startsWith(stem)) found = object;
+        });
+        if (!found) console.warn('bee pin names a joint this rig does not have:', stem);
+        return found;
+      });
+
       // Starts on the fly clip: the very first thing the bee does is fly in.
       beeActions[2]?.reset().fadeIn(0.01).play();
       /*
@@ -1626,11 +1711,49 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
                longer on screen. */
             subjectRect.presence = beePresence * (1 - dive);
           }
+
+          /*
+           * The anatomy labels, projected from their own joints.
+           *
+           * Right here, and for the same reason the rect above is: the world
+           * matrix is current and the placement for this frame has been
+           * applied. Positions go out as custom properties on the label layer,
+           * so three pins riding a 60 fps animation cost no React renders at
+           * all — the same trade `ModelStage.syncPins` makes.
+           *
+           * `beeMix` gates the whole set, not just the opacity. It is 0 in the
+           * hero and 1 at the study mark, so the labels belong to the chapter
+           * that is *about* the anatomy and never appear over the hero, where
+           * the animal is three times the size and cropped by the frame.
+           */
+          const pinLayer = pinHostRef.current;
+          if (pinLayer && beePinJoints.length) {
+            const chapter = beeMix * beePresence * (1 - dive);
+            for (let index = 0; index < beePinJoints.length; index += 1) {
+              const joint = beePinJoints[index];
+              if (!joint) continue;
+              joint.getWorldPosition(pinScratch);
+              pinScratch.project(landCamera);
+              const nx = pinScratch.x * 0.5 + 0.5;
+              const ny = 0.5 - pinScratch.y * 0.5;
+              const inFrame = pinScratch.z > -1 && pinScratch.z < 1
+                && nx > PIN_SAFE.minX && nx < PIN_SAFE.maxX
+                && ny > PIN_SAFE.minY && ny < PIN_SAFE.maxY;
+              pinLayer.style.setProperty(`--pin-${index}-x`, `${(nx * 100).toFixed(2)}%`);
+              pinLayer.style.setProperty(`--pin-${index}-y`, `${(ny * 100).toFixed(2)}%`);
+              /* Two decimals, because this is read by `opacity` and a value that
+                 changes every frame at full precision is a string allocation per
+                 pin per frame for a difference nobody can see. */
+              pinLayer.style.setProperty(`--pin-${index}-on`, inFrame ? chapter.toFixed(2) : '0');
+            }
+          }
         } else {
           clearSubjectRect();
+          clearBeePins();
         }
       } else {
         clearSubjectRect();
+        clearBeePins();
       }
 
       /* -------------------------------------------------------------- ocean --- */
@@ -1981,6 +2104,33 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
         <div className="visual-loader"><span />Đang mở phòng thí nghiệm 3D…</div>
       </div>
       <div className="explore-foreground" ref={foregroundHostRef} aria-hidden="true" />
+      {/*
+        The anatomy labels.
+
+        `aria-hidden`, and not reluctantly: the bee-study chapter's
+        `.study-readout` publishes the same four parts as a real `<dl>` — ĐẦU,
+        NGỰC, CÁNH, BỤNG, each with its own description — one column to the
+        right of this. These are the visual half of that list, riding the
+        animal, and announcing both would read the anatomy twice.
+
+        Positions arrive as `--pin-N-x/y/on` from the frame loop above.
+      */}
+      <div className="bee-pins" ref={pinHostRef} aria-hidden="true">
+        {BEE_PINS.map((pin, index) => (
+          <span
+            key={pin.stem}
+            className={`bee-pin bee-pin--${pin.side}`}
+            style={{
+              left: `var(--pin-${index}-x, 50%)`,
+              top: `var(--pin-${index}-y, 50%)`,
+              opacity: `var(--pin-${index}-on, 0)`,
+            }}
+          >
+            <i aria-hidden="true" />
+            <b>{pin.label}</b>
+          </span>
+        ))}
+      </div>
     </>
   );
 }

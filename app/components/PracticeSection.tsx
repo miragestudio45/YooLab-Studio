@@ -1,7 +1,6 @@
 'use client';
 
-import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
-import { useFormulaGate } from './FormulaGate';
+import { useCallback, useEffect, useState } from 'react';
 import { PracticeIcon } from './practice/PracticeIcons';
 import { PracticeModal } from './practice/PracticeModal';
 import {
@@ -37,62 +36,35 @@ import {
  *     robot now loads a real industrial arm and the stills are renders of the
  *     same three subjects, so the rail can show them.
  *
- * Nothing here mounts a renderer. The section costs three WebP files totalling
- * about 130 kB, and the drone and robot bundles are fetched on intent — hover
- * or focus on a rail cell, which lands ~200 ms before the click does.
+ * Nothing here mounts a renderer, and since the three experiences became their
+ * own deployments nothing in this bundle does — see `lib/practice/manifest.ts`.
+ * The section's entire cost is three WebP posters and three thumbnails, about
+ * 440 kB fetched lazily; the popup embeds the build a visitor actually opens.
+ *
+ * The preloader that used to live here is gone with the labs. Warming a `lazy`
+ * import on pointer-enter bought ~200 ms on a chunk this bundle no longer
+ * contains, and there is nothing honest to prefetch in its place: a hidden
+ * `<iframe>` or a `<link rel="prefetch">` at an external origin would start
+ * downloading a whole simulator for a visitor who only moved the mouse across a
+ * thumbnail.
  */
 
-const DroneLab = lazy(() => import('./practice/DroneLab').then((module) => ({ default: module.DroneLab })));
-const RobotLab = lazy(() => import('./practice/RobotLab').then((module) => ({ default: module.RobotLab })));
-const FormulaLab = lazy(() => import('./practice/FormulaLab').then((module) => ({ default: module.FormulaLab })));
-
-const PRELOAD: Record<PracticeId, () => Promise<unknown>> = {
-  formula: () => import('./practice/FormulaLab'),
-  drone: () => import('./practice/DroneLab'),
-  robot: () => import('./practice/RobotLab'),
-};
-
-function LabFallback() {
-  return (
-    <p className="lab-status">
-      <i />
-      Đang mở phòng thực hành…
-    </p>
-  );
-}
-
 export function PracticeSection() {
-  const { openFormula } = useFormulaGate();
-  const [active, setActive] = useState<PracticeId>('formula');
+  const [active, setActive] = useState<PracticeId>('excavator');
   const [open, setOpen] = useState(false);
-  const preloaded = useRef(new Set<PracticeId>());
 
-  const preload = useCallback((id: PracticeId) => {
-    if (preloaded.current.has(id)) return;
-    preloaded.current.add(id);
-    void PRELOAD[id]().catch(() => {
-      /* A failed prefetch is not an error state — the real import will retry
-         and can show its own fallback. Clearing the flag lets it try again. */
-      preloaded.current.delete(id);
-    });
-  }, []);
-
-  const select = useCallback((id: PracticeId) => {
-    setActive(id);
-    preload(id);
-  }, [preload]);
+  const select = useCallback((id: PracticeId) => setActive(id), []);
 
   const launch = useCallback((id: PracticeId) => {
     setActive(id);
-    preload(id);
     setOpen(true);
-  }, [preload]);
+  }, []);
 
-  /* A hash link to a specific lab opens it. The Library does the same, and it
-     is what makes "xem thử phòng robot" shareable as a URL. */
+  /* A hash link to a specific experience opens it. The Library does the same,
+     and it is what makes "xem thử phòng robot" shareable as a URL. */
   useEffect(() => {
     const fromHash = () => {
-      const match = /^#thuc-hanh\/(formula|drone|robot)$/.exec(window.location.hash);
+      const match = /^#thuc-hanh\/(excavator|drone|robot)$/.exec(window.location.hash);
       if (!match) return;
       launch(match[1] as PracticeId);
     };
@@ -113,12 +85,12 @@ export function PracticeSection() {
   const experience = findExperience(active);
 
   return (
-    <section className="practice" id="thuc-hanh" aria-labelledby="practice-title">
+    <section className="practice" id="thuc-hanh" data-snap aria-labelledby="practice-title">
       <div className="shell">
         <div className="section-heading section-heading--split practice-head" data-reveal>
           <div>
             <p className="section-kicker">Thực hành &amp; STEM</p>
-            <h2 id="practice-title">Thực hành những điều<br /><em>khó thực hiện trong lớp học.</em></h2>
+            <h2 id="practice-title" data-kinetic>Thực hành những điều<br /><em>khó thực hiện trong lớp học.</em></h2>
           </div>
           <p>
             Thiết bị đắt, thao tác nguy hiểm, hoặc quá nhỏ để nhìn thấy. Trong
@@ -138,7 +110,6 @@ export function PracticeSection() {
               type="button"
               className="practice-stage"
               onClick={() => launch(experience.id)}
-              onPointerEnter={() => preload(experience.id)}
               aria-label={`Mở trải nghiệm: ${experience.title}`}
             >
               {PRACTICE_EXPERIENCES.map((entry) => (
@@ -157,7 +128,7 @@ export function PracticeSection() {
                   aria-hidden={entry.id === active ? undefined : true}
                   width={1400}
                   height={1050}
-                  loading={entry.id === 'formula' ? undefined : 'lazy'}
+                  loading={entry.id === 'excavator' ? undefined : 'lazy'}
                   decoding="async"
                   draggable={false}
                 />
@@ -198,7 +169,6 @@ export function PracticeSection() {
                   aria-label={entry.title}
                   className={`practice-dot${entry.id === active ? ' is-active' : ''}`}
                   onClick={() => select(entry.id)}
-                  onPointerEnter={() => preload(entry.id)}
                 />
               ))}
             </div>
@@ -224,7 +194,6 @@ export function PracticeSection() {
                 type="button"
                 className="practice-cta"
                 onClick={() => launch(experience.id)}
-                onPointerEnter={() => preload(experience.id)}
               >
                 {experience.action}
                 <span aria-hidden="true">›</span>
@@ -242,8 +211,6 @@ export function PracticeSection() {
                 className={`practice-rail-item${entry.id === active ? ' is-active' : ''}`}
                 onClick={() => select(entry.id)}
                 onDoubleClick={() => launch(entry.id)}
-                onPointerEnter={() => preload(entry.id)}
-                onFocus={() => preload(entry.id)}
               >
                 <i aria-hidden="true">
                   <img
@@ -284,21 +251,10 @@ export function PracticeSection() {
         </ul>
       </div>
 
-      {open && (
-        <PracticeModal experience={experience} onClose={close}>
-          {/*
-            `key` on the experience id, not a prop swap. Each lab owns a WebGL
-            context, a loader and an animation loop, and re-keying is the only
-            way to guarantee the outgoing one is torn down in order before the
-            incoming one asks for a context.
-          */}
-          <Suspense fallback={<LabFallback />}>
-            {active === 'formula' && <FormulaLab key="formula" onOpenFull={openFormula} />}
-            {active === 'drone' && <DroneLab key="drone" />}
-            {active === 'robot' && <RobotLab key="robot" />}
-          </Suspense>
-        </PracticeModal>
-      )}
+      {/* The dialog owns the embed, keyed on the url inside it. Mounted only
+          while open, so a closed popup holds no frame and no external origin is
+          contacted until a visitor asks for one. */}
+      {open && <PracticeModal experience={experience} onClose={close} />}
     </section>
   );
 }

@@ -128,14 +128,14 @@ export function PricingSection() {
   const [cycle, setCycle] = useState<BillingCycle>('month');
 
   return (
-    <section className="pricing-section" id="bang-gia" aria-labelledby="pricing-title">
+    <section className="pricing-section" id="bang-gia" data-snap aria-labelledby="pricing-title">
       {/* Two washes, drawn once and never animated. They are what stops four
           white cards on ivory from reading as a spreadsheet. */}
       <div className="pricing-aura" aria-hidden="true" />
 
       <div className="shell">
         <div className="pricing-head" data-reveal>
-          <h2 id="pricing-title">Bảng giá dịch vụ</h2>
+          <h2 id="pricing-title" data-kinetic>Bảng giá dịch vụ</h2>
           <p>
             Chọn gói tháng hoặc năm để dùng thường xuyên, hoặc nạp Credits để dùng
             linh hoạt theo từng tác vụ.

@@ -52,30 +52,46 @@ import type { ExperienceManifest } from '../lib/library/types';
  */
 
 /**
- * Sixteen ids, ordered so no two neighbours share a subject tint.
+ * Sixteen ids, alternating a real render with a drawn one.
  *
- * The order is the composition. Grouped by subject, the belt reads as four
- * blocks of one colour sliding past; interleaved, every card that enters the
- * frame is a different colour from the one leaving it, which is what makes a
- * continuous strip read as a catalogue rather than as a filmstrip of one thing.
+ * Two rules fight here and the resolution is worth writing down.
+ *
+ * The first is **pictures over diagrams**. The belt shipped as sixteen drawn
+ * `LibraryMark` line diagrams and came back from review as ugly, which it was:
+ * they are drawings of objects this repository owns the actual meshes for. Nine
+ * of the sixteen below are now pre-baked renders of those meshes — see
+ * `scripts/bake-library-covers.mjs` and the `cover` field in `types.ts` — and
+ * one is a photograph. The remaining six are entries with **nothing to render**:
+ * the periodic table is a DOM grid, the physics labs are simulations and the
+ * molecules are generated from bond tables at runtime. A drawn mark is the
+ * honest picture of those, and dropping them would make the belt claim the
+ * library is only biology.
+ *
+ * The second is **colour rhythm**: grouped by subject the belt reads as four
+ * blocks of one tint sliding past, so the order interleaves. But only Sinh học
+ * has meshes, so a strict no-two-neighbours-alike rule would have capped the
+ * renders at eight. The renders win — that is what the review was about — and
+ * the order alternates render / diagram instead, which turns out to carry the
+ * same rhythm: every card entering the frame is a different *kind* of picture
+ * from the one leaving it.
  */
 const BELT = [
-  'bee',
-  'periodic-table',
-  'projectile-lab',
-  'globe-explorer',
-  'organ-heart',
-  'molecule-water',
-  'wave-lab',
-  'formula',
-  'cell-animal',
-  'molecule-caffeine',
-  'incline-lab',
-  'earth-layers',
-  'organ-brain',
-  'molecule-nacl',
-  'circuit-lab',
-  'organ-lungs',
+  'bee',                // render
+  'periodic-table',     // diagram — a DOM grid, no mesh
+  'organ-heart',        // render
+  'projectile-lab',     // diagram — a simulation
+  'trex',               // render
+  'globe-explorer',     // diagram — a canvas
+  'organ-brain',        // render
+  'molecule-caffeine',  // diagram — generated from a bond table
+  'jellyfish',          // render
+  'circuit-lab',        // diagram — a simulation
+  'organ-lungs',        // render
+  'earth-layers',       // diagram — a cross-section
+  'clownfish',          // render
+  'molecule-nacl',      // diagram — a generated lattice
+  'organ-kidney',       // render
+  'formula',            // photograph — the workshop is a full scene
 ];
 
 type Card = { entry: ExperienceManifest; subject: string; tint: string };
@@ -129,8 +145,19 @@ function BeltCard({ card, clone }: { card: Card; clone?: boolean }) {
          */
         onClick={() => openLibraryExperience(entry.id)}
       >
-        <span className={`proof-belt-plate proof-belt-plate--${entry.rail.kind}`}>
-          <RailVisual visual={entry.rail} />
+        {/*
+          A baked render if the entry has one, its drawn mark if it does not.
+
+          `cover` and `rail` are not alternatives to choose between per surface —
+          `rail` stays what the Library's own rail uses, where the GLBs are
+          coming anyway and a live bake is the better picture. This is the
+          homepage, where sixteen live bakes would be sixteen GLB fetches.
+        */}
+        <span className={`proof-belt-plate proof-belt-plate--${entry.cover ? 'cover' : entry.rail.kind}`}>
+          {entry.cover
+            /* eslint-disable-next-line @next/next/no-img-element */
+            ? <img src={`/asset/Library/cover/${entry.cover}.webp`} alt="" width={480} height={360} loading="lazy" decoding="async" draggable={false} />
+            : <RailVisual visual={entry.rail} />}
         </span>
         <span className="proof-belt-subject">{subject}</span>
         <span className="proof-belt-title">{entry.title}</span>
@@ -142,12 +169,12 @@ function BeltCard({ card, clone }: { card: Card; clone?: boolean }) {
 
 export function ProofSection() {
   return (
-    <section className="proof" id="bai-hoc-mau" aria-labelledby="proof-title">
+    <section className="proof" id="bai-hoc-mau" data-snap aria-labelledby="proof-title">
       <div className="shell-editorial">
         <div className="section-heading section-heading--split" data-reveal>
           <div>
             <p className="section-kicker">Bài học mẫu</p>
-            <h2 id="proof-title">Những bài học<br /><em>bạn có thể mở ngay.</em></h2>
+            <h2 id="proof-title" data-kinetic>Những bài học<br /><em>bạn có thể mở ngay.</em></h2>
           </div>
           {/*
             Both numbers are counted, not typed. The first is the belt's own

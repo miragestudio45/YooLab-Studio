@@ -82,7 +82,7 @@ export function FaqSection() {
         <div className="section-heading section-heading--split" data-reveal>
           <div>
             <p className="section-kicker section-kicker--light">Trước khi bắt đầu</p>
-            <h2 id="faq-title">Những câu <em>hỏi trước nhất.</em></h2>
+            <h2 id="faq-title" data-kinetic>Những câu <em>hỏi trước nhất.</em></h2>
           </div>
           <p>
             Sáu câu dưới đây là những gì giáo viên hỏi nhiều nhất trước khi tạo

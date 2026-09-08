@@ -138,6 +138,22 @@ Two companions to the screenshots, because a picture is bad at proving a number:
   Proof, footer — and where each section's primary block lands relative to the
   fold. It reads **spread = 0 px at all seven viewports**, which is the whole
   "does this page use one grid" question answered numerically.
+
+  Two things it now measures that it did not. Its practice target named
+  `.practice-grid`, a class that stopped existing when that section became a
+  poster wall, so it had been silently reporting `null` — a target that measures
+  nothing asserts nothing, and that is the failure mode to watch for in this
+  file. And it learned `fitTallerThan` alongside `fitAbove`, because Bảng giá is
+  the one section whose one-screen promise is bounded by viewport *height*; with
+  only a width threshold available there was no way to record that promise except
+  to leave it unasserted.
+
+  The snap track is no longer a fixed list either. `lib/story/snap.ts` admits a
+  `[data-snap]` section only while its content fits the viewport, so the anchor
+  count is a function of the viewport: eleven at 1512 × 982, seven on a tablet
+  where Practice, Education and Pricing deliberately stack. `window.__snap
+  .anchors()` in a dev build reports what was admitted, which is the number to
+  check when a settle lands somewhere unexpected.
 - `reference-audit/probe.mjs` evaluates an arbitrary expression in the real page
   at a given viewport. It exists because two of the faults in this round were
   invisible to a screenshot and obvious in three numbers.
@@ -161,6 +177,26 @@ than here; what it did **not** cover:
   watched.
 - **Touch.** Orbit, pinch-zoom and the mobile knowledge sheet were exercised
   with synthetic pointer events, not with fingers on glass.
+- **The kinetic type's feel.** `KineticType`'s play/reverse cycle is verified by
+  reading computed opacity, transform and filter at five scroll positions
+  (`--motion` in `probe.mjs`, added for this — see below), which proves the state
+  machine and says nothing about whether 0.92 s at `power4.out` with a 0.075
+  stagger *looks* right. Nobody has watched it on a trackpad.
+
+  One trap this file should keep: the harness inherits the host OS's animation
+  setting, so on a machine with Windows' "Show animations" off, Chrome reports
+  `prefers-reduced-motion: reduce` and every motion path correctly switches
+  itself off — including the GSAP import. A probe run there reports the opt-out
+  working and asserts nothing about the effect, which is indistinguishable from
+  the effect being broken. `probe.mjs --motion` forces `no-preference`; without
+  it the first verification of this feature was a false pass.
+- **The three embedded practice builds.** They are separate deployments now
+  (DESIGN.md §12b), and nothing in this repository tests what is inside the
+  frame. What is verified here is that the dialog opens, that the frame reaches
+  `load` and fades in over its own spinner, and that all three origins serve
+  without `X-Frame-Options` or a `frame-ancestors` policy — checked with a
+  request to each. If one of them ships either header, its card opens onto a
+  blank frame and only "Mở tab mới" still works.
 - **Assistive technology.** Roles, labels and focus order are authored, and the
   canvases are labelled `role="img"`; no screen reader has read the page.
 
@@ -178,6 +214,7 @@ report says `scrolls` rather than `CUT`:
 | YooStudio | 700 px | Editor keeps its height, the section scrolls |
 | Practice & STEM | 1180 px | Rail becomes a row of tabs above the stage; below 1000 the brief column moves under it |
 | Education | **1180 px** | Lesson player stacks under the brief card; the capability row goes to two columns |
+| Bảng giá | 900 px tall **and** 1181 px wide | Shorter: the four cards' CTA row falls under the fold — head, switch and 89% of a card stay above it. Narrower: the grid goes two-up and the row's height doubles |
 
 Library, the hero, the three creature chapters, the sample lessons and the CTA
 compose in one viewport at **every** tested size, 390 to 1920.

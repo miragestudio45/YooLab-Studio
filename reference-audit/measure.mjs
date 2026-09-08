@@ -47,8 +47,9 @@ const VIEWPORTS = {
 const TARGETS = [
   /*
    * `fitAbove` is the width above which a section promises to compose in one
-   * viewport. Below it the section deliberately stacks and scrolls, and a report
-   * of "CUT" would be the probe describing the design as a defect.
+   * viewport, and `fitTallerThan` the height. Outside either the section
+   * deliberately stacks and scrolls, and a report of "CUT" would be the probe
+   * describing the design as a defect.
    *
    * The phone regime (700) is where two-up diagrams, a four-panel editor and a
    * four-card row all stop being one-screen propositions — squeezing them in
@@ -58,7 +59,18 @@ const TARGETS = [
   { id: 'tu-kham-pha-den-tao', must: '.bridge-layout', label: 'Bridge layout', fitAbove: 860 },
   { id: 'cong-cu', must: '.studio', label: 'YooStudio editor', fitAbove: 700 },
   { id: 'thu-vien', must: '.library-app', label: 'Library workspace' },
-  { id: 'thuc-hanh', must: '.practice-grid', label: 'Practice grid', fitAbove: 1000 },
+  /*
+   * `.practice-hub`, not `.practice-grid`: that class has not existed since the
+   * section became a poster wall over a popup, so the probe was silently
+   * reporting `null` for its one measurable block — and a target that measures
+   * nothing asserts nothing.
+   *
+   * 1180, not 1000, now that it measures. The hub's own responsive rules stack
+   * the rail at 1180 and move the brief column under the stage below 1000, so
+   * 1180 is where the one-screen promise actually ends; KNOWN_LIMITATIONS.md has
+   * said 1180 for this section all along and the target simply disagreed with it.
+   */
+  { id: 'thuc-hanh', must: '.practice-hub', label: 'Practice hub', fitAbove: 1180 },
   /*
    * `fitAbove` is where a section stops promising to compose in one viewport.
    *
@@ -77,6 +89,25 @@ const TARGETS = [
      KNOWN_LIMITATIONS.md. */
   { id: 'giao-duc', must: '.education-panel', label: 'Education panel', fitAbove: 1180 },
   { id: 'bai-hoc-mau', must: '.proof-belt', label: 'Lesson belt', fitAbove: 700 },
+  /*
+   * Added when the section stopped reserving the header band twice.
+   *
+   * The one target that needs both thresholds, and it is the reason
+   * `fitTallerThan` exists at all.
+   *
+   * **Height**, because four cards and a head are a fixed ~790 px of content:
+   * the section composes in one screen wherever the viewport is 900 px tall —
+   * measured +171 at 1920 × 1080, +66 at 1512 × 982, +65 at 1440 × 900, +43 at
+   * 1298 × 970 — and at 1366 × 768 the CTA row falls below the fold by design.
+   *
+   * **Width**, because at 1180 the grid becomes two columns and the row's height
+   * doubles: 1,092 px at 768 wide, which no viewport height on a tablet holds.
+   * That is the ordinary stack every section on this page makes at that width,
+   * not a pricing defect.
+   *
+   * Reasoning in DESIGN.md §12c, the floor in KNOWN_LIMITATIONS.md.
+   */
+  { id: 'bang-gia', must: '.pricing-grid', label: 'Pricing cards', fitAbove: 1181, fitTallerThan: 900 },
   { id: 'bat-dau-voi-yoolab', must: '.final-cta > div:last-child', label: 'CTA actions' },
 ];
 
@@ -356,7 +387,21 @@ try {
     for (const section of report.sections) {
       if (section.missing) { console.log(`  #${section.id}  MISSING`); continue; }
       const target = TARGETS.find((entry) => entry.id === section.id);
-      const asserts = !target?.fitAbove || report.viewport[0] >= target.fitAbove;
+      /*
+       * Two thresholds, because two different dimensions can bind.
+       *
+       * `fitAbove` is a width and answers most sections: below it a two-up
+       * diagram or a four-panel editor deliberately stacks. `fitTallerThan` is
+       * a height, and Bảng giá is the section that needed it — four cards and a
+       * head are a fixed ~790 px of content, so what decides whether it composes
+       * in one screen is how tall the screen is, not how wide. Without it the
+       * only way to record that promise was to leave `fitAbove` off, which this
+       * line reads as "always asserted" and turns a designed scroll into a
+       * reported defect.
+       */
+      const wideEnough = !target?.fitAbove || report.viewport[0] >= target.fitAbove;
+      const tallEnough = !target?.fitTallerThan || report.viewport[1] >= target.fitTallerThan;
+      const asserts = wideEnough && tallEnough;
       const flags = [];
       if (section.slack !== null && section.slack < 0) flags.push(`${asserts ? 'CUT' : 'scrolls'} ${-section.slack}px`);
       if (section.underHeader) flags.push('HEADING UNDER HEADER');

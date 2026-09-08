@@ -313,3 +313,23 @@ export function requestThumbnail(request: ThumbnailRequest): Promise<string | nu
   inflight.set(id, task);
   return task;
 }
+
+/*
+ * A bake seam, for the build step that turns these renders into files.
+ *
+ * The Library's rail and the lesson belt want pictures of real meshes, and the
+ * runtime baker above is the wrong way to get them for the belt: sixteen cards
+ * would mean fetching sixteen GLBs, and this repository's organ set alone is
+ * 6.4 MB. So `scripts/bake-library-covers.mjs` drives a real Chrome, calls this
+ * from the page, and writes each result to a WebP under
+ * `public/asset/Library/cover/`. The belt then costs ~20 kB a card and fetches
+ * no geometry at all.
+ *
+ * Dev-only, and it has to be: it exists so a build script can reach a renderer
+ * that only exists inside a browser, and shipping a global that bakes GLBs on
+ * demand to production would be a way to make any visitor's tab do it.
+ */
+if (process.env.NODE_ENV !== 'production' && typeof window !== 'undefined') {
+  (window as unknown as { __bakeThumbnail?: unknown }).__bakeThumbnail =
+    (request: ThumbnailRequest) => requestThumbnail(request);
+}

@@ -386,6 +386,24 @@ export type ExperienceManifest = {
   view: ExperienceView;
   /** The rail illustration. Required: a row with no picture is the weak row. */
   rail: RailVisual;
+  /**
+   * A pre-baked render of this entry's own mesh, for surfaces that want a real
+   * picture and cannot afford the geometry.
+   *
+   * The slug of a WebP under `public/asset/Library/cover/` — capital L, which
+   * is the directory that already exists — written by
+   * `scripts/bake-library-covers.mjs`. `rail` stays the source of truth for the
+   * Library's own rail — a visitor who has opened a subject is getting those
+   * GLBs anyway, so a live bake there is the better picture. This field is for
+   * the homepage's lesson belt, where sixteen live bakes would be sixteen GLB
+   * fetches and 6.4 MB of organ mesh for cards 240 px wide.
+   *
+   * Optional, and its absence is meaningful: an entry with no mesh — the
+   * periodic table, the physics labs, the molecules, the globe — has nothing to
+   * render, and the belt falls back to its drawn `rail` mark. That is why the
+   * belt's curated list is now mostly entries that have one.
+   */
+  cover?: string;
   /** Named structures, organelles, parts — the anatomy readout. */
   parts?: LearningPoint[];
   /** What a student should be able to do afterwards. */

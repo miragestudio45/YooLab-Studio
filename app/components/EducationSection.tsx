@@ -541,7 +541,7 @@ export function EducationSection() {
   const active = ROLES.find((entry) => entry.id === role) ?? ROLES[0];
 
   return (
-    <section className="education" id="giao-duc" aria-labelledby="education-title">
+    <section className="education" id="giao-duc" data-snap aria-labelledby="education-title">
       {/*
         One screen-tall grid whose rows measure themselves.
         DESIGN.md: "Never estimate a head band. Make the layout subtract it."
@@ -561,26 +561,33 @@ export function EducationSection() {
                 type, which is the one thing DESIGN.md §3 forbids. */}
             <div className="section-heading education-head">
               {/*
-                Two rejected headings, and why this one.
+                Three rejected headings, and why this one.
 
                 "Ba cách sử dụng" promised three features, which is the reading
                 the next screen spends its whole time contradicting: the three
-                tabs are three *people*. "Ba vai trò" fixed that and stopped
-                there — it counts the audiences without saying anything about
-                them, and a heading whose only content is a number is a label on
-                a filing cabinet.
+                tabs are three *people*. "Một nền tảng cho cả trường." replaced it
+                and came back from review as reading badly in Vietnamese — "cho
+                cả trường" puts a school on the receiving end of a platform, which
+                is not how the language hands something over, and it also said
+                nothing about the three roles the tabs are about to show.
 
-                What the section actually claims is that a teacher, a student and
-                a school all open the same thing, which is the sentence below. It
-                is also the one a principal reads and recognises as their own
-                problem, and that audience is the one this section exists for.
+                The heading is now the same sentence the role dialog uses, which
+                is the second half of that review: `TrialInvite` asks a visitor
+                which role they are, this section shows what each role gets, and
+                the two screens were introducing the product with different
+                words. One claim, one wording, two places.
 
-                One sentence over two lines, not two sentences: "Cả trường cùng
-                dùng." was tried and ran to a third line in this column, which
-                pushes the tab strip and the whole brief card down with it.
+                The count is allowed to be bare here because the *lede* carries
+                the warmth — that was the other complaint, that the heading alone
+                read curt. A tight heading over a sentence that names the three
+                verbs is the shape the rest of this page uses.
               */}
               <p className="section-kicker">Dành cho giáo dục</p>
-              <h2 id="education-title">Một nền tảng<br /><em>cho cả trường.</em></h2>
+              <h2 id="education-title" data-kinetic>Một nền tảng,<br /><em>ba vai trò.</em></h2>
+              <p className="education-head-lede">
+                Giáo viên soạn bài, học sinh khám phá, nhà trường triển khai —
+                trên cùng một chỗ.
+              </p>
             </div>
 
             <div className="education-tabs" role="tablist" aria-label="Vai trò">
