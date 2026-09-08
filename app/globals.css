@@ -392,8 +392,27 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   border-radius: 15px;
   background: rgba(255, 247, 238, 0.34);
   box-shadow: 0 7px 24px rgba(87, 62, 43, 0.035);
-  backdrop-filter: blur(18px) saturate(1.14);
+  /*
+   * Prefix FIRST, standard LAST. Not cosmetic — the order is what decides
+   * whether this rule survives the build.
+   *
+   * Lightning CSS reads `-webkit-backdrop-filter` and `backdrop-filter` as one
+   * property carrying a prefix flag, so two declarations of it are a duplicate
+   * and the last one written wins. Written the other way round — standard, then
+   * `-webkit-` — the standard form is the one discarded, and the minified sheet
+   * ships `-webkit-backdrop-filter` alone. Chrome removed that alias: measured
+   * in Chrome 148, `CSS.supports('-webkit-backdrop-filter', 'blur(18px)')` is
+   * false, so the computed `backdrop-filter` on this header came out `none` and
+   * the bar was 34% transparent with nothing blurred behind it — the worst of
+   * the three states it can be in. Dev never showed it, because dev does not
+   * minify; it was only ever visible on a built deployment.
+   *
+   * The other prefix pairs in this file (`mask-image`, `text-size-adjust`) were
+   * already in this order and were never affected. All six `backdrop-filter`
+   * pairs were in the wrong one.
+   */
   -webkit-backdrop-filter: blur(18px) saturate(1.14);
+  backdrop-filter: blur(18px) saturate(1.14);
   transition:
     color 300ms ease,
     background-color 300ms ease,
@@ -1010,8 +1029,8 @@ button:focus-visible, a:focus-visible, input:focus-visible {
     0 10px 26px -12px rgba(87, 62, 43, 0.3),
     0 2px 6px -2px rgba(87, 62, 43, 0.16),
     inset 0 1px 0 rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px) saturate(1.06);
   -webkit-backdrop-filter: blur(10px) saturate(1.06);
+  backdrop-filter: blur(10px) saturate(1.06);
   font-size: 10px;
   font-weight: 640;
   letter-spacing: 0.1em;
@@ -2722,8 +2741,8 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
     0 12px 38px color-mix(in srgb, var(--color-lavender) 10%, transparent),
     inset 0 1px 0 rgba(255, 255, 255, 0.92),
     inset 0 -1px 0 rgba(255, 255, 255, 0.38);
-  backdrop-filter: blur(30px) saturate(1.24);
   -webkit-backdrop-filter: blur(30px) saturate(1.24);
+  backdrop-filter: blur(30px) saturate(1.24);
 }
 .bridge-viewer::before {
   content: '';
@@ -3051,8 +3070,8 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
   box-shadow:
     0 22px 52px rgba(87, 62, 43, 0.14),
     inset 0 1px 0 rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(22px) saturate(1.22);
   -webkit-backdrop-filter: blur(22px) saturate(1.22);
+  backdrop-filter: blur(22px) saturate(1.22);
 }
 
 .bridge-animation-panel {
@@ -3686,8 +3705,8 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
     background: rgba(255, 249, 242, 0.72);
     opacity: 0;
     box-shadow: 0 24px 55px rgba(87, 62, 43, 0.16);
-    backdrop-filter: blur(20px) saturate(1.12);
     -webkit-backdrop-filter: blur(20px) saturate(1.12);
+    backdrop-filter: blur(20px) saturate(1.12);
     transition: grid-template-rows 300ms ease, opacity 200ms ease, background-color 300ms ease, color 300ms ease;
   }
 
@@ -3992,8 +4011,8 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
   .earth-scale,
   .mol-group
 ) {
-  backdrop-filter: none;
   -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 /* The four surfaces whose readability was actually coming from the blur. Each
