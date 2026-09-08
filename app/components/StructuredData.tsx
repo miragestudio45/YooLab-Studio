@@ -1,3 +1,4 @@
+import { SITE_URL } from '../lib/siteUrl';
 /**
  * Structured data for the homepage.
  *
@@ -16,7 +17,7 @@
  * Everything below is checkable against the page it describes.
  */
 
-const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://yoolab.vn';
+const SITE = SITE_URL;
 
 const GRAPH = {
   '@context': 'https://schema.org',

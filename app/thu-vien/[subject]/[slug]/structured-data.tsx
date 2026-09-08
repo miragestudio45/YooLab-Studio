@@ -1,7 +1,8 @@
 import type { LibraryRoute } from '../../../lib/library/slugs';
 import { subjectById } from '../../../lib/library/slugs';
+import { SITE_URL } from '../../../lib/siteUrl';
 
-const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://yoolab.vn';
+const SITE = SITE_URL;
 
 /**
  * `LearningResource` for one specimen.

@@ -2,13 +2,16 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { StructuredData } from './components/StructuredData';
 import { ToastHost } from './components/ToastHost';
+import { INDEXABLE, SITE_URL } from './lib/siteUrl';
 
 const TITLE = 'YooLab — Biến kiến thức thành trải nghiệm 3D/XR';
 const DESCRIPTION =
   'YooLab giúp giáo viên xây dựng bài học với mô hình 3D, học sinh khám phá, tương tác và sáng tạo nội dung số trên cùng một nền tảng.';
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? 'https://yoolab.vn'),
+  /* One resolver for every absolute URL this page publishes — see the note in
+     `lib/siteUrl.ts` for what a deployment describing the wrong host cost. */
+  metadataBase: new URL(SITE_URL),
   title: TITLE,
   description: DESCRIPTION,
   /*
@@ -20,11 +23,17 @@ export const metadata: Metadata = {
    * consolidated onto one indexable address instead of splitting its signals.
    */
   alternates: { canonical: '/' },
+  /*
+   * `index` is not a constant because not every deployment of this repo should
+   * be in the index — only the one answering on `yoolab.vn`. See `INDEXABLE` in
+   * `lib/siteUrl.ts`. `follow` stays true either way: a staging copy that is not
+   * itself indexable has no reason to strand the links it carries.
+   */
   robots: {
-    index: true,
+    index: INDEXABLE,
     follow: true,
     googleBot: {
-      index: true,
+      index: INDEXABLE,
       follow: true,
       /* The Library and the practice rooms are the product; a text-only snippet
          cannot represent them, and a preview frame can. */
