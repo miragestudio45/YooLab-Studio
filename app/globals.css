@@ -2214,86 +2214,6 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
  */
 /* `.cta-orb` is retired by closing.css. */
 
-/*
- * The footer is on the shell too.
- *
- * `max(6.5vw, 26px)` was the last independent horizontal system on the page: at
- * 1920 it put the wordmark 125 px from the edge while every section above it
- * started at 80. The grid lives in a shell-width wrapper via `width` +
- * `margin-inline`, so the closing alignment line is the same as the opening one.
- */
-.site-footer {
-  display: grid;
-  /*
-   * Contact column carries the longest content (wrapping address line), so
-   * it gets a larger share of the row; the other three stay equal.
-   */
-  grid-template-columns: 1.5fr repeat(3, 1fr);
-  gap: clamp(18px, 2.4vw, 36px);
-  /*
-   * Full-bleed ground, shell-aligned content, and no extra wrapper element.
-   *
-   * `max(gutter, (100% - page-max) / 2)` is the shell expressed as padding: below
-   * the cap the gutter wins and the content is `100% - 2 * gutter`; above it the
-   * second term wins and the content is exactly `--page-max`, centred. Same box
-   * as `.shell`, on an element that also has to paint edge to edge.
-   */
-  padding:
-    clamp(28px, 4vh, 44px)
-    max(var(--page-gutter), calc((100% - var(--page-max)) / 2))
-    16px;
-  color: var(--ink-2);
-  border-top: 1px solid var(--line);
-  background: #f8efe2;
-}
-.footer-top { grid-column: 1 / -1; color: var(--brand-logo-ink); margin-bottom: 8px; }
-
-.footer-col { display: flex; flex-direction: column; align-items: start; gap: 16px; min-width: 0; }
-.footer-col h3 { margin: 0; color: var(--ink); font-size: 14.5px; font-weight: 700; letter-spacing: -0.01em; }
-
-.footer-contact-list, .footer-link-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  width: 100%;
-}
-.footer-contact-item { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; line-height: 1.5; color: var(--ink-2); }
-.footer-contact-item svg { flex-shrink: 0; margin-top: 2px; color: var(--ink-3); }
-.footer-contact-item a { color: var(--brand-ink); text-decoration: none; }
-.footer-contact-item a:hover { text-decoration: underline; }
-
-.footer-link-list a { color: var(--ink-2); font-size: 13px; text-decoration: none; }
-.footer-link-list a:hover { color: var(--brand-ink); }
-
-.footer-social-row { display: flex; flex-wrap: wrap; gap: 16px; }
-.footer-social-link {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--ink-2);
-  cursor: pointer;
-}
-
-.footer-bottom {
-  grid-column: 1 / -1;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 10px;
-  margin-top: 24px;
-  padding-top: 14px;
-  border-top: 1px solid var(--line);
-  color: var(--ink-4);
-  font-size: 11px;
-}
-.footer-bottom-links { display: flex; gap: 18px; }
-.footer-bottom-links a { color: var(--ink-4); text-decoration: none; }
-.footer-bottom-links a:hover { color: var(--brand-ink); }
-
- 
 /* The footer is owned by styles/closing.css. The rules here set 9-11px type and
    outranked it by position. */
 
@@ -3862,7 +3782,7 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
 @media (max-width: 860px) {
   .header-cta, .user-menu--desktop { display: none; }
   .site-header-inner { grid-template-columns: auto minmax(0, 1fr) auto; }
-  .site-footer { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 32px; }
+  .footer-links { margin-top: 20px; }
   .bridge-flow { grid-template-columns: minmax(0, 1fr) 72px minmax(0, 1fr); }
 }
 
@@ -3916,8 +3836,6 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
 
 @media (max-width: 560px) {
   .ribbon > li { flex: 1 1 100%; }
-  .site-footer { grid-template-columns: 1fr; row-gap: 28px; }
-  .footer-bottom { flex-direction: column; align-items: flex-start; gap: 8px; }
 }
 
 /* ------------------------------------------------------- narrow overrides --- */

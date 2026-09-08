@@ -93,6 +93,23 @@ export const metadata: Metadata = {
   },
 };
 
+/*
+ * Two Search Console properties were verified against this same host.
+ * `metadata.verification.google` takes only one code — an array renders as a
+ * single tag with the codes comma-joined into one `content`, which Google
+ * does not parse as two verifications — so both go in as literal tags below.
+ */
+const SITE_VERIFICATIONS = [
+  '4_ReIsy9dFXLO-i0Jt4V7uuejHJ-vHGhkGFWlVNgz-A',
+  'ZlsQjhBv4I-__izDobdI4N6r6fZOl9NGieI_eC6qHZ4',
+];
+
+const GA_MEASUREMENT_ID = 'G-NDFFXN9JPG';
+const GA_BOOTSTRAP = `window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', '${GA_MEASUREMENT_ID}');`;
+
 /**
  * Arms the scroll reveal before the first paint.
  *
@@ -147,6 +164,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     // warning on <html> only; every child is still checked normally.
     <html lang="vi" suppressHydrationWarning>
       <head>
+        {SITE_VERIFICATIONS.map((code) => (
+          <meta key={code} name="google-site-verification" content={code} />
+        ))}
         {/*
             One family for the whole site: Plus Jakarta Sans, 200–800, roman and
             italic.
@@ -173,6 +193,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap"
         />
         <script dangerouslySetInnerHTML={{ __html: REVEAL_BOOTSTRAP }} />
+        {/* Google tag (gtag.js) */}
+        <script async src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`} />
+        <script dangerouslySetInnerHTML={{ __html: GA_BOOTSTRAP }} />
         <StructuredData />
       </head>
       <body>
