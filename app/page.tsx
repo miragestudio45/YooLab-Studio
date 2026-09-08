@@ -1,3 +1,4 @@
+
 import { BridgeSection } from './components/BridgeSection';
 /* The closing band and the footer. They live in a component rather than in this
    file because the design they follow needs eleven marks the product's generated
