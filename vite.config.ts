@@ -1,3 +1,5 @@
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
 import tailwindcss from '@tailwindcss/postcss';
 import vinext from 'vinext';
 import { defineConfig, type PluginOption } from 'vite';
@@ -26,6 +28,61 @@ import hostingConfig from './.openai/hosting.json';
  * and mean nothing to Nitro.
  */
 
+/**
+ * Writes the port the dev server actually bound, so nothing has to guess it.
+ *
+ * Vite resolves `server.port` before it knows whether the port is free, and the
+ * number it ends up listening on is only knowable from the HTTP server itself —
+ * `server.config.server.port` still says 3000 after Vite has moved to 3001. So
+ * this reads it off the `listening` event, where it is a fact.
+ *
+ * `.cache/` because it is already gitignored, and the file is removed on a clean
+ * shutdown: a reader that finds no file falls back to 3000, which is right, and
+ * a reader that finds a stale one from a hard kill is protected by the liveness
+ * check in `reference-audit/dev-url.mjs`. Nothing here throws — a dev server
+ * must not fail to start because a cache file could not be written.
+ */
+function recordDevPort(): PluginOption {
+  const file = path.join(import.meta.dirname, '.cache', 'dev-server.json');
+  return {
+    name: 'yoolab:record-dev-port',
+    apply: 'serve',
+    configureServer(server) {
+      const write = () => {
+        const address = server.httpServer?.address();
+        if (!address || typeof address === 'string') return;
+        try {
+          mkdirSync(path.dirname(file), { recursive: true });
+          writeFileSync(
+            file,
+            `${JSON.stringify({ port: address.port, pid: process.pid, startedAt: new Date().toISOString() }, null, 2)}
+`,
+          );
+        } catch {
+          /* A dev server that cannot start because of a cache file is worse
+             than a harness that has to fall back to 3000. */
+        }
+      };
+      server.httpServer?.once('listening', write);
+      /*
+       * Only clear the file if it still describes *this* server. Two dev servers
+       * can run at once — that is the whole reason the port moves — and the
+       * second one to exit must not delete a record belonging to the first,
+       * which would send readers back to the 3000 fallback while a live server
+       * sat on 3001.
+       */
+      const clear = () => {
+        try {
+          if (JSON.parse(readFileSync(file, 'utf8')).pid !== process.pid) return;
+          rmSync(file, { force: true });
+        } catch { /* no file, or unreadable: nothing to clean up */ }
+      };
+      server.httpServer?.once('close', clear);
+      process.once('exit', clear);
+    },
+  };
+}
+
 const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
   '00000000-0000-4000-8000-000000000000';
 
@@ -50,7 +107,7 @@ const nitroPreset: string | null =
   process.env.NITRO_PRESET ?? (process.env.VERCEL ? 'vercel' : null);
 
 export default defineConfig(async () => {
-  const plugins: PluginOption[] = [vinext()];
+  const plugins: PluginOption[] = [vinext(), recordDevPort()];
 
   if (nitroPreset) {
     const { nitro } = await import('nitro/vite');
@@ -114,9 +171,38 @@ export default defineConfig(async () => {
 
   return {
     css: { postcss: { plugins: [tailwindcss()] } },
-    server: isCodexSeatbeltSandbox
-      ? { watch: { useFsEvents: false, usePolling: true } }
-      : undefined,
+    server: {
+      /*
+       * 3000 preferred, the next free port accepted, and the number written down.
+       *
+       * This was `strictPort: true` on a real argument: 5173 is the default for
+       * *every* Vite project, so an unset port means this repo fights whatever
+       * else is running — and Vite's normal response, quietly taking the next
+       * free port, is worse than failing, because the dev server comes up fine
+       * while every bookmark and screenshot harness still points at the old
+       * number. That hazard is not hypothetical. It cost real time in this
+       * repository: a harness aimed at a hard-coded 3000 hit a *stale* server
+       * there, reported a fix as not working, and sent the investigation after a
+       * bug that had already been fixed.
+       *
+       * But refusing to start is not a fix for that, it is the cost of it — and
+       * the person who has to close another window is paying it. The answer is
+       * to let the port move and stop making the tooling guess: `recordDevPort`
+       * below writes the port Vite actually bound to `.cache/dev-server.json`,
+       * and `reference-audit/dev-url.mjs` reads it, so the harnesses follow the
+       * server instead of assuming it.
+       *
+       * `host: true` binds 0.0.0.0 for LAN testing on a phone or tablet. It was
+       * already how this project is run (`--host` in the dev script); saying it
+       * here means the flag is no longer what makes it true.
+       */
+      port: 3000,
+      strictPort: false,
+      host: true,
+      ...(isCodexSeatbeltSandbox
+        ? { watch: { useFsEvents: false, usePolling: true } }
+        : {}),
+    },
     plugins,
   };
 });

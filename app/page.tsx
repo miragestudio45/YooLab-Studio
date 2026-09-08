@@ -1,19 +1,26 @@
 
 import { BridgeSection } from './components/BridgeSection';
+/* The closing band and the footer. They live in a component rather than in this
+   file because the design they follow needs eleven marks the product's generated
+   icon set has no reason to contain, and a hundred lines of path data between
+   `PricingSection` and `</main>` would bury the page's own shape. */
+import { FinalCta, SiteFooter } from './components/ClosingBand';
+import { ConsultProvider } from './components/ConsultModal';
 import { EducationSection } from './components/EducationSection';
 import { ExploreStory } from './components/ExploreStory';
 import { FaqSection, FaqStructuredData } from './components/FaqSection';
 import { FormulaGate } from './components/FormulaGate';
 import { GfxHud } from './components/GfxHud';
+import { KineticType } from './components/KineticType';
 import { LibraryWorkspace } from './components/library/LibraryWorkspace';
 import { PracticeSection } from './components/PracticeSection';
+import { PricingSection } from './components/PricingSection';
 import { ProofSection } from './components/ProofSection';
 import { ScrollReveal } from './components/ScrollReveal';
 import { SectionSnap } from './components/SectionSnap';
-import { SiteFooter } from './components/SiteFooter';
 import { SiteHeader } from './components/SiteHeader';
-import { StartWithYooLabButton } from './components/StartWithYooLabButton';
 import { StudioDemoGate } from './components/StudioDemoGate';
+import { TrialInvite } from './components/TrialInvite';
 /* From the shared module, not the full set: these four are the editor's own
    glyphs, but importing them out of `EditorIcons` drags all sixty-five into the
    first request wave and undoes `StudioDemoGate`. */
@@ -30,7 +37,9 @@ import { IconQuiz, IconSpace, IconSteps, IconText } from './components/studio/Ed
  *   06 Practice   what can I simulate?
  *   07 Education  what do I get out of it?     (teacher / student / school)
  *   08 Proof      what actually works?
- *   09 Start      what do I do now?
+ *   09 Pricing    what does it cost?
+ *   10 FAQ        what is still stopping me?   (the objections pricing creates)
+ *   11 Start      what do I do now?
  *
  * A section is allowed to say its one thing once. Where two sections were making
  * the same claim in different words — "khám phá", "sáng tạo" and "trải nghiệm"
@@ -63,7 +72,12 @@ export default function Home() {
   return (
     <main id="trang-chu">
       <FormulaGate>
+       <ConsultProvider>
         <ScrollReveal />
+        {/* The line-level layer over the block-level reveal above it. Additive,
+            by element, and it does nothing on a phone or under reduced motion —
+            see `KineticType`. */}
+        <KineticType />
         <GfxHud />
         <SectionSnap />
         <SiteHeader />
@@ -88,7 +102,7 @@ export default function Home() {
               */}
               <div className="section-heading tool-heading" data-reveal>
                 <p className="section-kicker section-kicker--light">Công cụ YooLab</p>
-                <h2 id="tool-title">Từ kiến thức <em>thành bài học.</em></h2>
+                <h2 id="tool-title" data-kinetic>Từ kiến thức <em>thành bài học.</em></h2>
                 <p className="tool-heading-lede">Chọn mô hình, thêm nội dung, âm thanh và tương tác — không cần lập trình.</p>
               </div>
             </div>
@@ -132,26 +146,23 @@ export default function Home() {
         <PracticeSection />
         <EducationSection />
         <ProofSection />
+        <PricingSection />
+        {/*
+          The FAQ answers the objections *pricing* creates, so it sits after it.
+          It used to run between Proof and Pricing, which put the answers before
+          the question they answer — a visitor reads "không cần cài đặt gì" while
+          still deciding whether the product is worth a price they have not seen.
+          Its own file has always said it belongs "immediately before the final
+          CTA"; the page now agrees with it, and the last thing before the button
+          is six reasons not to click resolved rather than a price table.
+        */}
         <FaqSection />
         <FaqStructuredData />
+        <TrialInvite />
 
-        <section className="final-cta" id="bat-dau-voi-yoolab" aria-labelledby="cta-title">
-          <div className="cta-orb cta-orb--one" /><div className="cta-orb cta-orb--two" />
-          <p className="section-kicker section-kicker--light" data-reveal>Sẵn sàng để bắt đầu?</p>
-          <h2 id="cta-title" data-reveal>Bắt đầu từ<br /><em>bài học tiếp theo.</em></h2>
-          <p data-reveal>
-            Gửi cho chúng tôi môn học bạn đang dạy, chúng tôi sẽ dựng thử một
-            scene cùng bạn.
-          </p>
-          <div data-reveal>
-            <StartWithYooLabButton className="cta-main">
-              Bắt đầu với YooLab <span aria-hidden="true">↗</span>
-            </StartWithYooLabButton>
-            <a href="mailto:hello@yoolab.vn?subject=Trao%20đổi%20cùng%20YooLab">Trao đổi cùng chúng tôi</a>
-          </div>
-        </section>
-
+        <FinalCta />
         <SiteFooter />
+       </ConsultProvider>
       </FormulaGate>
     </main>
   );

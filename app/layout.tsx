@@ -2,13 +2,16 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { StructuredData } from './components/StructuredData';
 import { ToastHost } from './components/ToastHost';
+import { INDEXABLE, SITE_URL } from './lib/siteUrl';
 
 const TITLE = 'YooLab — Biến kiến thức thành trải nghiệm 3D/XR';
 const DESCRIPTION =
   'YooLab giúp giáo viên xây dựng bài học với mô hình 3D, học sinh khám phá, tương tác và sáng tạo nội dung số trên cùng một nền tảng.';
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? 'https://yoolab.vn'),
+  /* One resolver for every absolute URL this page publishes — see the note in
+     `lib/siteUrl.ts` for what a deployment describing the wrong host cost. */
+  metadataBase: new URL(SITE_URL),
   title: TITLE,
   description: DESCRIPTION,
   /*
@@ -20,11 +23,17 @@ export const metadata: Metadata = {
    * consolidated onto one indexable address instead of splitting its signals.
    */
   alternates: { canonical: '/' },
+  /*
+   * `index` is not a constant because not every deployment of this repo should
+   * be in the index — only the one answering on `yoolab.vn`. See `INDEXABLE` in
+   * `lib/siteUrl.ts`. `follow` stays true either way: a staging copy that is not
+   * itself indexable has no reason to strand the links it carries.
+   */
   robots: {
-    index: true,
+    index: INDEXABLE,
     follow: true,
     googleBot: {
-      index: true,
+      index: INDEXABLE,
       follow: true,
       /* The Library and the practice rooms are the product; a text-only snippet
          cannot represent them, and a preview frame can. */
@@ -38,18 +47,49 @@ export const metadata: Metadata = {
     shortcut: '/brand/yoolab-icon.svg',
     apple: '/brand/yoolab-icon.svg',
   },
+  /*
+   * The share card, and the three scrapers that actually matter here.
+   *
+   * Most of this page's traffic is pasted into Zalo and Messenger rather than
+   * crawled, and both of those are stricter than the spec: Zalo wants `og:url`
+   * and a same-origin absolute image and quietly renders nothing without them,
+   * and Facebook trusts the declared `og:image:width`/`height` over the file —
+   * a card whose numbers disagree with its bytes comes back blank or letterboxed
+   * in Messenger. `metadataBase` above is what makes the relative URLs here come
+   * out absolute; the dimensions are the file's real ones, and stay that way.
+   *
+   * The filename is a cache key, not a name. Facebook and Zalo both cache a
+   * scrape against the image URL for days, so replacing the picture *at* the old
+   * `/og.png` would have gone on serving the jellyfish to every existing thread
+   * until each one was re-scraped by hand. `/og.jpg` is a URL neither has seen,
+   * which is the only re-scrape that needs nobody's cooperation. Any future
+   * change to this picture should change this filename too.
+   *
+   * Baked from `reference-sources/THUMB -  Open Graph  social share/` down to
+   * 1200x675 — Facebook's recommended width, the source's own 16:9 so nothing is
+   * cropped out of the headline, and 173 kB, which keeps it under the size where
+   * Zalo starts skipping images.
+   */
   openGraph: {
     title: TITLE,
     description: 'Thư viện học liệu 3D đa môn, không gian biên soạn YooLab và các trải nghiệm tương tác.',
     type: 'website',
     locale: 'vi_VN',
-    images: [{ url: '/og.png', width: 1792, height: 933, alt: 'YooLab — Không gian học tập 3D' }],
+    url: '/',
+    siteName: 'YooLab',
+    images: [{
+      url: '/og.jpg',
+      width: 1200,
+      height: 675,
+      type: 'image/jpeg',
+      alt: 'YooLab — Kiến tạo không gian học tập số',
+    }],
   },
   twitter: {
     card: 'summary_large_image',
     title: TITLE,
     description: 'Thư viện học liệu 3D đa môn, không gian biên soạn YooLab và các trải nghiệm tương tác.',
-    images: ['/og.png'],
+    images: ['/og.jpg'],
   },
 };
 

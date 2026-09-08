@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { PracticeIcon } from './PracticeIcons';
 import type { PracticeExperience } from '../../lib/practice/manifest';
 
@@ -38,24 +38,48 @@ import type { PracticeExperience } from '../../lib/practice/manifest';
  *
  * `requestFullscreen` rejects when the gesture is not trusted or the browser
  * disallows it (an iframe without `allowfullscreen`, iOS Safari on iPhone). The
- * failure is caught and the button simply stops offering — the dialog is
- * already large, so there is nothing to fall back *to*.
+ * failure is caught and the button simply stops offering — and on that last
+ * platform "Mở tab mới" is the honest fallback, which is one of the two reasons
+ * it is in the head.
+ *
+ * ## What is in the body
+ *
+ * Each experience is its own deployment now, embedded here rather than bundled
+ * into this page — see `lib/practice/manifest.ts` for why. The dialog did not
+ * have to change shape to take one: it was already a full-viewport frame with a
+ * body slot, an exit and a fullscreen button, and every argument that put the
+ * labs in a popup rather than in the section applies unchanged to a build that
+ * happens to live on another origin.
+ *
+ * Three details in the `<iframe>` are load-bearing and none of them is a
+ * default:
+ *
+ *   - **`allow`.** A simulator needs fullscreen and, on a tablet, the motion
+ *     sensors. Without the delegation the embedded build's own fullscreen
+ *     button is dead inside the frame, which reads as the *dialog* being broken.
+ *   - **No `sandbox`.** These are first-party YooX deployments and a sandbox
+ *     without `allow-scripts` would blank them; a sandbox *with* everything they
+ *     need grants what it would have withheld. The attribute would be theatre.
+ *   - **`loading` state owned here.** An embedded origin's first paint is its
+ *     own business and can be a second or two of white. The dialog shows its own
+ *     frame until `load` fires, so the popup never opens onto a blank rectangle.
  */
 
 export function PracticeModal({
   experience,
   onClose,
-  children,
 }: {
   experience: PracticeExperience;
   onClose: () => void;
-  children: ReactNode;
 }) {
   const cardRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const [fullscreen, setFullscreen] = useState(false);
   /** Set once a request has been refused, so a dead button stops being offered. */
   const [fullscreenBlocked, setFullscreenBlocked] = useState(false);
+  /* Keyed by url, so switching experience inside an open dialog shows the
+     loading frame again rather than the previous build's last frame. */
+  const [loaded, setLoaded] = useState('');
 
   const toggleFullscreen = useCallback(() => {
     const card = cardRef.current;
@@ -182,6 +206,23 @@ export function PracticeModal({
                 <span>{fullscreen ? 'Thu nhỏ' : 'Toàn màn hình'}</span>
               </button>
             )}
+            {/*
+              A real link, not a button that calls `window.open`. It is the
+              escape hatch for the two things an embedded frame cannot do —
+              fullscreen on iOS Safari, and being the only thing on the screen —
+              so it has to behave like a link: middle-click, ⌘-click and "copy
+              link address" all work, and `noopener` is there because the target
+              is a different origin.
+            */}
+            <a
+              className="practice-modal-button"
+              href={experience.url}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <PracticeIcon name="expand" />
+              <span>Mở tab mới</span>
+            </a>
             <button
               type="button"
               className="practice-modal-button practice-modal-button--close"
@@ -193,7 +234,27 @@ export function PracticeModal({
             </button>
           </div>
         </header>
-        <div className="practice-modal-body">{children}</div>
+        <div className="practice-modal-body">
+          {loaded !== experience.url && (
+            <p className="lab-status">
+              <i />
+              Đang mở phòng thực hành…
+            </p>
+          )}
+          <iframe
+            key={experience.url}
+            className="practice-frame"
+            src={experience.url}
+            title={experience.title}
+            /* Fullscreen so the build's own button works inside the frame; the
+               two sensors so a tablet can be tilted. Nothing else is delegated. */
+            allow="fullscreen; accelerometer; gyroscope; xr-spatial-tracking"
+            allowFullScreen
+            referrerPolicy="strict-origin-when-cross-origin"
+            onLoad={() => setLoaded(experience.url)}
+            data-ready={loaded === experience.url ? 'true' : 'false'}
+          />
+        </div>
       </div>
     </div>
   );

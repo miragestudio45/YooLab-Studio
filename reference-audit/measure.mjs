@@ -16,6 +16,7 @@ import net from 'node:net';
 import http from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { devUrl } from './dev-url.mjs';
 
 const CHROME_CANDIDATES = [
   'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
@@ -23,10 +24,26 @@ const CHROME_CANDIDATES = [
 ];
 
 const VIEWPORTS = {
+  /*
+   * Above 1920, which is where this page had no tested regime at all and a real
+   * defect shipped: the hero's legibility wash drew a visible rectangle on a
+   * 2560x1440 display, because its falloff is sized in a mix of fixed pixels and
+   * percentages that only reached zero inside the element up to about 1920.
+   *
+   * 2560x1440 is the common 27" desktop panel; 3440x1440 is the 21:9 ultrawide,
+   * which is the widest aspect the page is likely to meet and the one that
+   * stretches a 12-column shell furthest from the type inside it. Both are here
+   * because a regime nobody measures is a regime that breaks.
+   */
+  w3440: [3440, 1440],
+  w2560: [2560, 1440],
   w1920: [1920, 1080],
   w1512: [1512, 982],
   w1440: [1440, 900],
   w1366: [1366, 768],
+  /* iPad landscape — the untested gap between 1024 and 1366. */
+  w1298: [1298, 970],
+  w1194: [1194, 834],
   w1024: [1024, 768],
   w768: [768, 1024],
   w390: [390, 844],
@@ -44,8 +61,9 @@ const VIEWPORTS = {
 const TARGETS = [
   /*
    * `fitAbove` is the width above which a section promises to compose in one
-   * viewport. Below it the section deliberately stacks and scrolls, and a report
-   * of "CUT" would be the probe describing the design as a defect.
+   * viewport, and `fitTallerThan` the height. Outside either the section
+   * deliberately stacks and scrolls, and a report of "CUT" would be the probe
+   * describing the design as a defect.
    *
    * The phone regime (700) is where two-up diagrams, a four-panel editor and a
    * four-card row all stop being one-screen propositions — squeezing them in
@@ -55,7 +73,18 @@ const TARGETS = [
   { id: 'tu-kham-pha-den-tao', must: '.bridge-layout', label: 'Bridge layout', fitAbove: 860 },
   { id: 'cong-cu', must: '.studio', label: 'YooStudio editor', fitAbove: 700 },
   { id: 'thu-vien', must: '.library-app', label: 'Library workspace' },
-  { id: 'thuc-hanh', must: '.practice-grid', label: 'Practice grid', fitAbove: 1000 },
+  /*
+   * `.practice-hub`, not `.practice-grid`: that class has not existed since the
+   * section became a poster wall over a popup, so the probe was silently
+   * reporting `null` for its one measurable block — and a target that measures
+   * nothing asserts nothing.
+   *
+   * 1180, not 1000, now that it measures. The hub's own responsive rules stack
+   * the rail at 1180 and move the brief column under the stage below 1000, so
+   * 1180 is where the one-screen promise actually ends; KNOWN_LIMITATIONS.md has
+   * said 1180 for this section all along and the target simply disagreed with it.
+   */
+  { id: 'thuc-hanh', must: '.practice-hub', label: 'Practice hub', fitAbove: 1180 },
   /*
    * `fitAbove` is where a section stops promising to compose in one viewport.
    *
@@ -73,7 +102,26 @@ const TARGETS = [
      five-row list at 1024. See the note in `sections.css` and the table in
      KNOWN_LIMITATIONS.md. */
   { id: 'giao-duc', must: '.education-panel', label: 'Education panel', fitAbove: 1180 },
-  { id: 'bai-hoc-mau', must: '.proof-grid', label: 'Proof row', fitAbove: 700 },
+  { id: 'bai-hoc-mau', must: '.proof-belt', label: 'Lesson belt', fitAbove: 700 },
+  /*
+   * Added when the section stopped reserving the header band twice.
+   *
+   * The one target that needs both thresholds, and it is the reason
+   * `fitTallerThan` exists at all.
+   *
+   * **Height**, because four cards and a head are a fixed ~790 px of content:
+   * the section composes in one screen wherever the viewport is 900 px tall —
+   * measured +171 at 1920 × 1080, +66 at 1512 × 982, +65 at 1440 × 900, +43 at
+   * 1298 × 970 — and at 1366 × 768 the CTA row falls below the fold by design.
+   *
+   * **Width**, because at 1180 the grid becomes two columns and the row's height
+   * doubles: 1,092 px at 768 wide, which no viewport height on a tablet holds.
+   * That is the ordinary stack every section on this page makes at that width,
+   * not a pricing defect.
+   *
+   * Reasoning in DESIGN.md §12c, the floor in KNOWN_LIMITATIONS.md.
+   */
+  { id: 'bang-gia', must: '.pricing-grid', label: 'Pricing cards', fitAbove: 1181, fitTallerThan: 900 },
   { id: 'bat-dau-voi-yoolab', must: '.final-cta > div:last-child', label: 'CTA actions' },
 ];
 
@@ -180,7 +228,7 @@ const readFlag = (flag, fallback) => {
   args.splice(index, 2);
   return value;
 };
-const url = readFlag('--url', 'http://localhost:3000');
+const url = await devUrl(readFlag('--url', null));
 const keys = args.filter((value) => VIEWPORTS[value]);
 const list = keys.length ? keys : Object.keys(VIEWPORTS);
 
@@ -270,23 +318,58 @@ try {
         section.scrollIntoView({ block: 'start', behavior: 'auto' });
         document.documentElement.style.scrollBehavior = previous;
         await new Promise((r) => setTimeout(r, 260));
+        /*
+         * Both numbers below are differences between two rects in the same
+         * section, which makes them independent of where the page is scrolled.
+         * That is not a refinement, it is the difference between a measurement
+         * and a rumour.
+         *
+         * scrollIntoView above puts the section's top at the viewport's top,
+         * and then lib/story/snap.ts takes the page over: it waits 120 ms of
+         * quiet and animates to its own nearest anchor over 300-620 ms. The
+         * 260 ms pause here lands *inside* that, so every viewport-relative
+         * reading was taken mid-flight. It showed: this file reported the
+         * practice hub 329 px past the fold at 1366x768 and the education panel
+         * 43 px past it, when the sections are actually 114 px and 202 px taller
+         * than that viewport — one number nearly triple the truth, the other a
+         * quarter of it, and the education panel's real overflow is the larger
+         * of the two while the report ranked it the smaller. A section that is
+         * too tall to get a snap anchor at all (the conditional anchors in
+         * snap.ts) is dragged to a *neighbour's* anchor, so the drift is not
+         * even bounded by the section.
+         *
+         * Measuring the section against itself also states the promise
+         * correctly. "Composes in one viewport" is a property of the layout:
+         * from the section's own top edge to the bottom of the block that must
+         * be visible, does it fit? Where the visitor happens to be is a separate
+         * question, and one this file was never trying to ask.
+         */
         const must = document.querySelector(target.must);
         const rect = must ? must.getBoundingClientRect() : null;
+        const box = section.getBoundingClientRect();
         const first = section.querySelector('h2, h1');
+        const headerH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--header-h'));
         out.sections.push({
           id: target.id,
           label: target.label,
-          sectionTop: Math.round(section.getBoundingClientRect().top),
-          headingTop: first ? Math.round(first.getBoundingClientRect().top) : null,
-          mustTop: rect ? Math.round(rect.top) : null,
-          mustBottom: rect ? Math.round(rect.bottom) : null,
+          sectionTop: Math.round(box.top),
+          /* Offsets within the section, so they read the same at any scroll. */
+          headingTop: first ? Math.round(first.getBoundingClientRect().top - box.top) : null,
+          mustTop: rect ? Math.round(rect.top - box.top) : null,
+          mustBottom: rect ? Math.round(rect.bottom - box.top) : null,
           mustHeight: rect ? Math.round(rect.height) : null,
-          /* Negative = that many pixels of the block are below the fold. */
-          slack: rect ? Math.round(innerHeight - rect.bottom) : null,
-          /* Does the header cover the first thing in the section? */
+          /* Negative = the block cannot be fully visible with the section's own
+             top edge at the top of the viewport. */
+          slack: rect ? Math.round(innerHeight - (rect.bottom - box.top)) : null,
+          /*
+           * Would the header cover the first thing in the section when the
+           * section is at rest? That is a question about the section's top
+           * padding, which is why it is measured against the section rather
+           * than against the viewport: the padding is header-h plus the gap, so
+           * anything less than header-h means the contract is broken.
+           */
           underHeader: first
-            ? Math.round(first.getBoundingClientRect().top)
-              < parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--header-h'))
+            ? Math.round(first.getBoundingClientRect().top - box.top) < headerH
             : null,
         });
       }
@@ -353,7 +436,21 @@ try {
     for (const section of report.sections) {
       if (section.missing) { console.log(`  #${section.id}  MISSING`); continue; }
       const target = TARGETS.find((entry) => entry.id === section.id);
-      const asserts = !target?.fitAbove || report.viewport[0] >= target.fitAbove;
+      /*
+       * Two thresholds, because two different dimensions can bind.
+       *
+       * `fitAbove` is a width and answers most sections: below it a two-up
+       * diagram or a four-panel editor deliberately stacks. `fitTallerThan` is
+       * a height, and Bảng giá is the section that needed it — four cards and a
+       * head are a fixed ~790 px of content, so what decides whether it composes
+       * in one screen is how tall the screen is, not how wide. Without it the
+       * only way to record that promise was to leave `fitAbove` off, which this
+       * line reads as "always asserted" and turns a designed scroll into a
+       * reported defect.
+       */
+      const wideEnough = !target?.fitAbove || report.viewport[0] >= target.fitAbove;
+      const tallEnough = !target?.fitTallerThan || report.viewport[1] >= target.fitTallerThan;
+      const asserts = wideEnough && tallEnough;
       const flags = [];
       if (section.slack !== null && section.slack < 0) flags.push(`${asserts ? 'CUT' : 'scrolls'} ${-section.slack}px`);
       if (section.underHeader) flags.push('HEADING UNDER HEADER');

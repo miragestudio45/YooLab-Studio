@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
+import { attachWheelZoom } from '../../../lib/three/wheelZoom';
 import { LibraryIcon } from '../LibraryIcons';
 import { usePrefersReducedMotion } from '../../../lib/usePrefersReducedMotion';
+import { useZoomModifier } from '../../../lib/useZoomModifier';
 import { createVisibilityGate } from '../../../lib/three/visibility';
 import { pixelRatioCap } from '../../../lib/three/deviceTier';
 import { createProceduralEnvironment } from '../../../lib/three/environment';
@@ -173,6 +175,10 @@ function MoleculeStage({
   const [mode, setMode] = useState<RenderMode>('ball');
   const [labels, setLabels] = useState(false);
   const [measure, setMeasure] = useState(false);
+  /* The wheel only zooms with a modifier now, so the hint has to name it.
+     See `lib/three/wheelZoom.ts`. */
+  const zoomKey = useZoomModifier();
+
   const [picks, setPicks] = useState<number[]>([]);
   const [selected, setSelected] = useState<number | null>(null);
   /*
@@ -552,19 +558,16 @@ function MoleculeStage({
       const instanceId = raycaster.intersectObject(pickMesh, false)[0]?.instanceId;
       if (instanceId !== undefined) pickAtom(instanceId);
     };
-    const onWheel = (event: WheelEvent) => {
-      // Claims the wheel only for a clear zoom gesture, so the page still
-      // scrolls past the viewer.
-      if (Math.abs(event.deltaY) < 2) return;
-      event.preventDefault();
-      zoom = THREE.MathUtils.clamp(zoom * (1 + event.deltaY * 0.0012), 0.42, 2.6);
+    // Shared policy: a plain wheel belongs to the page, ctrl/cmd and a trackpad
+    // pinch belong to the camera. See `lib/three/wheelZoom.ts`.
+    const detachWheel = attachWheelZoom(host, (deltaY) => {
+      zoom = THREE.MathUtils.clamp(zoom * (1 + deltaY * 0.0012), 0.42, 2.6);
       distanceTarget = fittedDistance() * zoom;
-    };
+    });
     host.addEventListener('pointerdown', onPointerDown);
     host.addEventListener('pointermove', onPointerMove);
     host.addEventListener('pointerup', onPointerUp);
     host.addEventListener('pointercancel', onPointerUp);
-    host.addEventListener('wheel', onWheel, { passive: false });
 
     /* ----------------------------------------------------- pause when idle --- */
     const gate = createVisibilityGate(host, 160);
@@ -642,7 +645,7 @@ function MoleculeStage({
       host.removeEventListener('pointermove', onPointerMove);
       host.removeEventListener('pointerup', onPointerUp);
       host.removeEventListener('pointercancel', onPointerUp);
-      host.removeEventListener('wheel', onWheel);
+      detachWheel();
       document.removeEventListener('visibilitychange', onVisibility);
       resizeObserver.disconnect();
       gate.dispose();
@@ -808,7 +811,7 @@ function MoleculeStage({
         <p className="stage-hint">
           {measure
             ? 'Nhấp hai nguyên tử để đo độ dài · ba nguyên tử để đo góc'
-            : 'Kéo để quay · lăn chuột để phóng · nhấp một nguyên tử để xem'}
+            : `Kéo để quay · ${zoomKey} + lăn chuột để phóng · nhấp một nguyên tử để xem`}
         </p>
 
         <button

@@ -1,0 +1,126 @@
+/* ======================================================== the workspace glass === */
+/*
+ * One material, six panes, two sections.
+ *
+ * This began inside `studio.css` as the YooStudio band's own surface, and it was
+ * already written to be shared: it names `.tool-story`, the narrative column
+ * beside the editor, not just the editor. The note it carried said why —
+ *
+ *   "Defining the material once and letting each surface set its own intensity
+ *    is the only way 'the same' stays true — copy-pasted gradient stacks drift
+ *    apart the moment one of them is tuned."
+ *
+ * — and then review asked for the Library workspace to read as the same
+ * material. Which is the moment that sentence gets tested: the cheap way to
+ * answer it is a second copy of the stack in `library.css`, and the first time
+ * anyone tunes the tint the two sections stop matching and nobody can say which
+ * is right. So the material moved here instead, one file that owns it, and the
+ * section stylesheets now do exactly two things: add their panes to the lists
+ * below, and set the four variables.
+ *
+ *   --glass-radius  the pane's corner
+ *   --glass-tint    alpha of the top stop — how much sheet there is to see
+ *   --glass-blur    how hard the ground behind it bends
+ *   --glass-lift    multiplier on the outer shadows; 0 keeps a pane flat on the
+ *                   paper, 1 lifts it into the room
+ *   --glass-sheen   multiplier on the specular sweep, default 1. It exists
+ *                   because the sweep is strongest in the pane's top corners,
+ *                   and what sits there decides whether that reads as a lit
+ *                   edge or as a white band. YooStudio puts a dark canvas under
+ *                   it; the Library puts a title bar and a rail header — thin
+ *                   rows of small type — and at full strength review read the
+ *                   band as "trắng hẳn lên", brighter than the section it is in.
+ *
+ * Imported before both section files, so a section can still override a detail
+ * for itself and win. Nothing here is a reset that has to be fought.
+ *
+ * ## What makes it a material and not a wash
+ *
+ * The blur lives only in the **rim**: the pool of light behind the section bends
+ * through a band of cover glass at the pane's edge while the surface inside stays
+ * crisp, because the content sitting on it is opaque. That is the whole
+ * difference between this and the decorative frosted panel the craft floor
+ * rejects — and it is why both sections that use it put a *ground* behind the
+ * pane first (`.tool-section::before`, `.library::before`). Glass over a flat
+ * fill is just a tinted box; there has to be something to refract.
+ *
+ * ## Neither section's heading band is on this list
+ *
+ * Tried in YooStudio and taken back out: a pane behind 54 px display type greys
+ * out the gradient it exists to show, and a rim there either pads the type off
+ * the shell edge that DESIGN.md holds every band to, or bleeds into the gutter
+ * to avoid doing so. The Library's head band is left alone for the same reason,
+ * and so are its subject tabs and search field — they are chrome *above* the
+ * workspace, and glass on a 28 px pill is a highlight with no room to read.
+ */
+.studio,
+.studio-gate,
+.tool-story,
+.library-rail,
+.library-viewer,
+.library-knowledge {
+  position: relative;
+  border-radius: var(--glass-radius);
+  background: linear-gradient(178deg,
+    rgba(255, 255, 255, var(--glass-tint)) 0%,
+    rgba(255, 255, 255, calc(var(--glass-tint) * 0.47)) 38%,
+    rgba(214, 236, 234, calc(var(--glass-tint) * 0.42)) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, calc(0.85 * var(--glass-tint) / 0.72)),
+    inset 0 -1px 0 rgba(255, 255, 255, calc(0.4 * var(--glass-tint) / 0.72)),
+    inset 0 0 0 1px rgba(255, 255, 255, calc(0.4 * var(--glass-tint) / 0.72)),
+    0 0 0 1px rgba(23, 78, 79, calc(0.055 * var(--glass-lift))),
+    0 26px 60px -30px rgba(28, 62, 61, calc(0.16 * var(--glass-lift))),
+    0 60px 120px -76px rgba(16, 88, 90, calc(0.3 * var(--glass-lift)));
+  backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+}
+
+/* The specular sweep. It sits over the tint and under the content, and is masked
+   to the top third so it reads as a highlight on a curved edge rather than as a
+   gradient poured over the whole pane. */
+.studio::before,
+.tool-story::before,
+.library-rail::before,
+.library-viewer::before,
+.library-knowledge::before {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(102deg, rgba(255, 255, 255, 0.86) 0%, rgba(255, 255, 255, 0) 26%, rgba(255, 255, 255, 0) 74%, rgba(255, 255, 255, 0.6) 100%);
+  content: '';
+  mask-image: linear-gradient(180deg, #000 0%, transparent 34%);
+  opacity: calc(var(--glass-tint) / 0.72 * var(--glass-sheen, 1));
+  pointer-events: none;
+}
+
+.tool-story > * { position: relative; z-index: 1; }
+
+/*
+ * Every pane that gets the sweep lifts its children over it.
+ *
+ * The sweep is at `z-index: 0` inside the pane, so an unpositioned child paints
+ * *under* it and comes back washed. `.tool-story > *` has always done this; the
+ * Library's three panes need it for the same reason, and the first pass proved
+ * what happens when one is left out. `.library-viewer` was excluded on the
+ * theory that its stage is opaque and would hide the sweep anyway — true of the
+ * stage, false of the row above it, so the viewer's title and its three tags
+ * rendered under a white gradient and lost most of their contrast. A pane either
+ * gets the highlight and lifts its content, or gets neither.
+ *
+ * It is a stacking change only: none of these children is positioned against
+ * anything but its own grid cell, and the stage already carried
+ * `position: relative` for its own overlays.
+ */
+.library-rail > *,
+.library-viewer > *,
+.library-knowledge > * { position: relative; z-index: 1; }
+
+@supports not (backdrop-filter: blur(2px)) {
+  .studio,
+  .studio-gate,
+  .tool-story,
+  .library-rail,
+  .library-viewer,
+  .library-knowledge { background: linear-gradient(178deg, rgba(255, 255, 255, 0.9), rgba(226, 240, 238, 0.75)); }
+}

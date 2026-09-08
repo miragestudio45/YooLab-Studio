@@ -98,6 +98,11 @@ function organEntry({ file, mark, yaw, pitch, fill, targetY, shell, ...content }
       shell,
     },
     rail: { kind: 'mark', mark },
+    /* Derived, not typed twelve times. `scripts/bake-library-covers.mjs` names
+       every organ render after the entry it belongs to, so the two cannot drift:
+       a renamed entry has no cover and falls back to its drawn mark, which is
+       visible rather than silent. */
+    cover: content.id,
     credits: HRA_CREDIT,
   };
 }

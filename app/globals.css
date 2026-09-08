@@ -20,6 +20,8 @@
  * now own a file, so a change to the molecule viewer cannot move the hero.
  * Everything above the partials is tokens + page chrome, which is shared.
  */
+/* The workspace glass, before the two sections that set its variables. */
+@import './styles/glass.css';
 @import './styles/library.css';
 @import './styles/sections.css';
 @import './styles/practice.css';
@@ -33,6 +35,9 @@
 @import './styles/library-page.css';
 @import './styles/auth.css';
 @import './styles/toast.css';
+@import './styles/pricing.css';
+@import './styles/closing.css';
+@import './styles/conversion.css';
 
 /* ==========================================================================
    YooLab design tokens
@@ -49,6 +54,19 @@
    ========================================================================== */
 
 :root {
+  /*
+   * 1 while the Explore copy sits UNDER the creature stage instead of beside it.
+   *
+   * Not a style — a fact about the layout, published for the one reader that
+   * cannot infer it. `ExploreCanvas` composes the bee for a frame with a copy
+   * column beside it or for a frame without one, and those are different marks:
+   * off to the right at full size, or centred and clamped to fit. It used to
+   * decide with its own `viewportWidth < 780` while the stack actually happens
+   * at 1000, and every iPad in portrait fell in the gap between the two numbers.
+   * The switch is set where the stacking is, so the pair cannot drift again.
+   */
+  --story-stacked: 0;
+
   /* --------------------------------------------------------------- type --- */
   /*
    * One family. Not four.
@@ -126,6 +144,14 @@
   /* Soft accents. Present for tinting and for subject colour-coding, never as
      a page-level background. */
   --color-lavender: #8d6bcc;
+  /* The same lavender, dark enough to be read rather than seen — the convention
+     `--color-accent-readable` sets above, for the same reason. `#8d6bcc` on the
+     Library's pane surface (a measured rgb(253, 249, 244)) is 3.92:1, which is
+     under the 4.5 a 12 px italic needs; this is 4.78. Split into its own token
+     rather than darkened in place because the base value is also used as a
+     *swatch* — the incline and wave legends in `exp-physics.css` fill 8 px
+     squares with it, where luminance is identity and not legibility. */
+  --color-lavender-readable: #8159bf;
   --color-lavender-soft: #ddd2f2;
   --color-cyan: #5fb6c4;
   --color-cyan-soft: #cfe9ee;
@@ -255,6 +281,30 @@
 html {
   scroll-behavior: smooth;
   background: var(--surface);
+  /*
+   * iOS decides how big small text is unless it is told not to.
+   *
+   * `-webkit-text-size-adjust` defaults to `auto` on iOS and iPadOS, and `auto`
+   * is text autosizing: Safari inflates small type per block, by a factor it
+   * derives from the block's width against the viewport. Nothing on a desktop
+   * does this, so nothing about it shows up in a Chrome capture at any of the
+   * widths this project tests.
+   *
+   * It is why this page looked broken on an iPad and correct everywhere else.
+   * The type scale here bottoms out at 9.5-11 px by design — kickers, readouts,
+   * the editor's rail labels — and those live in columns sized to fit them with
+   * single-digit slack. Measured at 1194: the editor's tool rail is 70 px wide
+   * and `Thanh phan` is 56 px at 10.44 px, so 14 px of room. A 20% autosize
+   * boost is 67 px and the label is in the canvas. Every rail label in both
+   * rails overflowing at once — which is exactly what the iPad screenshots show
+   * — is one global cause, not eleven local ones.
+   *
+   * `100%` means "render the size I asked for". It does not disable pinch zoom;
+   * that is `user-scalable=no` in the viewport meta, which this site does not
+   * set and must not.
+   */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -317,8 +367,25 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   position: fixed;
   z-index: 50;
   top: 8px;
-  right: clamp(24px, 2vw, 32px);
-  left: clamp(24px, 2vw, 32px);
+  /*
+   * The shell's own left edge, computed rather than approximated.
+   *
+   * This was `clamp(24px, 2vw, 32px)` — a fourth horizontal width, which
+   * DESIGN.md section 1 names as a bug outright, and the one `measure.mjs` has
+   * been reporting as an open regression. It disagreed with the page at every
+   * size and in both directions: 47 px inboard at 1920, 6 px at 1024, 2 px the
+   * other way at 768. On a tablet that is the glass rail and the kicker
+   * underneath it visibly failing to line up.
+   *
+   * `.shell` is `min(--page-max, 100% - gutter * 2)`, centred — so its left edge
+   * is the gutter until the page hits its 1760 px cap and the leftover margin
+   * takes over. That is exactly this expression, and because the header is
+   * `fixed`, the percentage resolves against the same viewport width the shell
+   * measures itself from. `.mobile-nav` is positioned against this box, so the
+   * open menu inherits the alignment instead of needing its own copy of it.
+   */
+  right: max(var(--page-gutter), calc((100% - var(--page-max)) / 2));
+  left: max(var(--page-gutter), calc((100% - var(--page-max)) / 2));
   height: 56px;
   color: var(--color-ink);
   border: 1px solid rgba(255, 255, 255, 0.48);
@@ -611,9 +678,42 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   grid-row: 1 / -1;
   align-self: start;
   max-width: 52rem;
-  margin-top: clamp(126px, 15.5vh, 176px);
+  /* Lifted from `clamp(126px, 15.5vh, 176px)`. The opening gained an eyebrow, a
+     capability line and two role rows for the MKT round, and at the old offset
+     the last of those landed in the flower band where the student CTA was
+     effectively unreadable. */
+  margin-top: clamp(88px, 11.5vh, 138px);
+  /*
+   * No legibility wash here, and that is a deletion rather than an omission.
+   *
+   * This carried a `::before` radial wash in the page's cream, on the argument
+   * that the copy sits over a meadow whose colour moves. It does not: the flower
+   * field keeps a corridor under this column on purpose — the exclusion zone in
+   * `flowerValley/composition.ts` is centred at `v: 0.46` with a soft rim — so at
+   * every width where the copy is beside the specimen rather than over it, the
+   * text is already on clean cream and the wash was covering nothing.
+   *
+   * What it did instead was draw a rectangle. Its box was `-170px` on the left
+   * and `-46%` on the right, so the ellipse — 62% of a 1385 px box, centred at
+   * 27% of it — reached its zero contour 484 px *past* its own left edge and was
+   * clipped there at alpha 0.68. That is a straight vertical line with a
+   * near-white fill, which is exactly the "translucent panel" its own comment
+   * said it must never become. It was invisible up to about 1920 only because
+   * the backdrop behind it is near-white there; on a 2560×1440 display the hero
+   * ground is a warmer beige at that height and the box appeared, which is how
+   * review found it.
+   *
+   * Verified without it at 1194×834 and 1366×768 — the shortest viewports in
+   * this regime, where the copy sits closest to the flowers — and every line
+   * reads. The one-column regime below 1001px is a different composition, with
+   * the creature *behind* the words, and it keeps its own plate.
+   *
+   * `position: relative` and `isolation` stay: that plate is absolute inside
+   * this box and needs both.
+   */
+  position: relative;
+  isolation: isolate;
 }
-
 .hero h1 {
   /* Compact on wide frames and allowed to wrap once more on phones. Height joins
      width in the clamp so a short laptop never lets type dominate the specimen. */
@@ -637,10 +737,149 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 
 .hero-lede {
   max-width: 64ch;
-  margin: 20px 0 0;
+  margin: 16px 0 0;
   color: var(--ink-2);
   font-size: 15.5px;
   line-height: 1.62;
+}
+
+/* ------------------------------------------------- hero product positioning --- */
+/*
+ * The eyebrow, the capability line and the two role rows.
+ *
+ * All three are type and rules only — no card, no fill, no shadow. The hero's
+ * subject is the scene behind the copy, and every box added here is a box the
+ * bee has to be read through.
+ */
+.hero-eyebrow {
+  margin: 0 0 14px;
+  color: var(--color-accent-readable);
+  font-size: 12px;
+  font-weight: 620;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.hero-capability {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  margin: 12px 0 0;
+  padding: 0;
+  color: var(--ink-3, var(--ink-2));
+  font-size: 12.5px;
+  letter-spacing: 0.04em;
+}
+/* Separators are drawn, not typed, so a wrap never leaves a dot stranded at the
+   start of the second line. */
+.hero-capability span + span::before {
+  content: '';
+  display: inline-block;
+  width: 3px;
+  height: 3px;
+  margin-right: 10px;
+  border-radius: 50%;
+  background: var(--color-accent-line, currentColor);
+  vertical-align: 0.28em;
+}
+
+.hero-roles {
+  /*
+   * A grid, not a flex row.
+   *
+   * The two roles carry different amounts of copy — the student line wraps to
+   * two, the teacher line to one — and under `flex` that meant two columns of
+   * different widths whose buttons landed at different heights. Equal tracks fix
+   * the width; `align-items: stretch` plus the auto margin below fixes the
+   * baseline, so the two actions sit on one line whatever the copy does.
+   */
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 30px;
+  align-items: stretch;
+  max-width: 640px;
+  margin-top: 20px;
+}
+.hero-role {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  padding-left: 14px;
+  border-left: 1.5px solid var(--color-accent-line, rgba(0, 170, 171, 0.42));
+}
+.hero-role__tag {
+  color: var(--brand-ink, var(--color-ink));
+  font-size: 11.5px;
+  font-weight: 660;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.hero-role p {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 13.5px;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
+/*
+ * Real buttons.
+ *
+ * These were underlined text links sitting over a photographic meadow, which is
+ * the one place on the page a text link cannot hold: the student action was
+ * teal-on-flowers and effectively invisible. The primary takes the brand fill,
+ * the secondary a teal stroke on the page's own cream — a pair, not two
+ * identical buttons competing at the same weight.
+ */
+.hero-role__cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  /* Pushed to the bottom of its own track so both buttons share a baseline. */
+  margin-top: auto;
+  padding: 0 18px;
+  min-height: 46px;
+  border: 1.5px solid var(--color-accent-strong, #00aaab);
+  border-radius: 12px;
+  background: rgba(255, 253, 249, 0.86);
+  color: var(--color-accent-readable, #00aaab);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 640;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 200ms var(--ease-reveal, ease), color 200ms var(--ease-reveal, ease),
+              border-color 200ms var(--ease-reveal, ease), transform 200ms var(--ease-reveal, ease);
+}
+.hero-role__cta span { transition: transform 220ms var(--ease-reveal, ease); }
+.hero-role__cta:hover { background: #fff; transform: translateY(-1px); }
+.hero-role__cta:hover span { transform: translateX(3px); }
+.hero-role__cta:active { transform: translateY(0); }
+
+.hero-role__cta--primary {
+  border-color: transparent;
+  background: var(--color-accent-strong, #00aaab);
+  color: #fff;
+  box-shadow: 0 10px 24px -14px rgba(0, 170, 171, 0.9);
+}
+.hero-role__cta--primary:hover {
+  background: var(--color-accent-hover, #018e8f);
+  border-color: transparent;
+}
+
+@media (max-width: 700px) {
+  .hero-roles { grid-template-columns: minmax(0, 1fr); gap: 16px; margin-top: 18px; max-width: none; }
+  .hero-role__cta { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-role__cta, .hero-role__cta span { transition: none; }
+  /* The cue keeps its pill and its chevron and loses the fall. A hint that
+     cannot mime the gesture still names it in words. */
+  .scroll-cue, .scroll-cue i { animation: none; transition: none; }
+  .scroll-cue:hover { transform: translateX(-50%); }
 }
 
 .hero-actions { display: flex; align-items: center; gap: 22px; margin-top: 26px; flex-wrap: wrap; }
@@ -729,22 +968,131 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 }
 .hero-spec small { margin-top: 3px; line-height: 1.5; letter-spacing: 0.03em; text-transform: none; }
 
+/*
+ * The scroll cue, and why it had to become an object.
+ *
+ * It was bare 9.5 px uppercase type at 46% ink over a 1 px gradient hairline,
+ * which is a perfectly good cue over a flat ground and illegible over the one it
+ * actually sits on: `FlowerValley` paints a full-width photographic meadow
+ * across the bottom of the hero, so the label lands on white daisies, magenta
+ * cosmos and dark foliage all at once. No text colour reads over all three, and
+ * a text-shadow halo — the trick the creature annotations use — needs a *quiet*
+ * background to lift off. Review called it "chưa được rõ nét lắm", and it was
+ * not a contrast value that could be nudged; it was type with nothing behind it.
+ *
+ * So it is a pill now, in the same material as every other floating chip on the
+ * site (`.bridge-viewer-context`, `.practice-live`): warm-white glass, a
+ * white hairline, the warm-brown shadow, `backdrop-filter`. Two differences from
+ * those, both because of what is behind this one — the fill is 0.82 rather than
+ * 0.42 so the meadow reads as texture through it rather than as competing
+ * shapes, and the shadow carries a real offset so the pill sits *above* the
+ * flowers instead of floating in them.
+ *
+ * Nothing here touches the flower field. It is a sibling in the hero, drawn on
+ * top; the valley's own canvas, layout and exclusion rect are untouched.
+ */
 .scroll-cue {
   position: absolute;
-  bottom: 24px;
+  bottom: clamp(20px, 3vh, 34px);
   left: 50%;
-  display: flex;
-  flex-direction: column;
+  z-index: 3;
+  display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 9px;
+  min-height: 38px;
+  padding: 0 8px 0 16px;
   transform: translateX(-50%);
-  color: rgba(45, 36, 32, 0.46);
-  font-size: 9.5px;
-  font-weight: 620;
-  letter-spacing: 0.11em;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 999px;
+  color: var(--ink-2);
+  background: rgba(255, 253, 249, 0.82);
+  box-shadow:
+    0 10px 26px -12px rgba(87, 62, 43, 0.3),
+    0 2px 6px -2px rgba(87, 62, 43, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px) saturate(1.06);
+  -webkit-backdrop-filter: blur(10px) saturate(1.06);
+  font-size: 10px;
+  font-weight: 640;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
+  transition:
+    opacity 260ms var(--ease-reveal, ease),
+    transform 260ms var(--ease-reveal, ease),
+    box-shadow 240ms var(--ease-reveal, ease);
 }
-.scroll-cue i { display: block; width: 1px; height: 24px; background: linear-gradient(rgba(45, 36, 32, 0.5), transparent); }
+/*
+ * Retired, not removed: it fades and settles downward rather than blinking out,
+ * and it comes back if the visitor returns to the top. `visibility` rides the
+ * same transition so the link stops being focusable once it is invisible —
+ * `opacity: 0` alone leaves a tab stop over the meadow.
+ */
+.scroll-cue[data-retired] {
+  opacity: 0;
+  transform: translateX(-50%) translateY(10px);
+  visibility: hidden;
+  transition:
+    opacity 200ms var(--ease-reveal, ease),
+    transform 200ms var(--ease-reveal, ease),
+    visibility 0s linear 200ms;
+  pointer-events: none;
+}
+/*
+ * Not on a touch device at all.
+ *
+ * The pill says "scroll to explore" to someone whose only way of moving the
+ * page IS to swipe it — it teaches nothing, and it spends the one clear band
+ * between the creature and the copy, which is the scarcest space in the phone
+ * and tablet composition. Asked of the input rather than the width so an iPad
+ * in landscape at 1194 is covered too, and a touchscreen laptop is not.
+ */
+@media (hover: none) and (pointer: coarse) {
+  .scroll-cue { display: none; }
+}
+.scroll-cue:hover {
+  transform: translateX(-50%) translateY(-2px);
+  box-shadow:
+    0 16px 32px -12px rgba(87, 62, 43, 0.34),
+    0 2px 6px -2px rgba(87, 62, 43, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+/*
+ * The chevron sits in its own teal disc.
+ *
+ * A pill with a label and nothing else is a badge; a pill with one round
+ * accented target on its trailing edge is a control, and this element is a
+ * link. The disc is the only place the brand colour appears in the hero's lower
+ * third, which is what makes it findable at 22 px.
+ */
+.scroll-cue i {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--color-accent-wash, rgba(0, 170, 171, 0.12));
+  animation: scroll-cue-bob 2.8s var(--ease-reveal, ease-in-out) infinite;
+}
+/* Drawn rather than a glyph: a Unicode arrow would inherit the label's
+   letter-spacing and sit off-centre in the disc at every font size. */
+.scroll-cue i::after {
+  content: '';
+  width: 7px;
+  height: 7px;
+  margin-top: -3px;
+  border-right: 1.7px solid var(--color-accent-strong, #00aaab);
+  border-bottom: 1.7px solid var(--color-accent-strong, #00aaab);
+  transform: rotate(45deg);
+}
+
+/* The one authored moment in the hero's lower third: a 3 px fall and a pause,
+   which is what a scroll hint is miming. The pill itself never moves. */
+@keyframes scroll-cue-bob {
+  0%, 62%, 100% { transform: translateY(0); }
+  34% { transform: translateY(3px); }
+}
 
 @keyframes pulse { 50% { transform: scale(0.72); opacity: 0.55; } }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -1011,12 +1359,12 @@ button:focus-visible, a:focus-visible, input:focus-visible {
  * them at the top, middle and bottom of the creature's half without a single
  * absolute offset.
  */
-/* Row 1 *start*, not end: at `end` this label landed on the abdomen, which is
-   the darkest, densest part of the creature, and no amount of halo makes 9.5 px
-   uppercase readable there. The top of the model band is clear ground. */
-.annotation--bee-a { grid-column: 3 / span 4; grid-row: 1; justify-self: end; align-self: start; }
-.annotation--bee-b { grid-column: 1 / span 3; grid-row: 2; justify-self: start; align-self: center; }
-.annotation--bee-c { grid-column: 3 / span 3; grid-row: 3; justify-self: end; align-self: start; }
+/* The bee's three used to be here, on rows 1 / 2 / 3. They are pins now, and
+   they live with the thing they point at — see `.bee-pins` below and `BEE_PINS`
+   in `ExploreCanvas`. The fish and jelly keep the grid treatment because they
+   fill their own half of the frame: a label beside them with a leader reaching
+   in is a margin note, which is honest, where the same treatment on a bee that
+   sits right of centre was a claim about a position it did not occupy. */
 
 /* Both at the panel's vertical extremes: the fish now fills six of twelve
    columns, so the only clear ground on its side of the frame is above its dorsal
@@ -1247,6 +1595,165 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   line-height: 1.42;
 }
 
+/* ------------------------------------------------------------- bee pins --- */
+/*
+ * The bee's anatomy callouts, in the language of a technical drawing.
+ *
+ * They sit in `.explore-stage`, which is `position: sticky; top: 0; height:
+ * 100svh` — so while the cinematic run is on screen the stage's box *is* the
+ * viewport, and the frame coordinates `ExploreCanvas` projects land here with no
+ * conversion. That is the whole reason the layer is a sibling of the canvas
+ * instead of a child of the bee panel: a panel scrolls, and a pin placed in a
+ * scrolling box would need its own offset correction every frame.
+ *
+ * `left`/`top`/`opacity` come in as custom properties from the frame loop. Every
+ * other property is authored once and never touched, so the per-frame cost is
+ * three custom-property writes and a composited opacity.
+ *
+ * ## Three versions, and why this is the third
+ *
+ * They were grid children placed against the layout, which pointed them at
+ * empty air. Pinning them to the rig fixed the accuracy and created a legibility
+ * problem, because there is no clear ground within a leader's reach of the
+ * thorax when the animal fills half the frame — so the labels went onto glass
+ * plates, which was legible and turned three anatomy callouts into three chips
+ * floating over a specimen.
+ *
+ * The reference the client pointed at solves it a different way and a better
+ * one: **the leader is long enough to carry the label out of the subject.** A
+ * small filled dot marks the anatomy, a hairline runs from it to a hollow ring
+ * out on the clear ivory ground, and the label sits beside the ring where a
+ * halo is all the separation type needs. No plate, nothing boxed, and the line
+ * itself becomes part of the drawing rather than an apology for one. It is also
+ * the older convention — this is how a plate in an anatomy atlas is labelled.
+ *
+ * The cost is that the leaders are long, so `PIN_SAFE` in `ExploreCanvas` does
+ * more work: it hides any pin whose ring would reach the copy column, which is
+ * why the pins come and go as the bee turns. That is correct. A callout that
+ * cannot reach clear ground has nothing to say.
+ */
+.bee-pins {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.bee-pin {
+  position: absolute;
+  /* The element's origin IS the joint — 0,0 is the point being named — and every
+     piece below is placed from it in plain pixels. */
+  color: rgba(30, 24, 21, 0.9);
+  font-size: 9.5px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  white-space: nowrap;
+  text-transform: uppercase;
+  transition: opacity 200ms linear;
+}
+
+/*
+ * ## Matching the reference, on its own terms
+ *
+ * The client pointed at a demo whose callouts are the reason this looks the way
+ * it does, and the first attempt at it missed by being *polite*: warm ink at
+ * 55%, a 1 px hairline, a 9 px ring at 58%. On cream at 9.5 px that reads as a
+ * smudge, and the review was right that it was not the reference.
+ *
+ * What the reference actually does is commit: near-black, a line you can see,
+ * and a ring big enough to be a mark rather than a dot. Three numbers carry it —
+ * **0.9 ink, 1.5 px line, 14 px ring** — and it is monochrome, which is the
+ * other half. The teal dot the earlier pass used was this project's accent doing
+ * a job the accent is not for: a callout is drafting, and drafting is one
+ * colour. The brand still owns every control on the page; it does not need to
+ * own the anatomy labels too.
+ */
+
+/* The anatomy dot. Solid, dark, small — the only thing that touches the animal,
+   with a cream ring so it holds its edge where the body goes to full red. */
+.bee-pin i {
+  position: absolute;
+  top: -3.5px;
+  left: -3.5px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(30, 24, 21, 0.92);
+  box-shadow: 0 0 0 1.5px rgba(251, 248, 244, 0.9);
+}
+
+/*
+ * The leader and the ring, both drawn from the dot.
+ *
+ * `::before` is the line, rotated about its own dot end so one length and one
+ * angle place it; `::after` is the hollow ring that terminates it. Each carries
+ * a cream outline, because the line's whole job is to survive crossing the
+ * darkest part of a transmissive body on its way out to clear ground.
+ */
+.bee-pin::before,
+.bee-pin::after {
+  content: '';
+  position: absolute;
+}
+.bee-pin::before {
+  height: 1.5px;
+  transform-origin: 100% 50%;
+  background: rgba(30, 24, 21, 0.82);
+  box-shadow: 0 0 0 1px rgba(251, 248, 244, 0.55);
+}
+.bee-pin::after {
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid rgba(30, 24, 21, 0.85);
+  border-radius: 50%;
+  background: rgba(251, 248, 244, 0.9);
+  box-shadow: 0 0 0 1px rgba(251, 248, 244, 0.55);
+}
+
+/* The label, outside the ring. The halo is two stops of the page's own cream,
+   which on the ivory the ring reaches is all the separation 9.5 px uppercase
+   needs — and unlike a plate it leaves the composition unboxed. */
+.bee-pin b {
+  position: absolute;
+  font-weight: inherit;
+  text-shadow:
+    0 0 3px rgba(251, 248, 244, 0.98),
+    0 0 9px rgba(251, 248, 244, 0.92),
+    0 0 18px rgba(251, 248, 244, 0.7);
+}
+
+/*
+ * Three angles, and the numbers are trigonometry rather than taste.
+ *
+ * Each leader is a length L at an angle θ off horizontal, swinging left; the
+ * ring sits at its far end, which is (−L·cos θ, ∓L·sin θ) from the dot, and the
+ * label sits just outside the ring. Every one goes up or left, never right,
+ * because the copy column owns the right half of this chapter — and `PIN_SAFE`
+ * in `ExploreCanvas` hides any pin whose dot has drifted far enough that its
+ * ring would leave the frame or reach the type.
+ *
+ * The three joints are within about 130 px of each other on the animal, so the
+ * angles fan the rings apart rather than looking tidy on their own: 38° up,
+ * flat, and 26° down.
+ */
+
+/* Wing root — up and left. 126 at 38°: far end −99, −78. The longest reach of
+   the three, because this joint sits deepest inside the body. */
+.bee-pin--up::before { right: 7px; top: -0.75px; width: 126px; transform: rotate(-38deg); }
+.bee-pin--up::after { right: 92px; top: -85px; }
+.bee-pin--up b { right: 114px; top: -82px; }
+
+/* Thorax — straight left. 104 flat. */
+.bee-pin--left::before { right: 7px; top: -0.75px; width: 104px; }
+.bee-pin--left::after { right: 98px; top: -7px; }
+.bee-pin--left b { right: 120px; top: -4px; }
+
+/* Abdomen — down and left. 118 at 26°: far end −106, +52. */
+.bee-pin--down::before { right: 7px; top: -0.75px; width: 118px; transform: rotate(26deg); }
+.bee-pin--down::after { right: 99px; top: 45px; }
+.bee-pin--down b { right: 121px; top: 48px; }
+
 /* Annotation halos invert with the ground: dark letterforms lifted off ivory
    become light letterforms lifted off deep water. */
 .story-panel--bee .annotation,
@@ -1323,11 +1830,28 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 /* The revealed flag is an attribute, not a class: React owns `className` on
    these elements and a class set from outside React can be wiped by a
    re-render. `data-revealed` is invisible to reconciliation. */
+/*
+ * 520 ms, not 760, and the stagger step is 44 ms rather than 70.
+ *
+ * The two numbers have to be read against the chapter settle in
+ * `lib/story/snap.ts`, which lands a section's top edge at viewport 0 in about
+ * 300-620 ms. At the old pair, a six-item staggered row finished 1,180 ms after
+ * it was observed — so the page had stopped moving, the visitor was already
+ * reading, and the content was still arriving underneath them. That gap is what
+ * the review called "chua muot": not a dropped frame, a transition still
+ * running after the gesture that caused it had visibly ended.
+ *
+ * There is a second cost the shorter duration buys back. A `translate3d` reveal
+ * promotes the section to its own layer, and while it moves the browser
+ * composites it under the fixed blurred header — the one per-frame CSS cost on
+ * this page (see DESIGN.md on `data-gpu="lean"`). Halving the time each section
+ * spends in that state halves how often it is paid during a scroll.
+ */
 [data-reveal] {
   opacity: 0;
   transition:
-    opacity 760ms var(--ease-reveal) var(--reveal-delay, 0ms),
-    transform 760ms var(--ease-reveal) var(--reveal-delay, 0ms);
+    opacity 520ms var(--ease-reveal) var(--reveal-delay, 0ms),
+    transform 520ms var(--ease-reveal) var(--reveal-delay, 0ms);
 }
 /* `soft` fades only. It is for elements that already carry a transform of
    their own — the Explore copy blocks are centred with `translateY(-50%)`, and
@@ -1339,13 +1863,68 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 html:not(.reveal-ready) [data-reveal] { opacity: 1; transition: none; }
 html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: none; }
 
+/*
+ * The kinetic layer's own two rules, and there are only two.
+ *
+ * Everything else about the effect is in `KineticType.tsx`, in JavaScript, on
+ * purpose: nothing in CSS may hide a heading. `[data-kinetic] { opacity: 0 }`
+ * here would leave every display heading on the page invisible if GSAP failed
+ * to load, which is the one failure this project's reveal system is explicitly
+ * built not to have (see the bootstrap note in `layout.tsx`). The armed state is
+ * written by the tween's own `fromTo`, after the split has succeeded.
+ *
+ * `will-change` is not set either. GSAP manages it per tween and clears it on
+ * completion; setting it here would promote every heading on the page to its own
+ * layer for the whole session, which on a page running three WebGL contexts is
+ * exactly the cost the effect is trying to stay inside.
+ */
+/*
+ * The mask has to be taller than the line box, and this is the bug that shipped.
+ *
+ * `mask: 'lines'` wraps each split line in a div with `overflow: clip`, and that
+ * div is exactly as tall as the line box — measured on the bridge heading: mask
+ * 53 px, line 53 px, at `font-size: 49.14px` with `line-height: 1.08`. A 49 px
+ * face needs about 62 px for its full ascent and descent, so **6-13 px of every
+ * line was being clipped**, and Vietnamese pays for that twice: the dot under
+ * `ạ`, the tail of `g`, `y`, `ạ`, `ợ` at the bottom, and a tone mark stacked
+ * over a circumflex at the top. Review caught it on three separate headings.
+ *
+ * `overflow: clip` clips at the **padding box**, so padding on the mask enlarges
+ * the visible region, and an equal negative margin puts the box back where it
+ * was. Net layout is identical — content lands on the same pixel it did before —
+ * and the clip region now extends past the glyphs on all four sides.
+ *
+ * Values, and why each one:
+ *
+ *   0.26em bottom  the descender depth these faces actually use. It also means
+ *                  the rising line becomes visible a quarter of an em earlier in
+ *                  its travel, which softens the start of the wipe rather than
+ *                  hurting it.
+ *   0.14em top     tone marks. Smaller than the bottom because the line box
+ *                  already contains most of the ascent.
+ *   0.06em sides   the italic `em` in every one of these headings overhangs its
+ *                  own line box on the right; without this the final full stop
+ *                  of "khó thực hiện trong lớp học." loses its edge.
+ *
+ * `em`, not `px`, so it tracks a heading whose size is a `clamp()` across nine
+ * viewports.
+ */
+.kinetic-line-mask {
+  padding: 0.14em 0.06em 0.26em;
+  margin: -0.14em -0.06em -0.26em;
+}
+/* A split line is a block that must not pick up the heading's `text-wrap:
+   balance` a second time: SplitText has already decided where this line breaks,
+   and re-balancing inside it can re-break it and leave a word outside its mask. */
+.kinetic-line { text-wrap: nowrap; }
+
 [data-stagger] > *:nth-child(1) { --reveal-delay: 0ms; }
-[data-stagger] > *:nth-child(2) { --reveal-delay: 70ms; }
-[data-stagger] > *:nth-child(3) { --reveal-delay: 140ms; }
-[data-stagger] > *:nth-child(4) { --reveal-delay: 210ms; }
-[data-stagger] > *:nth-child(5) { --reveal-delay: 280ms; }
-[data-stagger] > *:nth-child(6) { --reveal-delay: 350ms; }
-[data-stagger] > *:nth-child(n+7) { --reveal-delay: 420ms; }
+[data-stagger] > *:nth-child(2) { --reveal-delay: 44ms; }
+[data-stagger] > *:nth-child(3) { --reveal-delay: 88ms; }
+[data-stagger] > *:nth-child(4) { --reveal-delay: 132ms; }
+[data-stagger] > *:nth-child(5) { --reveal-delay: 176ms; }
+[data-stagger] > *:nth-child(6) { --reveal-delay: 220ms; }
+[data-stagger] > *:nth-child(n+7) { --reveal-delay: 264ms; }
 
 /* The anchor scroll margin used to be declared here as a bare 96 px as well as
    in the safe-area block at the bottom of this file. Two declarations of the
@@ -1585,35 +2164,11 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
  * worth of breathing room at most, and the ceiling is what stops a tall display
  * from ending the page on emptiness.
  */
-.final-cta {
-  position: relative;
-  display: flex;
-  min-height: clamp(400px, 58svh, 580px);
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  padding: clamp(56px, 8vh, 92px) max(var(--page-gutter), calc((100% - var(--page-max)) / 2));
-  scroll-margin-top: 0;
-  text-align: center;
-  color: var(--ink);
-  background:
-    radial-gradient(circle at 50% 104%, rgba(0, 170, 171, 0.15), transparent 48%),
-    linear-gradient(180deg, var(--color-bg) 0%, #f8efe2 100%);
-}
-.final-cta h2 {
-  position: relative;
-  z-index: 2;
-  color: var(--ink);
-  /* Same height cap as the other display headings: the closing statement is the
-     largest type on the page, and unguarded `5.2vw` put it at 71 px on a 1366
-     laptop where two lines then left no room for the copy and the two actions
-     under it. */
-  font-size: clamp(34px, min(4.6vw, 6.6vh), 70px);
-}
-.final-cta > p:not(.section-kicker) { position: relative; z-index: 2; max-width: 52ch; margin: 18px 0 0; color: var(--ink-2); font-size: 14.5px; line-height: 1.65; }
-.final-cta > div:last-child { position: relative; z-index: 2; display: flex; align-items: center; gap: 28px; margin-top: clamp(22px, 3vh, 32px); flex-wrap: wrap; justify-content: center; }
-.final-cta > div:last-child > a:not(.cta-main) { color: var(--ink-2); font-size: 12px; font-weight: 560; }
+/* `.final-cta` layout, type and actions now live in styles/closing.css, which
+   rebuilt this band as a studio cove. They were here too, later in the cascade,
+   and silently won. */
+
+
 .cta-main {
   display: inline-flex;
   align-items: center;
@@ -1638,23 +2193,7 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
  * two-tone circle sitting behind the call to action. Fading a colour to its own
  * zero-alpha self has no edge at any opacity.
  */
-.cta-orb { position: absolute; border-radius: 50%; }
-.cta-orb--one {
-  top: -170px;
-  left: -130px;
-  width: 520px;
-  height: 520px;
-  background: radial-gradient(circle at 50% 50%,
-    rgba(140, 217, 217, 0.30) 0%, rgba(140, 217, 217, 0.11) 44%, rgba(140, 217, 217, 0) 72%);
-}
-.cta-orb--two {
-  right: -190px;
-  bottom: -220px;
-  width: 640px;
-  height: 640px;
-  background: radial-gradient(circle at 50% 50%,
-    rgba(203, 180, 234, 0.26) 0%, rgba(203, 180, 234, 0.09) 44%, rgba(203, 180, 234, 0) 72%);
-}
+/* `.cta-orb` is retired by closing.css. */
 
 /*
  * The footer is on the shell too.
@@ -1735,6 +2274,10 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
 .footer-bottom-links a { color: var(--ink-4); text-decoration: none; }
 .footer-bottom-links a:hover { color: var(--brand-ink); }
 
+ 
+/* The footer is owned by styles/closing.css. The rules here set 9-11px type and
+   outranked it by position. */
+
 
 /* ====================================================== shared primitives === */
 .model-thumbnail { display: grid; width: 100%; height: 100%; min-height: 0; place-items: center; }
@@ -1761,7 +2304,33 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
    than a third of a very tall box, and the whole section is sized so headline and
    both frames compose in one viewport.
    ======================================================================== */
+/*
+ * The bridge is re-skinned to the brand palette by overriding four tokens here,
+ * not by editing the fifty rules below that read them.
+ *
+ * This section was authored against a lilac-and-blush duotone: `--color-lavender`
+ * carried every active state, eyebrow and hotspot, and `--color-blush-soft` was
+ * the wash the specimen stands in. On a page whose one accent is #00AAAB and
+ * whose ground is warm ivory, that made the single largest block on the site the
+ * one that looked like a different product — "cứ hồng hồng", as the review put
+ * it, and the pink was strongest exactly where the eye goes, behind the bee.
+ *
+ * Custom properties inherit, so redeclaring them on the section retargets every
+ * `var()` and `color-mix()` underneath it — including the ones inside the
+ * viewport's gradients — while the same tokens keep their original values for
+ * the subject tints elsewhere, which is what they were actually introduced for.
+ *
+ * The duotone survives; only its two hues change. Teal is the accent and warm
+ * cream is the second wash, which is the pairing the hero and the closing band
+ * already use, so the specimen now stands in the same room as the rest of the
+ * page rather than in a pink one.
+ */
 .bridge {
+  --color-lavender: var(--color-accent-readable, #00aaab);
+  --color-lavender-soft: #c7e8e8;
+  --color-blush: var(--color-accent-readable, #00aaab);
+  --color-blush-soft: #f6e6cd;
+
   position: relative;
   z-index: 4;
   overflow: hidden;
@@ -2035,7 +2604,10 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
 .bridge-eyebrow { color: var(--color-blush); }
 
 .bridge-copy h2 {
-  max-width: 12.4ch;
+  /* The wider of the two halves, because a `max-width` on the block caps what
+     its children can use: at 12.4ch here the black span's own 19ch did nothing
+     and it still set three lines. The em keeps the narrow measure below. */
+  max-width: 19ch;
   margin: clamp(14px, 2vh, 22px) 0 0;
   color: var(--color-ink);
   font-family: var(--font-display);
@@ -2048,6 +2620,21 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
 
 .bridge-copy h2 span,
 .bridge-copy h2 em { display: block; }
+/*
+ * Two lines each, and two different measures to get there.
+ *
+ * The heading is one sentence in two voices — a black statement over a teal
+ * claim — and it only reads as one thing if both halves set the same number of
+ * lines. At the h2's shared 12.4ch the black half ran to three against the teal
+ * half's two, which review called "3 dòng nhìn rất nhiều chữ". The copy lost a
+ * word it did not need (see `BridgeSection`), and the black half gets the wider
+ * measure it needs to break once, after "khám phá".
+ *
+ * Wider on top and narrower below is deliberate rather than tolerated: the
+ * taper puts the teal claim on the shorter line length, which is where the eye
+ * ends up, and it is the same shape the hero's own two-voice heading makes.
+ */
+.bridge-copy h2 span { max-width: 19ch; }
 .bridge-copy h2 em { max-width: 13.5ch; margin-top: 9px; }
 
 .bridge-lede {
@@ -2278,12 +2865,23 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
   min-width: 0;
   min-height: 0;
   overflow: hidden;
+  /*
+   * What is behind the canvas until the canvas exists.
+   *
+   * The three stops below are literally `bridgeBackdropPalette` in
+   * `lib/three/libraryEnvironment.ts` — centre, mid and edge — because this is
+   * the plate the visitor sees for the second before WebGL composites its first
+   * frame, and any other colour here is a flash. It was a blush-and-lavender
+   * pair, from the room the section had before the palette moved, so the panel
+   * opened pink and then turned; matching the render is what removes the change
+   * rather than re-timing it.
+   */
   background:
-    radial-gradient(ellipse 58% 18% at 53% 78%, color-mix(in srgb, var(--color-blush-soft) 46%, transparent), transparent 72%),
-    radial-gradient(circle at 54% 45%, color-mix(in srgb, var(--color-blush-soft) 22%, var(--color-surface-raised)) 0%, color-mix(in srgb, var(--color-lavender-soft) 30%, var(--color-surface)) 62%, transparent 100%);
+    radial-gradient(ellipse 58% 18% at 53% 78%, rgba(210, 219, 215, 0.55), transparent 72%),
+    radial-gradient(circle at 54% 45%, #fdf8f1 0%, #ecf1ee 62%, #d2dbd7 100%);
   transition: background-color 240ms ease;
 }
-.bridge-viewer:not(.is-effects-on) .bridge-viewport { background: color-mix(in srgb, var(--color-surface) 72%, var(--color-lavender-soft)); }
+.bridge-viewer:not(.is-effects-on) .bridge-viewport { background: #ecf1ee; }
 /* The bridge drives the same `CreatureStage` the Library does but supplies its
    own toolbar, so the stage's own chrome is hidden here. `.stage-rail` replaced
    `.stage-tools` when the rail was regrouped; `.stage-guide` is the card that
@@ -2908,6 +3506,20 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
 }
 
 @media (max-width: 1000px) {
+  /*
+   * The creature has to be composed for the layout it is actually in, and this
+   * is where that layout is decided, so this is where it is published.
+   *
+   * `ExploreCanvas` reads it on resize. It used to carry its own copy of the
+   * threshold — `viewportWidth < 780` — while the stack happened here at 1000,
+   * and the 220 px between them is every iPad in portrait: 810, 820 and 834 all
+   * got the one-column layout with a creature still placed off to the right for
+   * a copy column that was no longer beside it, which cropped the bee's abdomen
+   * off the frame. A number duplicated in two languages had drifted, so it is
+   * now written once, here, and read there.
+   */
+  :root { --story-stacked: 1; }
+
   .desktop-nav { display: none; }
   .ribbon { flex-wrap: wrap; }
   .ribbon > li { flex: 1 1 46%; }
@@ -2960,7 +3572,24 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
     content: '';
     position: absolute;
     z-index: -1;
-    inset: -74px calc(var(--page-gutter) * -1) -120px;
+    /*
+     * Bled to the frame, not to the gutter.
+     *
+     * A gutter-sized bleed is only full width while the copy fills the shell,
+     * and in this regime it does not: `max-width: 46rem` above makes the block
+     * narrower than its column, and the plate inherited the shortfall. Measured
+     * at 820 x 1180 — shell 756, copy 736 — the plate ran 0 to 785 against a
+     * 805 px frame and left a 19 px strip of bare canvas down one side. Which
+     * side depended on `justify-self`: the hero starts, so the strip was on the
+     * right; chapter 01 ends, so it was on the left. Both were reported, and
+     * they are one bug.
+     *
+     * `50vw` is not a measurement, it is "past the edge from anywhere" — the
+     * gradient is vertical, so horizontal extent costs nothing and means
+     * nothing, and `.story-panel` is `overflow: hidden`, so the excess is
+     * clipped rather than scrollable.
+     */
+    inset: -74px -50vw -120px;
     pointer-events: none;
     /*
      * Solid by the first line of type, not by the third: the kicker sits 20 px
@@ -3060,7 +3689,12 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
   }
 
   .hero-spec { grid-column: 1; grid-row: 1; justify-self: end; align-self: end; margin-bottom: 22px; }
+  /* Both label systems go. On a phone the bee is scaled to 22% and lifted into
+     the top half (see `mobileFrame` in `ExploreCanvas`), so three 9.5 px
+     callouts on a body that small would be larger than the parts they name —
+     and the readout beside them already carries every one of the four parts. */
   .annotation { display: none; }
+  .bee-pins { display: none; }
   .section-heading--split { grid-template-columns: minmax(0, 1fr); gap: 22px; align-items: start; }
   .section-heading--split > p { max-width: 52ch; }
   .tool-heading-lede { max-width: 52ch; }
@@ -3214,10 +3848,15 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
 }
 
 @media (max-width: 700px) {
-  .site-header {
-    right: 12px;
-    left: 12px;
-  }
+  /*
+   * The bar keeps the shell here too.
+   *
+   * It used to break out to a 12 px inset to buy back width on a 390. The
+   * gutter floor is 20 px, so that was 8 px of extra bar in exchange for the
+   * header being the one band on the page that did not line up with anything —
+   * on the narrowest screen, where a misalignment is the largest fraction of
+   * the width. 350 px is more than the brand and the hamburger need.
+   */
   .site-header-inner { padding-inline: 14px 6px; }
 }
 
@@ -3419,6 +4058,11 @@ html:not(.reveal-ready) [data-reveal]:not([data-reveal='soft']) { transform: non
   .lab-readout,
   .lab-pad button,
   .tool-story,
+  .library-rail,
+  .library-viewer,
+  .library-knowledge,
+  .library-subject,
+  .library-search,
   .studio-canvas-menu,
   .studio-canvas-side button,
   .studio-playbar,

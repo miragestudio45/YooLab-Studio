@@ -60,29 +60,89 @@ export const libraryEnvironmentPalette: EnvironmentPalette = {
 export const LIBRARY_CLEAR_COLOR = 0xfffdf9;
 
 /**
- * The bridge viewer is still the same warm YooLab room, but with enough tonal
- * separation for the bee's colourless optical shell to stay legible. The
- * Library remains untouched; this preset is opt-in from the bridge only.
+ * The bridge viewer's room.
+ *
+ * It exists because the bee's optical shell is colourless: dropped into the
+ * Library's near-white cove it loses its silhouette, so this preset trades some
+ * of that brightness for tonal separation behind the specimen. That reasoning
+ * still holds. The HUE it used to do it in did not.
+ *
+ * Every value below was a mauve or a pink — horizon `#eadde8`, ground `#dccfd9`,
+ * a lavender rim at `#d8c7ff` and a rose point fill at `#f1bec1` — and this room
+ * fills the largest panel on the site. The section came back from review as "cứ
+ * hồng hồng": on a page whose one accent is #00AAAB over warm ivory, the biggest
+ * thing on it was rendering in a colour the brand does not contain, and because
+ * the bee is glass it was reflecting that colour too, so the specimen looked
+ * pink as well as the floor.
+ *
+ * Same structure, same strengths, same separation — moved onto the page's own
+ * pair. The sky and key stay warm ivory, and the cool half of the room (horizon,
+ * ground, rim and fill) is now the brand teal, which is also the colour the
+ * shell has been reflecting in the hero all along.
+ *
+ * ## And then the teal was turned down
+ *
+ * Moving off the mauve was right; the *amount* was not. The section came back a
+ * second time as "xanh nhiều quá, rực quá" — too much green, too glaring — and
+ * the numbers agreed: the rim was `#9fdfdd` and the point fill `#a6dcd8`, chroma
+ * 64 and 54 on a page whose entire ground is a warm ivory of chroma 16, and this
+ * room is the largest single rectangle on the site. Two things made it read as
+ * glare rather than as colour. The bee is glass, so it reflected the room and
+ * came out mint as well as the floor. And `LearningGrid` draws salmon and
+ * lavender lines, which on a saturated mint plate is a near-complementary pair
+ * at matching chroma — the single loudest thing two colours can do to each
+ * other.
+ *
+ * So every cool value below keeps its **luminance** and loses two thirds of its
+ * **chroma**. That is the whole edit, and it is deliberate that it is only that:
+ * the separation the room exists to provide is a value relationship (the ground
+ * is a real step below the horizon, which is what gives a colourless shell a
+ * shadow side), and value is exactly what is preserved. Measured against the old
+ * pair, the horizon holds 236 luma, the ground 221 and the 15-point step between
+ * them; the hue is now a whisper of teal instead of a wash of it.
  */
 const bridgeEnvironmentPalette: EnvironmentPalette = {
-  zenith: 0xfff7f2,
-  horizon: 0xeadde8,
-  ground: 0xdccfd9,
-  keyColor: 0xffe9df,
+  zenith: 0xfffaf4,
+  horizon: 0xe6eeeb,
+  ground: 0xd5dfdb,
+  keyColor: 0xfff1e4,
   keyStrength: 4.15,
-  rimColor: 0xd8c7ff,
+  rimColor: 0xc7dad7,
   rimStrength: 1.45,
-  fillColor: 0xf1bec1,
+  fillColor: 0xc9d9d6,
   fillStrength: 0.72,
 };
 
+/*
+ * The plate, and where the depth comes from now.
+ *
+ * Dropping the chroma took the *apparent* falloff with it, because most of what
+ * the old vignette was doing was a hue shift: `#e9f2ef` to `#d2e6e3` is nine
+ * points of luminance and twenty of chroma, so on a near-neutral plate the same
+ * ramp reads almost flat. The edge is therefore about ten points darker than it
+ * was — the corner falloff is now carried by value, which is what a photographic
+ * seamless does and what survives being desaturated.
+ */
 const bridgeBackdropPalette: BackdropPalette = {
-  center: 0xfbf1eb,
-  mid: 0xeee2e8,
-  edge: 0xded7e7,
+  center: 0xfdf8f1,
+  mid: 0xecf1ee,
+  edge: 0xd2dbd7,
 };
 
-const BRIDGE_CLEAR_COLOR = 0xe9dfe5;
+const BRIDGE_CLEAR_COLOR = 0xebeee9;
+
+/**
+ * The bridge's floor, in the bridge's own family.
+ *
+ * `LearningGrid`'s authored pair — lavender minors under salmon majors — was
+ * tuned against the Library's warm ivory cove, where it is warm lines on a warm
+ * plate and reads as pencil on paper. On the bridge's cool plate the same salmon
+ * is the highest-chroma thing in the frame, and with the plate now near-neutral
+ * it would be the *only* chromatic thing in it. These two carry the same
+ * two-tier structure and the same value steps at a fifth of the chroma, so the
+ * floor still says where the ground is without drawing attention to itself.
+ */
+const BRIDGE_GRID_COLORS = { minor: 0xb3bcba, major: 0x8f9c99 };
 
 export type LibraryStage = {
   renderer: THREE.WebGLRenderer;
@@ -178,8 +238,8 @@ export function createLibraryStage(host: HTMLElement, options: LibraryStageOptio
      separate the silhouette from the plate, and a soft point on the camera side
      so the near surfaces are not carried by the environment alone. */
   const hemisphere = new THREE.HemisphereLight(
-    bridgeAppearance ? 0xffeee8 : 0xfff6ec,
-    bridgeAppearance ? 0xd5c8d4 : 0xdccbb6,
+    bridgeAppearance ? 0xfff4ec : 0xfff6ec,
+    bridgeAppearance ? 0xc6ded9 : 0xdccbb6,
     bridgeAppearance ? 0.92 : 0.86,
   );
   scene.add(hemisphere);
@@ -187,7 +247,7 @@ export function createLibraryStage(host: HTMLElement, options: LibraryStageOptio
   keyLight.position.set(-3.2, 4.4, 5.0);
   scene.add(keyLight);
   const rimLight = new THREE.DirectionalLight(
-    bridgeAppearance ? 0xd5c2ff : 0xffd9c6,
+    bridgeAppearance ? 0x9edfdd : 0xffd9c6,
     bridgeAppearance ? 1.15 : 1.42,
   );
   rimLight.position.set(4.0, -0.6, -4.0);
@@ -198,7 +258,7 @@ export function createLibraryStage(host: HTMLElement, options: LibraryStageOptio
      surfaces should not be carried by the environment alone — at a strength that
      lifts the shadow side instead of erasing it. */
   const fillLight = new THREE.PointLight(
-    bridgeAppearance ? 0xf1c6ca : 0xe4d9f6,
+    bridgeAppearance ? 0xa9ded9 : 0xe4d9f6,
     bridgeAppearance ? 3.15 : 2.4,
     18,
     2,
@@ -208,7 +268,10 @@ export function createLibraryStage(host: HTMLElement, options: LibraryStageOptio
 
   const backdrop = createStudioBackdrop(camera, bridgeAppearance ? bridgeBackdropPalette : undefined);
   const shadow = createContactShadow({
-    color: bridgeAppearance ? 0x6e4a55 : undefined,
+    /* Softened with the room. A deep teal cast under a colourless shell was
+       the last saturated thing left in a frame the review called too green, and
+       a shadow is the one surface in it that must not carry a hue of its own. */
+    color: bridgeAppearance ? 0x4a5a58 : undefined,
     /* Raised with the rest of the rebalance. A specimen framed in mid-air over a
        0.16 shadow was floating; the grid below now says where the floor is, and
        the shadow has to agree with it. */
@@ -227,7 +290,7 @@ export function createLibraryStage(host: HTMLElement, options: LibraryStageOptio
    * never calls `fit` draws a correctly-scaled nothing instead of a 9-unit plane
    * at the origin.
    */
-  const grid = createLearningGrid();
+  const grid = createLearningGrid(bridgeAppearance ? BRIDGE_GRID_COLORS : undefined);
   grid.mesh.visible = false;
   scene.add(grid.mesh);
 

@@ -30,6 +30,27 @@ export type SubjectRect = {
   bottom: number;
   /** 0 when the creature is absent; the field ignores the rect below ~0.01. */
   presence: number;
+  /**
+   * How much of the creature is ALREADY drawn above the field, 0 to 1.
+   *
+   * There are two ways to keep flowers off the bee and the page uses whichever
+   * it can afford. The good one is `ExploreCanvas`'s foreground pass: a second
+   * WebGL context that redraws the bee into a transparent canvas stacked above
+   * this field, which puts the real creature — legs, antennae, wing tips — in
+   * front of real plants. The other is this rect, which asks the field to leave
+   * a hole instead.
+   *
+   * They must not both run. A hole cut around a bee that is already composited
+   * on top is a flower-free bubble travelling with the creature, which is more
+   * obviously wrong than the thing it was guarding against.
+   *
+   * So the pass publishes its own coverage here and the field subtracts it. The
+   * default is 0 — no pass, cut the hole — because that is the answer on every
+   * machine where the second context is refused, and a field that guards the
+   * creature it did not need to is a great deal better than one that paints
+   * over the creature it did.
+   */
+  covered: number;
 };
 
 export const subjectRect: SubjectRect = {
@@ -38,6 +59,7 @@ export const subjectRect: SubjectRect = {
   right: 0,
   bottom: 0,
   presence: 0,
+  covered: 0,
 };
 
 export function clearSubjectRect() {

@@ -12,6 +12,7 @@ import { createLibraryStage } from '../../lib/three/libraryEnvironment';
 import { useManagedContext } from '../../lib/three/useManagedContext';
 import { createOrbitRig, createSubjectFit, type OrbitRig, type SubjectFit } from '../../lib/three/framing';
 import type { ModelAnchor, ModelClip, ModelFraming, ModelPreset } from '../../lib/library/types';
+import { useZoomModifier } from '../../lib/useZoomModifier';
 import { StageChrome, StageClipRow, StageRail, StageRailGroup, StageToolButton } from './StageChrome';
 import { LibraryIcon } from './LibraryIcons';
 
@@ -392,6 +393,17 @@ function applyPreset(root: THREE.Object3D, preset: ModelPreset, shell: string[] 
  *
  * The anchor comes from the clip the specimen *opens* on rather than from the
  * first clip in the file, because that is the pose the camera was fitted against.
+ *
+ * ## Why the stem can name more than one root
+ *
+ * The work drone is four drones — one per livery — as four sibling subtrees, and
+ * its reel takes turns between them by scaling three down to nothing while the
+ * fourth performs. Every one of the four roots carries its own travelling
+ * translation track, so locking only the first one found left three liveries
+ * flying out of frame on their turn. The stem therefore resolves to **every**
+ * joint at the shallowest matching depth, each anchored to its own first key.
+ * On a single-rooted rig — the T-rex, the spider, the whale — that set has one
+ * member and the behaviour is unchanged.
  */
 function lockRootMotion(
   clips: THREE.AnimationClip[],
@@ -415,7 +427,9 @@ function lockRootMotion(
    * The hierarchy settles it without any string cleverness. Of the joints whose
    * name starts with the stem, the root of the chain is the one nearest the scene
    * root — `bn_Spine` is the parent of `bn_Spine1` — so depth is the tiebreak, and
-   * a mis-sanitised name cannot pick the wrong joint.
+   * a mis-sanitised name cannot pick the wrong joint. It also keeps the mesh nodes
+   * out: the drone's `Drone v2 WorkMachine_Cybertech Material_0` matches the stem
+   * as a string and is a child of the joint that matters.
    */
   const wanted = THREE.PropertyBinding.sanitizeNodeName(stem);
   const depthOf = (object: THREE.Object3D) => {
@@ -423,34 +437,33 @@ function lockRootMotion(
     for (let node = object.parent; node; node = node.parent) depth += 1;
     return depth;
   };
-  let joint: THREE.Object3D | null = null;
-  let jointDepth = Infinity;
+  const matches: THREE.Object3D[] = [];
   root.traverse((object) => {
-    if (!object.name.startsWith(wanted)) return;
-    const depth = depthOf(object);
-    if (depth >= jointDepth) return;
-    joint = object;
-    jointDepth = depth;
+    if (object.name.startsWith(wanted)) matches.push(object);
   });
-  if (!joint) {
+  if (!matches.length) {
     console.warn('lockRoot names a joint this model does not have:', stem);
     return;
   }
-  const key = `${(joint as THREE.Object3D).name}.position`;
+  const shallowest = Math.min(...matches.map(depthOf));
+  const joints = matches.filter((object) => depthOf(object) === shallowest);
 
   const ordered = anchorClip
     ? [...clips].sort((a, b) => Number(b.name === anchorClip) - Number(a.name === anchorClip))
     : clips;
 
-  let anchor: [number, number, number] | null = null;
-  for (const clip of ordered) {
-    const track = clip.tracks.find((entry) => entry.name === key);
-    if (!track || track.values.length < 3) continue;
-    if (!anchor) anchor = [track.values[0], track.values[1], track.values[2]];
-    for (let index = 0; index + 2 < track.values.length; index += 3) {
-      track.values[index] = anchor[0];
-      track.values[index + 1] = anchor[1];
-      track.values[index + 2] = anchor[2];
+  for (const joint of joints) {
+    const key = `${joint.name}.position`;
+    let anchor: [number, number, number] | null = null;
+    for (const clip of ordered) {
+      const track = clip.tracks.find((entry) => entry.name === key);
+      if (!track || track.values.length < 3) continue;
+      if (!anchor) anchor = [track.values[0], track.values[1], track.values[2]];
+      for (let index = 0; index + 2 < track.values.length; index += 3) {
+        track.values[index] = anchor[0];
+        track.values[index + 1] = anchor[1];
+        track.values[index + 2] = anchor[2];
+      }
     }
   }
 }
@@ -488,6 +501,9 @@ export function ModelStage({ url, preset, framing, clips, defaultClip, lockRoot,
   const [touched, setTouched] = useState(false);
   /* Whether the loaded materials actually carry maps. Only `natural` reads it. */
   const [textured, setTextured] = useState(false);
+  /* The wheel no longer belongs to the camera unless a modifier is held, so the
+     guide card has to say which one. See `lib/three/wheelZoom.ts`. */
+  const zoomKey = useZoomModifier();
   // Latest framing without restarting the scene: switching specimens replaces
   // the whole effect anyway, and a new object identity for an unchanged framing
   // must not tear down the context. Seeded at mount and then kept in an effect,
@@ -868,7 +884,7 @@ export function ModelStage({ url, preset, framing, clips, defaultClip, lockRoot,
             guide={touched ? null : (
               <>
                 <li><LibraryIcon name="drag" /> Kéo để xoay</li>
-                <li><LibraryIcon name="scroll" /> Cuộn để phóng</li>
+                <li><LibraryIcon name="scroll" /> {zoomKey} + cuộn để phóng</li>
                 {!!anchors?.length && <li><LibraryIcon name="tap" /> Nhấp điểm để đọc</li>}
               </>
             )}

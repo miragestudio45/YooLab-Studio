@@ -43,11 +43,87 @@
   justify-content: center;
   padding: calc(var(--header-h) + clamp(12px, 2vh, 26px)) 0 clamp(12px, 2vh, 26px);
   scroll-margin-top: 0;
-  background:
-    linear-gradient(180deg, var(--color-bg) 0%, var(--color-bg-deep) 46%, var(--color-bg) 100%);
+  /* Clipped, because the ground below closes with a corner vignette and a
+     vignette that runs past the section edge is just a darker page. */
+  overflow: clip;
 }
 
+/*
+ * The ground the glass has something to bend.
+ *
+ * This section was a single vertical gradient — `--color-bg` to `--color-bg-deep`
+ * and back — which is a perfectly good backdrop for flat white cards and useless
+ * behind glass. A pane over an even fill has nothing to refract, so it stops
+ * being a material and becomes a tinted box; the frosted-panel-as-decoration the
+ * craft floor rejects is mostly this mistake.
+ *
+ * So the Library gets the same four-layer ground YooStudio has, in the same
+ * order and for the same reasons — a pool of near-white light centred where the
+ * workspace sits, the two house accents blurred far enough to be atmosphere
+ * rather than shapes, and a corner vignette that closes the composition — with
+ * three deliberate differences:
+ *
+ *   - the pool is centred at 58% rather than 47%, because the Library's head
+ *     band and subject switcher take two rows above the panes while YooStudio's
+ *     editor sits nearly centred. The light belongs under the workspace.
+ *   - the accents are swapped corner for corner (teal low-left, coral high-right)
+ *     so the two sections do not read as the same picture twice when a visitor
+ *     scrolls from one to the other four screens apart.
+ *   - the vignette is 0.10 rather than 0.13. Three panes with their own rims
+ *     already carry more edge than one editor card, and at 0.13 the corners
+ *     started competing with them.
+ *
+ * The base gradient is the section's original one, unchanged, as the last layer.
+ */
+.library::before {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  background:
+    radial-gradient(104% 68% at 50% 58%, rgba(255, 255, 255, 1) 0%, rgba(255, 252, 246, 0.86) 30%, rgba(250, 242, 231, 0) 68%),
+    radial-gradient(46% 42% at 6% 88%, rgba(84, 199, 191, 0.18), transparent 66%),
+    radial-gradient(44% 38% at 94% 8%, rgba(238, 122, 101, 0.14), transparent 68%),
+    radial-gradient(132% 104% at 50% 50%, transparent 42%, rgba(116, 92, 68, 0.1) 100%),
+    linear-gradient(180deg, var(--color-bg) 0%, var(--color-bg-deep) 46%, var(--color-bg) 100%);
+  content: '';
+  pointer-events: none;
+}
+
+/*
+ * The Library's own reading of the workspace glass.
+ *
+ * Same four variables as `.tool-stage`, different values, and each difference is
+ * about there being *three* panes here instead of two.
+ *
+ *   tint is the SAME 0.72, and that is deliberate. It was set to 0.80 first, on
+ *     the theory that content sitting directly on these panes needs more sheet
+ *     under it than YooStudio's opaque editor does — but `.tool-story` also has
+ *     its text directly on the glass at 0.72 and reads fine, and the ground
+ *     behind both is the same near-white pool, so the extra eight points bought
+ *     no measured contrast and cost the one thing the request was about: being
+ *     the same material. A difference has to earn itself.
+ *   blur 18px vs 22px — the panes are narrower, so the band of cover glass at
+ *     each edge is a smaller share of the surface. The same 22 px over a 250 px
+ *     rail reads as a frosted strip rather than as a bent edge.
+ *   lift 0.66 vs 1 — three adjacent panes each casting a full 60 px ambient
+ *     shadow pool their darkness in the two 12 px gaps between them, which draws
+ *     exactly the seams the material exists to dissolve. Two thirds keeps each
+ *     pane off the paper without the gaps going grey.
+ *   radius matches `--radius-lg`, which the rail's own rows are already drawn to.
+ */
 .library-stage {
+  --glass-radius: var(--radius-lg);
+  --glass-tint: 0.72;
+  --glass-blur: 18px;
+  --glass-lift: 0.66;
+  /* Half the sweep. See `--glass-sheen` in `glass.css`: the top of these panes
+     carries the viewer's title row and the rail's header, and the full sheen put
+     a white band across both. */
+  --glass-sheen: 0.5;
+
+  /* Above the section's ground, which is `.library::before` at z-index 0. */
+  position: relative;
+  z-index: 1;
   display: grid;
   width: 100%;
   height: calc(100svh - var(--header-h) - clamp(24px, 4vh, 52px));
@@ -205,10 +281,38 @@
 }
 .library-subject:hover { border-color: var(--color-border-hair); background: var(--color-surface); }
 .library-subject:hover > svg { color: var(--color-muted); }
-.library-subject.is-active {
-  border-color: var(--color-border);
-  background: var(--color-surface-raised);
-  box-shadow: 0 5px 14px rgba(87, 62, 43, 0.07);
+/*
+ * Thin glass, for the chrome that is too small to be a pane.
+ *
+ * The active chip and the search field were `--color-surface-raised` behind a
+ * `--color-border` hairline — a flat opaque pill, which is exactly right on a
+ * flat page and wrong on this one. Once the workspace became glass they were the
+ * only fully white things in the section, and review circled both: *"nó cứ
+ * trắng hẳn lên ý.. chưa match"*.
+ *
+ * They are not panes and should not be. A pane's 60 px ambient under a 34 px
+ * chip is a smudge, and its 18 px blur across 11 px of type is a frosted strip.
+ * What they take instead is the material's *reading* at chip scale: a
+ * half-transparent sheet so the ground's light pool comes through, a 1 px white
+ * top edge where a real sheet would catch the light, a hairline ring in the
+ * page's warm ink rather than a grey border, one short shadow to lift it off the
+ * paper, and a small blur — which is genuine refraction here, because these sit
+ * directly on the section ground rather than on another pane.
+ *
+ * The earlier note in `glass.css` said this chrome was "deliberately excluded"
+ * from the material. That was half right and wrongly concluded: excluding it
+ * from the *pane* rule is correct, leaving it opaque white was not.
+ */
+.library-subject.is-active,
+.library-search {
+  border-color: rgba(255, 255, 255, 0.62);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0.4));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.32),
+    0 0 0 1px rgba(23, 78, 79, 0.05),
+    0 6px 16px -8px rgba(28, 62, 61, 0.16);
+  backdrop-filter: blur(9px) saturate(140%);
 }
 /* The subject's own accent lands on the MARK, not on the chip. Seven filled
    chips in seven colours would be the loudest thing on the page; one tinted
@@ -229,10 +333,11 @@
   width: clamp(176px, 18vw, 250px);
   min-height: 34px;
   padding: 0 10px;
-  border: 1px solid var(--color-border);
+  /* Surface and ring come from the thin-glass rule above; this keeps only the
+     shape and the type. */
+  border: 1px solid transparent;
   border-radius: var(--radius-sm);
   color: var(--color-muted);
-  background: var(--color-surface-raised);
   font-size: 12px;
 }
 .library-search svg { flex: none; width: 14px; height: 14px; }
@@ -245,7 +350,17 @@
   background: transparent;
   font: inherit;
 }
-.library-search input::placeholder { color: var(--color-muted-2); }
+/*
+ * `--color-muted` rather than `--color-muted-2`, because a placeholder has to be
+ * read. Measured on the field's real composited surface — rgb(255, 253, 251) —
+ * the lighter token is 2.94:1, well under the 4.5 a placeholder needs, and it
+ * measured the same before this field became translucent: the surface is the
+ * same near-white either way, so this is an old miss that sampling the pixels
+ * finally caught rather than something the glass introduced. The step down from
+ * the input's own ink (17.5:1) is still obvious at 5.2:1, which is the only job
+ * the lighter tone had.
+ */
+.library-search input::placeholder { color: var(--color-muted); }
 .library-search:focus-within { border-color: var(--color-accent-line); }
 .library-search kbd {
   flex: none;
@@ -291,12 +406,36 @@
 .library-rail,
 .library-viewer,
 .library-knowledge {
+  /*
+   * `relative` here, in the base rule, and not in a standalone one further down
+   * the file.
+   *
+   * It exists to anchor `.scroll-thumb`, which is absolute. It used to be its
+   * own `.library-knowledge { position: relative; }` about two hundred lines
+   * BELOW the `max-width: 1180px` block that turns this panel into a bottom
+   * sheet with `position: fixed` — same specificity, later in source, so
+   * `relative` won at every width and the sheet never left the flow.
+   *
+   * What that cost: `.library-body` is two columns and one explicit
+   * `minmax(0, 1fr)` row on a tablet, and an in-flow third child auto-places
+   * into an IMPLICIT second row. The implicit row is `auto`, so it took the
+   * panel's full 568 px of content, and the explicit `1fr` row — the one
+   * holding the asset rail and the viewer — collapsed to 0. The rail measured
+   * 2 px: its two borders. The panel itself is `visibility: hidden` and
+   * translated off-screen by the same block, so the section rendered as a
+   * heading, a subject switcher and 569 px of nothing between two hairlines.
+   *
+   * Order is the whole bug, and it is why `position: relative` is now set in
+   * `styles/glass.css` — imported BEFORE this file, so the `max-width: 1180px`
+   * block below is still later in source and still wins when it makes this panel
+   * a fixed bottom sheet. The three panes take their surface from there too:
+   * radius, background, the specular rim and the lift are the workspace glass,
+   * one declaration shared with YooStudio, and the flat card chrome that used to
+   * be here (a 1 px border, `--color-surface`, `--shadow-card`) is gone rather
+   * than overridden.
+   */
   min-width: 0;
   min-height: 0;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-card);
   overflow: hidden;
 }
 
@@ -456,12 +595,22 @@
   line-height: 1.6;
 }
 
+/*
+ * The rail's footer, translucent.
+ *
+ * `--color-surface-2` is an opaque warm white, so this band covered the bottom
+ * of the pane it sits in — the one part of the glass gradient that carries the
+ * cool green, which is what a sheet of glass looks like where it is thickest.
+ * Painting over it left a flat strip with a hairline above it, and it is the
+ * fourth thing review circled. A wash at 0.34 keeps the band readable as a
+ * separate register without hiding the pane underneath.
+ */
 .library-rail-foot {
   display: grid;
   gap: 3px;
   padding: 13px 16px 15px;
   border-top: 1px solid var(--color-border-hair);
-  background: var(--color-surface-2);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.34));
 }
 .library-rail-foot b {
   color: var(--color-muted);
@@ -555,6 +704,17 @@
   background: var(--color-surface-raised);
 }
 
+/*
+ * The viewer's title row, given a floor of its own.
+ *
+ * This row is transparent and always was; what review circled is what it sits
+ * *on*. It spans the top of the pane, which is where the glass gradient is
+ * whitest (the first stop) and where the specular sweep is masked in at full
+ * strength — two brightnesses stacked in a 40 px band, over a section whose
+ * ground is warm. Halving `--glass-sheen` fixes most of it; this adds the last
+ * part, a barely-there warm wash that gives the row a floor instead of letting
+ * it be the brightest thing in the frame.
+ */
 .library-viewer-bar {
   display: flex;
   align-items: center;
@@ -562,6 +722,7 @@
   gap: 18px;
   padding: 10px 16px;
   border-bottom: 1px solid var(--color-border-hair);
+  background: linear-gradient(180deg, rgba(247, 240, 231, 0.34), rgba(247, 240, 231, 0.08));
 }
 .library-viewer-title { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
 .library-viewer-title b {
@@ -1363,7 +1524,7 @@
  */
 .knowledge-poetic {
   margin: 6px 0 0;
-  color: var(--color-lavender);
+  color: var(--color-lavender-readable);
   font-size: 12px;
   font-style: italic;
   font-weight: 500;
@@ -1866,10 +2027,16 @@
 .library-rail-list::-webkit-scrollbar,
 .library-knowledge-scroll::-webkit-scrollbar { display: none; }
 
-/* The rail hosts an indicator and becomes its containing block. The knowledge
-   panel already has its own `position: relative` above — set there, not here,
-   because this rule is unconditioned and would otherwise win over the
-   ≤1180px breakpoint's `position: fixed` on every narrower width. */
+/*
+ * The rail hosts an indicator and so becomes its containing block.
+ *
+ * The knowledge panel needs the same thing and used to be named here beside it.
+ * It cannot be: two hundred lines above, the tablet regime turns that panel into
+ * a `position: fixed` bottom sheet, and a rule this far down the file overrode
+ * it at equal specificity — which is the whole reason the section rendered as
+ * 569 px of nothing on an iPad. Its `relative` now lives in its own base rule so
+ * the media query is the later one and wins.
+ */
 .library-rail { position: relative; }
 
 .scroll-thumb {

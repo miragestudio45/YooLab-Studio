@@ -14,6 +14,7 @@ import {
   type CreatureHandle,
 } from '../../lib/three/creatures';
 import { createLibraryStage } from '../../lib/three/libraryEnvironment';
+import { useZoomModifier } from '../../lib/useZoomModifier';
 import { useManagedContext } from '../../lib/three/useManagedContext';
 import type { LearningGrid } from '../../lib/three/studioBackdrop';
 import { createOrbitRig, createSubjectFit, type OrbitRig, type SubjectFit } from '../../lib/three/framing';
@@ -141,6 +142,10 @@ export function CreatureStage({
   const [flightCount, setFlightCount] = useState(0);
   /** The guide card is spent once the visitor has actually driven the model. */
   const [touched, setTouched] = useState(false);
+  /* The wheel only zooms with a modifier now, so the hint has to name it.
+     See `lib/three/wheelZoom.ts`. */
+  const zoomKey = useZoomModifier();
+
   const markTouched = useCallback(() => setTouched(true), []);
   // Latest framing without restarting the scene: a new object identity for an
   // unchanged framing must not tear down the WebGL context. Seeded at mount and
@@ -534,7 +539,7 @@ export function CreatureStage({
             guide={touched ? null : (
               <>
                 <li><LibraryIcon name="drag" /> Kéo để xoay</li>
-                <li><LibraryIcon name="scroll" /> Cuộn để phóng</li>
+                <li><LibraryIcon name="scroll" /> {zoomKey} + cuộn để phóng</li>
               </>
             )}
           />

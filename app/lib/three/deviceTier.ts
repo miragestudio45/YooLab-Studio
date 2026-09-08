@@ -45,6 +45,17 @@
 export type SurfaceKind =
   /** Full-viewport, always-on, and usually more than one pass. */
   | 'cinema'
+  /**
+   * The same surface with the passes taken off it.
+   *
+   * The Apple safe path disables transmission, HDR, mip chains, bloom and the
+   * bee's second context, so the frame it draws is a fraction of the one
+   * `cinema` is priced for. Charging it the `cinema` ceiling anyway — 1.15 on a
+   * handheld — is what made the creature's silhouette break up on every iPad
+   * and iPhone: a refraction rim resolved at barely one buffer pixel per CSS
+   * pixel, then scaled up by a 2x or 3x panel.
+   */
+  | 'cinema-lite'
   /** A workspace canvas inside a card, next to real type. */
   | 'panel'
   /** An off-screen bake displayed far smaller than it is rendered. */
@@ -147,6 +158,51 @@ export function pixelRatioCap(kind: SurfaceKind): number {
     /* Next to 10 px labels, so it keeps the most. */
     if (handheld) return Math.min(dpr, 1.5);
     return Math.min(dpr, lean ? 1.4 : 1.75);
+  }
+
+  /*
+   * The reduced pipeline buys its resolution back.
+   *
+   * Measured on a 2x frame with the safe path forced: at the `cinema` ceiling
+   * the bee's rim was a dark crust of speckle all the way round the body, and
+   * at full device ratio the same frame was clean. The defect is resolution and
+   * nothing else — no shader was touched between those two captures.
+   *
+   * 1.45 is not a new number: it is what a machine running the FULL pipeline
+   * already gets. A frame with transmission, HDR, mip chains, bloom and a second
+   * context removed can afford at least what a frame carrying all five can, and
+   * `handheld` is not consulted for the same reason — that clamp exists to pay
+   * for the passes this path does not run. The adaptive ladder still owns the
+   * outcome: this is its ceiling, not its setting, and it steps down on measured
+   * frames.
+   */
+  if (kind === 'cinema-lite') {
+    /*
+     * Budgeted in PIXELS, because a ratio is the wrong unit for this.
+     *
+     * The clamp this replaces asked how retina the screen was and answered
+     * 1.15 for anything handheld — which conflates device class with cost. A
+     * 390 x 844 phone at ratio 2 is 1.3 megapixels; a 1512 x 982 laptop at the
+     * 1.45 it already gets is 3.1. The phone was being starved to protect a
+     * budget the laptop exceeds by well over double, and the visible price was
+     * the creature's rim: a stippled dark crust all the way round the body at
+     * 1.0, still present at 1.45, gone at 2. Three captures, same shader.
+     *
+     * So the ceiling is the laptop's own frame — 1512 x 982 at 1.45 — spent
+     * wherever it buys the most. A phone reaches its device ratio and stops; a
+     * large window resolves lower, which is correct, because that is where the
+     * pixels actually cost something.
+     */
+    const BUDGET = 3_200_000;
+    const css = typeof window === 'undefined'
+      ? 0
+      : Math.max(1, window.innerWidth) * Math.max(1, window.innerHeight);
+    if (!css) return Math.min(dpr, 1.45);
+    /* And never past 2. The captures that established the rim is clean were
+       taken at 2, so a 3x phone would be buying pixels with nothing left to
+       resolve — 2.96 megapixels instead of 1.3, for a difference no capture
+       shows. The budget bounds large frames; this bounds dense small ones. */
+    return Math.max(1, Math.min(dpr, 2, Math.sqrt(BUDGET / css)));
   }
 
   /* cinema: full viewport, several passes, and two of these run at once during

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { ExploreCanvas } from './ExploreCanvas';
+import { StartWithYooLabButton } from './StartWithYooLabButton';
 import { FlowerValleyLayer } from './FlowerValleyLayer';
 import { EXPLORE_SCENES } from '../lib/exploreScenes';
 
@@ -68,8 +69,36 @@ export function ExploreStory() {
       });
     };
 
+    /*
+     * The cue is an instruction, and an instruction that has been followed is
+     * clutter.
+     *
+     * It lives at the bottom of the hero panel, so scrolling does eventually
+     * carry it off screen — but the hero is the tallest thing on the page and
+     * the pill tracked the whole first chapter down before it went, sitting over
+     * the meadow and, at the crossing, over the copy plate. Review read it as
+     * following the section rather than belonging to its foot.
+     *
+     * A class, not a style, and written only when it changes: this runs on the
+     * same rAF as the stage clock, and an inline assignment invalidates computed
+     * style whether or not the value moved.
+     */
+    const cue = document.querySelector<HTMLElement>('.scroll-cue');
+    let cueGone = false;
+    const retireCue = () => {
+      /* An eighth of a viewport. Far enough that a trackpad's smallest nudge
+         does not blink it, near enough that it is gone before the visitor has
+         read anything below the fold. */
+      const gone = window.scrollY > window.innerHeight * 0.12;
+      if (gone === cueGone) return;
+      cueGone = gone;
+      cue?.toggleAttribute('data-retired', gone);
+    };
+    retireCue();
+
     const sample = () => {
       frame = 0;
+      retireCue();
       if (!centres.length) return;
       const focus = window.scrollY + window.innerHeight * 0.5;
       const last = centres.length - 1;
@@ -121,37 +150,58 @@ export function ExploreStory() {
       <section className="hero story-panel" data-snap data-scene="bee-hero" data-header-theme="light" aria-labelledby="hero-title">
         <div className="story-grid">
           <div className="hero-copy story-content">
+            {/*
+              The opening had to answer "what is this" before it answered
+              "isn't this beautiful". It used to open on "Biến kiến thức thành
+              trải nghiệm 3D/XR" — a promise, not a product — and testers came
+              away from the first screen unable to say what YooLab actually is.
+              The brand sits in the eyebrow and the plain sentence sits in the
+              h1, so the two read as one line without printing the word twice.
+            */}
+            <p className="hero-eyebrow">YooLab</p>
             <h1 id="hero-title">
-              Biến kiến thức
+              Kiến tạo
               <br />
-              <em>thành trải nghiệm 3D/XR.</em>
+              <em>không gian học tập số.</em>
             </h1>
             <p className="hero-lede">
-              YooLab giúp giáo viên xây dựng bài học với mô hình 3D, học sinh khám
-              phá, tương tác và sáng tạo nội dung số trên cùng một nền tảng.
+              Công cụ giúp giáo viên thiết kế bài giảng 3D/XR, mở không gian để
+              học sinh thực hành và trải nghiệm.
             </p>
-            <div className="hero-actions">
-              <a className="primary-button" href="#thu-vien">
-                Khám phá bài học <span aria-hidden="true">→</span>
-              </a>
-              {/*
-                "Xem", not "Mở".
+            <p className="hero-capability" aria-label="Bài giảng, Thí nghiệm, Thực hành">
+              <span>Bài giảng</span>
+              <span>Thí nghiệm</span>
+              <span>Thực hành</span>
+            </p>
 
-                This read "Mở YooLab" beside a play glyph, which is the wording
-                the header's account button earns — that one resolves the
-                visitor's project and opens the real editor in a new tab. This
-                one scrolls to `#cong-cu`, the demo. Two buttons on the same
-                first screen promising the same thing and delivering different
-                things is the kind of small dishonesty a visitor notices once
-                and then discounts everything else by. The section calls itself
-                "Công cụ YooLab" directly above the fold it scrolls to, so the
-                name is not needed twice — and keeping the label short is what
-                keeps both hero actions on one row at 390 px.
-              */}
-              <a className="text-button" href="#cong-cu">
-                <span className="play-icon" aria-hidden="true">▶</span>
-                Xem công cụ
-              </a>
+            {/*
+              Two roles, not two buttons.
+
+              The first screen was carrying "Khám phá bài học" and "Xem công cụ"
+              side by side, which tells a visitor what the *page* can do and
+              nothing about who the product is for. Naming the reader — teacher
+              or student — is what makes the next click obvious, and it is the
+              same split the Education section and the trial dialog use, so the
+              site says "một nền tảng, ba cách dùng" once and keeps saying it.
+              Rendered as two short rows rather than a card grid: the hero's
+              subject is the scene behind it, and a pair of marketing tiles here
+              would compete with the bee for the same attention.
+            */}
+            <div className="hero-roles">
+              <div className="hero-role">
+                <span className="hero-role__tag">Giáo viên</span>
+                <p>Xây dựng bài học trực quan với mô hình 3D/XR</p>
+                <StartWithYooLabButton className="hero-role__cta hero-role__cta--primary">
+                  Mở YooLab ngay <span aria-hidden="true">→</span>
+                </StartWithYooLabButton>
+              </div>
+              <div className="hero-role">
+                <span className="hero-role__tag">Học sinh</span>
+                <p>Khám phá, tương tác và thực hành với Sandbox/STEM 3D/XR</p>
+                <a className="hero-role__cta" href="#thu-vien">
+                  Khám phá bài học ngay <span aria-hidden="true">→</span>
+                </a>
+              </div>
             </div>
           </div>
           <div className="hero-spec">
@@ -198,9 +248,13 @@ export function ExploreStory() {
               <p className="bee-hint">{beeStates[beeMode].hint}</p>
             </div>
           </div>
-          <div className="annotation annotation--bee-a"><i />Cánh gắn vào ngực</div>
-          <div className="annotation annotation--flip annotation--bee-b"><i />Ngực — trung tâm cơ bay</div>
-          <div className="annotation annotation--bee-c"><i />Bụng chia thành nhiều đốt</div>
+          {/* The bee's three anatomy labels are no longer here. They were grid
+              children placed against the *layout* rather than against the
+              animal, so they pointed at empty air — see `BEE_PINS` in
+              `ExploreCanvas`, which now projects each one from its own joint in
+              the rig. The fish and jelly labels below stay as grid children on
+              purpose: those two creatures fill their half of the frame, so their
+              labels are margin notes with a leader reaching in, not pins. */}
         </div>
       </section>
 

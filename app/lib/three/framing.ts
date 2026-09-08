@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { attachWheelZoom } from './wheelZoom';
 
 /**
  * Camera framing and orbit for the Library's specimen viewers.
@@ -406,23 +407,22 @@ export function createOrbitRig(host: HTMLElement, options: OrbitOptions): OrbitR
     if (host.hasPointerCapture(event.pointerId)) host.releasePointerCapture(event.pointerId);
     delete host.dataset.grabbing;
   };
-  const onWheel = (event: WheelEvent) => {
-    // Only claims the wheel once the pointer is over the stage *and* the
-    // gesture is clearly a zoom, so the page still scrolls past the viewer.
-    if (Math.abs(event.deltaY) < 2) return;
-    event.preventDefault();
+  // Who owns the wheel is one decision for the whole page — a plain wheel
+  // scrolls the document, ctrl/cmd (and therefore a trackpad pinch) zooms. See
+  // `wheelZoom.ts` for why the old `deltaY < 2` guard trapped the scroll
+  // instead of sharing it.
+  const detachWheel = attachWheelZoom(host, (deltaY) => {
     distanceTarget = THREE.MathUtils.clamp(
-      distanceTarget * (1 + event.deltaY * 0.0012),
+      distanceTarget * (1 + deltaY * 0.0012),
       minDistance,
       maxDistance,
     );
-  };
+  });
 
   host.addEventListener('pointerdown', onPointerDown);
   host.addEventListener('pointermove', onPointerMove);
   host.addEventListener('pointerup', endDrag);
   host.addEventListener('pointercancel', endDrag);
-  host.addEventListener('wheel', onWheel, { passive: false });
 
   return {
     apply: (camera, delta) => {
@@ -479,7 +479,7 @@ export function createOrbitRig(host: HTMLElement, options: OrbitOptions): OrbitR
       host.removeEventListener('pointermove', onPointerMove);
       host.removeEventListener('pointerup', endDrag);
       host.removeEventListener('pointercancel', endDrag);
-      host.removeEventListener('wheel', onWheel);
+      detachWheel();
       delete host.dataset.grabbing;
     },
   };

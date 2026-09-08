@@ -1,4 +1,5 @@
 import { LIBRARY_ROUTES, ROUTABLE_SUBJECTS } from '../lib/library/slugs';
+import { SITE_URL } from '../lib/siteUrl';
 
 /**
  * The sitemap, read off the manifest instead of maintained by hand.
@@ -21,7 +22,7 @@ import { LIBRARY_ROUTES, ROUTABLE_SUBJECTS } from '../lib/library/slugs';
  * library changed daily, which is a claim, and a false one.
  */
 
-const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://yoolab.vn';
+const SITE = SITE_URL;
 
 type Entry = { path: string; changefreq: string; priority: string };
 

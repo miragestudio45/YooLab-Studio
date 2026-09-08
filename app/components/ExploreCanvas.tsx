@@ -28,7 +28,7 @@ import {
   hdrTargetType,
   transmissionTargetSupport,
 } from '../lib/three/hdrTarget';
-import { gfxAllows, gfxRecord, trackRenderer } from '../lib/three/gfx';
+import { gfxAllows, gfxRecord, gfxRelease, trackRenderer } from '../lib/three/gfx';
 import { appleSafePath, presumeAppleSafePath } from '../lib/three/appleSafePath';
 import { createQualityLadder } from '../lib/three/qualityLadder';
 import { createOceanWorld, type OceanWorld } from '../lib/ocean/scene';
@@ -316,9 +316,68 @@ const BEE_ENTRY_SECONDS = 2.6;
 /** Where the bee starts: off the right edge, high, and closer to camera. */
 const beeEntry = { x: 6.4, y: 1.35 };
 
+/**
+ * The bee-study chapter's three anatomy labels, and the joints they belong to.
+ *
+ * They used to be CSS-grid children of the bee panel, placed on rows 1 / 2 / 3
+ * of the copy grid — which is to say they were placed against the *layout* and
+ * not against the animal. That was itself a fix: an earlier build positioned
+ * them in viewport percentages and all three printed through the headline and
+ * the readout. Putting them on the grid stopped the collisions and left them
+ * pointing at empty air, which is what review reported: "hiện tại nó k bám theo
+ * con ong".
+ *
+ * A label that names a body part has to be on that body part or not exist. The
+ * shipped rig has exactly the joints needed — `bee_fixed.glb` carries
+ * `thorax_jnt`, `abdomen_jnt01..04` and `l_/r_wingroot_jnt` — so each label is
+ * now projected from its own joint every frame, the same technique
+ * `ModelStage.syncPins` uses for the Library's anatomy pins.
+ *
+ * `stem` is matched with `startsWith` rather than by equality because
+ * `GLTFLoader` runs every node name through `PropertyBinding.sanitizeNodeName`,
+ * which turns `thorax_jnt.36` into `thorax_jnt36`. The stems below are unique
+ * prefixes: `abdomen_jnt02` cannot match `abdomen_jnt01`.
+ *
+ * `side` is where the label sits relative to its dot, and it is the collision
+ * rule rather than a taste. The copy column owns the right half of this
+ * chapter, so no label may ever grow rightwards — two go left of their joint
+ * and one goes above it. Combined with `PIN_SAFE` below, that is what makes
+ * "on the animal" and "never on the type" both true.
+ */
+const BEE_PINS = [
+  { stem: 'l_wingroot_jnt', side: 'up', label: 'Cánh gắn vào ngực' },
+  { stem: 'thorax_jnt', side: 'left', label: 'Ngực — trung tâm cơ bay' },
+  { stem: 'abdomen_jnt02', side: 'down', label: 'Bụng chia thành nhiều đốt' },
+] as const;
+
+/**
+ * The box a pin has to project inside to be drawn at all.
+ *
+ * Fractions of the stage frame, and every bound is about where the *label* ends
+ * up rather than where the dot is — a leader carries its ring 60-108 px away
+ * from the joint, so the dot has to be well inside the frame for the ring and
+ * its text to be.
+ *
+ * The right bound matters most: the study chapter's copy column starts at about
+ * 58% of the width, and the thorax pin's label sits 108 px left of its dot but
+ * the wing pin's sits directly above it, so 0.50 is the last position at which
+ * every variant still clears the type. `minY` is 0.20 because the wing pin
+ * reaches 60 px upward and the header band owns the first 64. Outside any
+ * bound the pin is hidden, which is why they come and go as the animal turns —
+ * a callout that cannot reach clear ground has nothing to say, and one printing
+ * through a heading costs the composition.
+ */
+const PIN_SAFE = { minX: 0.16, maxX: 0.5, minY: 0.2, maxY: 0.78 };
+
 export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const foregroundHostRef = useRef<HTMLDivElement>(null);
+  /* The anatomy labels' own layer. It is written to as custom properties rather
+     than through React — three pins at 60 fps is 180 state writes a second — and
+     it is a sibling of the canvas rather than a child of the bee panel so the
+     projected frame coordinates land in the element's own coordinate space with
+     no conversion. See `BEE_PINS`. */
+  const pinHostRef = useRef<HTMLDivElement>(null);
   const beeModeRef = useRef(beeMode);
   // Held in a ref of our own so the scene effect can stay on an empty dependency
   // list: the renderer, the loaders and the models must survive a prop change,
@@ -390,19 +449,44 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
 
     /* One place decides this now, for every canvas on the site. See
        `lib/three/deviceTier.ts` for why the retina ceiling came down. */
-    const maxPixelRatio = presumedSafe.active
-      /* Capped harder on the driver family that corrupts. Two full-viewport
-         targets at retina is the largest allocation on the page, and tile
-         memory pressure is the one thing every reported artefact here has in
-         common. 1.0 is one buffer pixel per CSS pixel — not soft, just not
-         supersampled. */
-      ? Math.min(pixelRatioCap('cinema'), 1)
-      : pixelRatioCap('cinema');
+    /*
+     * The safe path no longer caps resolution, and the reason is that it had
+     * already removed what the cap was protecting.
+     *
+     * The extra `Math.min(…, 1)` was justified by tile memory pressure from
+     * "two full-viewport targets at retina" — the transmission and HDR buffers.
+     * But `SAFE_OFF` turns off `transmission`, `hdr`, `mip`, `bloom` and
+     * `foreground` on this very path, so on the configuration being capped
+     * those targets are not allocated at all. It was charging the reduced
+     * pipeline for the full one's worst allocation.
+     *
+     * What that cost is the defect that was reported as the bee looking broken
+     * and jagged on iOS. `pixelRatioCap('cinema')` already answers 1.15 for a
+     * handheld and 1.45 otherwise, both measured against the FULL pipeline; the
+     * extra cap took a 2x MacBook down to 1.0, so an alpha-cut silhouette was
+     * drawn at one buffer pixel per CSS pixel and then scaled up by the display.
+     * No amount of shader work fixes a staircase introduced after the shader.
+     *
+     * The adaptive ladder below is the backstop it always was: `dprCeiling` is
+     * this number and it steps down on measured frames, so a device that cannot
+     * hold it does not have to.
+     */
+    const maxPixelRatio = pixelRatioCap(presumedSafe.active ? 'cinema-lite' : 'cinema');
     const renderer = new THREE.WebGLRenderer({
-      /* MSAA on a full-viewport buffer that is already resolution-governed pays
-         twice for the same edge. A lean device spends that budget on resolution
-         instead, which helps every pixel rather than only the silhouettes. */
-      antialias: gfxAllows('msaa', !lean && !presumedSafe.active),
+      /*
+       * MSAA on a full-viewport buffer that is already resolution-governed pays
+       * twice for the same edge. A lean device spends that budget on resolution
+       * instead, which helps every pixel rather than only the silhouettes.
+       *
+       * That trade is about the performance tier and nothing else, so it is
+       * asked of `lean` alone now. `presumeAppleSafePath` says so itself —
+       * "MSAA on the default framebuffer is not the surface any of these
+       * defects live on" — and then disabled it anyway, which took antialiasing
+       * away from every Mac: not handheld, not lean, no reason. iPad and iPhone
+       * are unaffected, because `handheld` makes them lean and the resolution
+       * trade above is the right one there.
+       */
+      antialias: gfxAllows('msaa', !lean),
       alpha: false,
       powerPreference: 'high-performance',
     });
@@ -563,7 +647,8 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
     const ensureForeground = () => {
       if (foregroundRenderer) return foregroundRenderer;
       const created = new THREE.WebGLRenderer({
-        antialias: gfxAllows('msaa', !lean && !presumedSafe.active),
+        /* Same tier question as the main context above. */
+        antialias: gfxAllows('msaa', !lean),
         alpha: true,
         premultipliedAlpha: true,
         powerPreference: 'high-performance',
@@ -610,6 +695,11 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
       /* Not just `dispose`: that frees three's own objects but leaves the GL
          context attached to a live canvas, which is exactly the thing this is
          here to give back. */
+      /* Chapter-scoped by design — see `dropForeground` above — so its ending
+         is housekeeping, not a fault. Unannounced it did the same damage the
+         thumbnail baker's did: one deliberate teardown, and every renderer the
+         visitor scrolled into afterwards was built on the fallback path. */
+      gfxRelease(foregroundRenderer.domElement);
       foregroundRenderer.forceContextLoss();
       /* The element goes with it. A canvas whose context has been released
          composites as nothing, and a transparent full-viewport rectangle over
@@ -731,7 +821,12 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
       hdrTargets: safeTargetType === THREE.UnsignedByteType ? '8bit' : 'half-float',
       foreground: wantForeground,
       bloom: bloomEnabled,
-      msaa: gfxAllows('msaa', !lean && !presumedSafe.active),
+      /* Must mirror the constructor argument exactly. A report that states
+         a decision the renderer did not make is worse than no report: this file
+         has just spent a round chasing a fallback nobody could see, because the
+         number that drove it was not the number being published. */
+      msaa: gfxAllows('msaa', !lean),
+      pixelRatioCeiling: maxPixelRatio,
       liquidSim: gfxAllows('liquid', !reduceMotion && !lean && !safePath.active),
     });
     const oceanBloom = createOceanBloomPass(lean, safeTargetType);
@@ -799,6 +894,20 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
     /** Root-local bounding-box corners, for the per-frame screen projection. */
     let beeCorners: THREE.Vector3[] = [];
     const cornerScratch = new THREE.Vector3();
+    /** One entry per `BEE_PINS`, `null` where the rig has no such joint. */
+    let beePinJoints: (THREE.Object3D | null)[] = [];
+    const pinScratch = new THREE.Vector3();
+    /* Called on every frame the bee is not being placed — the ocean chapters and
+       the frames before the rig has loaded. Only the opacity is reset: leaving
+       the last position in place means a pin that comes back does not have to
+       travel from 0,0 on its first visible frame. */
+    const clearBeePins = () => {
+      const layer = pinHostRef.current;
+      if (!layer) return;
+      for (let index = 0; index < BEE_PINS.length; index += 1) {
+        layer.style.setProperty(`--pin-${index}-on`, '0');
+      }
+    };
     const mixers: THREE.AnimationMixer[] = [];
 
     let ocean: OceanWorld | null = null;
@@ -863,6 +972,18 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
         new THREE.Vector3(bounds.min.x, bounds.max.y, bounds.max.z),
         new THREE.Vector3(bounds.max.x, bounds.max.y, bounds.max.z),
       ];
+      /* The three anatomy joints, resolved once. A stem that matches nothing is
+         dropped rather than guessed, so a re-export that renames a joint loses
+         its label instead of pinning it to the wrong part of the animal. */
+      beePinJoints = BEE_PINS.map(({ stem }) => {
+        let found: THREE.Object3D | null = null;
+        handle.root.traverse((object) => {
+          if (!found && object.name.startsWith(stem)) found = object;
+        });
+        if (!found) console.warn('bee pin names a joint this rig does not have:', stem);
+        return found;
+      });
+
       // Starts on the fly clip: the very first thing the bee does is fly in.
       beeActions[2]?.reset().fadeIn(0.01).play();
       /*
@@ -1013,12 +1134,94 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
            * while the visitor is still up in the meadow, and it means the first
            * frame they actually see has nothing left to allocate.
            */
-          renderer.compile(world.scene, world.camera);
+          /*
+           * `compileAsync`, and one warm pass per frame.
+           *
+           * The warm-up was right about WHAT to do and wrong about when. It ran
+           * as one synchronous block - a full shader compile of the reef, then
+           * six full-scene renders back to back - and a block is a frame.
+           * Measured on an emulated 390 x 844 at DPR 3: a single frame of
+           * 4,467 ms, ending on the tick that sets `oceanWarm`. Nothing else in
+           * a 26-second trace came close; every other frame was 16.7 ms. On a
+           * phone that is the whole complaint - the page paints, then freezes,
+           * and the freeze lands while the visitor is still reading the hero.
+           *
+           * The work is unchanged and still finishes before the crossing. Two
+           * things changed: `compileAsync` returns a promise and, where
+           * `KHR_parallel_shader_compile` exists, lets the driver build programs
+           * off-thread instead of blocking on each one; and every render pass
+           * gets its own frame through `warmStep`. Six passes over six frames is
+           * the same GPU work and no long task.
+           *
+           * Each step restores whatever it mutated before it yields. That is not
+           * tidiness: between two steps the page paints, and a frame that caught
+           * a half-applied `setPresence` would show a creature dissolving for no
+           * reason the visitor could explain.
+           */
+          /*
+           * The reef's shaders, a slice at a time.
+           *
+           * `compileAsync` was tried here first and does not help: three's
+           * implementation calls the synchronous `compile()` and only defers
+           * *resolution* until the driver reports the programs ready, so the
+           * translation cost still lands in one frame. Measured on the emulated
+           * phone, that one call was 2,943 ms of the 4,467 ms stall.
+           *
+           * `compile()` walks the scene with `traverseVisible`, so hiding the
+           * meshes it has already done is enough to make it compile a subset —
+           * no reparenting, no temporary scene, no lighting difference, because
+           * the lights stay visible and the scene it resolves them from is the
+           * same one. Six slices is six frames the browser can paint and answer
+           * a touch between, instead of three seconds where it can do neither.
+           *
+           * The ocean is not on screen while this runs (`dive` is 0 in the
+           * meadow, so the loop draws only the land), which is why toggling its
+           * visibility is free rather than a flicker.
+           */
+          const compilable: THREE.Object3D[] = [];
+          world.scene.traverse((node) => {
+            const mesh = node as THREE.Mesh;
+            if (mesh.isMesh || (node as THREE.InstancedMesh).isInstancedMesh) compilable.push(node);
+          });
+          const wasVisible = compilable.map((node) => node.visible);
+          for (const node of compilable) node.visible = false;
+          /* Six slices: enough that no frame carries more than a few hundred
+             milliseconds, few enough that the walk itself is not the cost. */
+          const sliceSize = Math.max(1, Math.ceil(compilable.length / 6));
+          for (let start = 0; start < compilable.length; start += sliceSize) {
+            if (disposed) break;
+            const slice = compilable.slice(start, start + sliceSize);
+            for (let i = 0; i < slice.length; i += 1) slice[i].visible = wasVisible[start + i];
+            renderer.compile(world.scene, world.camera);
+            for (const node of slice) node.visible = false;
+            await new Promise<void>((resolve) => { requestAnimationFrame(() => resolve()); });
+          }
+          for (let i = 0; i < compilable.length; i += 1) compilable[i].visible = wasVisible[i];
+          if (disposed) { world.dispose(); return; }
           ensureTargets();
           if (landTarget && oceanTarget) {
-            const previous = [fish.root.visible, jelly.root.visible] as const;
-            fish.root.visible = true;
-            jelly.root.visible = true;
+            const warmStep = async (run: () => void) => {
+              if (disposed) return;
+              run();
+              renderer.setRenderTarget(null);
+              await new Promise<void>((resolve) => { requestAnimationFrame(() => resolve()); });
+            };
+            /* Captured as `const` because the closures below outlive the
+               straight-line narrowing: `fish` and `jelly` are the effect's
+               `let` bindings, and TypeScript cannot know they are still
+               assigned by the time a callback runs. */
+            const warmFish = fish;
+            const warmJelly = jelly;
+            const warmLand = landTarget;
+            const warmOcean = oceanTarget;
+            const withCreaturesVisible = (run: () => void) => {
+              const previous = [warmFish.root.visible, warmJelly.root.visible] as const;
+              warmFish.root.visible = true;
+              warmJelly.root.visible = true;
+              run();
+              warmFish.root.visible = previous[0];
+              warmJelly.root.visible = previous[1];
+            };
             /*
              * Both presence states, because they are different PROGRAMS.
              *
@@ -1030,23 +1233,29 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
              * the crossing.
              */
             for (const presence of [0.5, 1]) {
-              fish.setPresence(presence);
-              jelly.setPresence(presence);
-              renderer.setRenderTarget(oceanTarget);
-              renderer.render(world.scene, world.camera);
+              await warmStep(() => withCreaturesVisible(() => {
+                warmFish.setPresence(presence);
+                warmJelly.setPresence(presence);
+                renderer.setRenderTarget(oceanTarget);
+                renderer.render(world.scene, world.camera);
+              }));
             }
             /* Compile and allocate the HDR extract/blur/composite while the
                visitor is still in the meadow, exactly like the waterline pass. */
-            oceanBloom.render(renderer, oceanTarget.texture, 0.88, OCEAN_EXPOSURE, warmScratch);
+            await warmStep(() => {
+              oceanBloom.render(renderer, warmOcean.texture, 0.88, OCEAN_EXPOSURE, warmScratch);
+            });
             /* The land half, including the bee's own blended variant, so the way
                back up is warm too. */
             const beePresence = bee ? 1 : 0;
             for (const presence of [0.5, 1]) {
-              bee?.setPresence(presence);
-              renderer.setRenderTarget(landTarget);
-              renderer.render(landScene, landCamera);
+              await warmStep(() => {
+                bee?.setPresence(presence);
+                renderer.setRenderTarget(landTarget);
+                renderer.render(landScene, landCamera);
+                bee?.setPresence(beePresence);
+              });
             }
-            bee?.setPresence(beePresence);
 
             /*
              * And the composite itself. It is a `RawShaderMaterial` with its own
@@ -1054,16 +1263,16 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
              * on first draw — which would otherwise be the first frame of the
              * water surface appearing.
              */
-            waterline.uniforms.uLand.value = landTarget.texture;
-            waterline.uniforms.uOcean.value = oceanTarget.texture;
-            waterline.uniforms.uOceanBloom.value = oceanBloom.texture;
-            waterline.uniforms.uBloomStrength.value = 0.88;
-            renderer.setRenderTarget(warmScratch);
-            renderer.render(waterline.scene, waterline.camera);
+            await warmStep(() => {
+              waterline.uniforms.uLand.value = warmLand.texture;
+              waterline.uniforms.uOcean.value = warmOcean.texture;
+              waterline.uniforms.uOceanBloom.value = oceanBloom.texture;
+              waterline.uniforms.uBloomStrength.value = 0.88;
+              renderer.setRenderTarget(warmScratch);
+              renderer.render(waterline.scene, waterline.camera);
+            });
 
-            renderer.setRenderTarget(null);
-            fish.root.visible = previous[0];
-            jelly.root.visible = previous[1];
+            if (disposed) return;
             host.dataset.oceanWarm = 'true';
             /* The programs are in the driver's cache now, so the next visit can
                afford to warm on idle. See `oceanShadersLikelyCached`. */
@@ -1167,6 +1376,14 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
     /* ---------------------------------------------------------------- resize --- */
     let viewportWidth = 1;
     let viewportHeight = 1;
+    /**
+     * Whether the hero copy sits UNDER the stage rather than beside it.
+     *
+     * Read from `--story-stacked`, which the stylesheet sets in the same query
+     * that does the stacking — see the note there. The fallback matches that
+     * query, and exists only for the frame before the stylesheet has applied.
+     */
+    let storyStacked = false;
     /* Sizing the bee pass is its own step because it now has two callers: the
        shared resize, and `ensureForeground` when it builds a fresh context that
        has never been sized. A `function` declaration, so it is available to
@@ -1183,6 +1400,9 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
     const resize = () => {
       viewportWidth = Math.max(host.clientWidth, 1);
       viewportHeight = Math.max(host.clientHeight, 1);
+      const stacked = getComputedStyle(document.documentElement)
+        .getPropertyValue('--story-stacked').trim();
+      storyStacked = stacked === '' ? window.innerWidth <= 1000 : stacked === '1';
       const aspect = viewportWidth / viewportHeight;
       landCamera.aspect = aspect;
       landCamera.updateProjectionMatrix();
@@ -1356,7 +1576,9 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
       const paletteA = LAND_PALETTES[lower];
       const paletteB = LAND_PALETTES[lower + 1];
 
-      const mobileFrame = viewportWidth < 780 ? 0.22 : 1;
+      /* The camera aims off-centre only while there is a copy column beside the
+         creature to aim away from. */
+      const mobileFrame = storyStacked ? 0.22 : 1;
       shotPosition.copy(shotA.position).lerp(shotB.position, mix);
       shotTarget.copy(shotA.target).lerp(shotB.target, mix);
       const shotFov = shotA.fov + (shotB.fov - shotA.fov) * mix;
@@ -1439,7 +1661,7 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
         beeMaterialSet.optical.uLightDir.value.copy(keyLight.position).normalize();
       }
 
-      const mobile = viewportWidth < 780;
+      const mobile = storyStacked;
       const landFrameH = 2 * Math.tan((cameraFov * Math.PI) / 360) * cameraPosition.distanceTo(cameraTarget);
       const landFrameW = landFrameH * landCamera.aspect;
 
@@ -1538,11 +1760,49 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
                longer on screen. */
             subjectRect.presence = beePresence * (1 - dive);
           }
+
+          /*
+           * The anatomy labels, projected from their own joints.
+           *
+           * Right here, and for the same reason the rect above is: the world
+           * matrix is current and the placement for this frame has been
+           * applied. Positions go out as custom properties on the label layer,
+           * so three pins riding a 60 fps animation cost no React renders at
+           * all — the same trade `ModelStage.syncPins` makes.
+           *
+           * `beeMix` gates the whole set, not just the opacity. It is 0 in the
+           * hero and 1 at the study mark, so the labels belong to the chapter
+           * that is *about* the anatomy and never appear over the hero, where
+           * the animal is three times the size and cropped by the frame.
+           */
+          const pinLayer = pinHostRef.current;
+          if (pinLayer && beePinJoints.length) {
+            const chapter = beeMix * beePresence * (1 - dive);
+            for (let index = 0; index < beePinJoints.length; index += 1) {
+              const joint = beePinJoints[index];
+              if (!joint) continue;
+              joint.getWorldPosition(pinScratch);
+              pinScratch.project(landCamera);
+              const nx = pinScratch.x * 0.5 + 0.5;
+              const ny = 0.5 - pinScratch.y * 0.5;
+              const inFrame = pinScratch.z > -1 && pinScratch.z < 1
+                && nx > PIN_SAFE.minX && nx < PIN_SAFE.maxX
+                && ny > PIN_SAFE.minY && ny < PIN_SAFE.maxY;
+              pinLayer.style.setProperty(`--pin-${index}-x`, `${(nx * 100).toFixed(2)}%`);
+              pinLayer.style.setProperty(`--pin-${index}-y`, `${(ny * 100).toFixed(2)}%`);
+              /* Two decimals, because this is read by `opacity` and a value that
+                 changes every frame at full precision is a string allocation per
+                 pin per frame for a difference nobody can see. */
+              pinLayer.style.setProperty(`--pin-${index}-on`, inFrame ? chapter.toFixed(2) : '0');
+            }
+          }
         } else {
           clearSubjectRect();
+          clearBeePins();
         }
       } else {
         clearSubjectRect();
+        clearBeePins();
       }
 
       /* -------------------------------------------------------------- ocean --- */
@@ -1696,6 +1956,26 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
       const visibility = 1 - smoothstep(0.04, 0.3, dive);
       const wanted = wantForeground
         && !!bee && !!beeMaterialSet && beePresence >= 0.006 && visibility >= 0.006;
+
+      /*
+       * Tell the flower field whether it still has to guard the bee.
+       *
+       * This pass and the field's exclusion rect are alternatives, and until now
+       * nothing said so: `withMeasured` in the flower renderer dropped every
+       * authored `subject` zone outright on the grounds that "the Bee now owns a
+       * real WebGL foreground pass". It does not always own one. `wantForeground`
+       * is false on every lean device and on every machine that trips the Apple
+       * safe path — which is every Mac and every iPad, because the check matches
+       * `Apple GPU` under WebKit and `ANGLE (Apple, …)` under Chromium alike. On
+       * all of those the bee was drawn only into the main canvas at z-index -4,
+       * the field composited over it at -3, and the flower band along the bottom
+       * of the frame printed straight across the creature's legs.
+       *
+       * A float rather than a flag because the pass fades out across the dive
+       * rather than switching off, and the hole has to fade in exactly as fast
+       * or the swap is a visible pop.
+       */
+      subjectRect.covered = wanted ? visibility : 0;
 
       /*
        * The context's whole lifecycle, decided here.
@@ -1893,6 +2173,33 @@ export function ExploreCanvas({ progressRef, beeMode }: ExploreCanvasProps) {
         <div className="visual-loader"><span />Đang mở phòng thí nghiệm 3D…</div>
       </div>
       <div className="explore-foreground" ref={foregroundHostRef} aria-hidden="true" />
+      {/*
+        The anatomy labels.
+
+        `aria-hidden`, and not reluctantly: the bee-study chapter's
+        `.study-readout` publishes the same four parts as a real `<dl>` — ĐẦU,
+        NGỰC, CÁNH, BỤNG, each with its own description — one column to the
+        right of this. These are the visual half of that list, riding the
+        animal, and announcing both would read the anatomy twice.
+
+        Positions arrive as `--pin-N-x/y/on` from the frame loop above.
+      */}
+      <div className="bee-pins" ref={pinHostRef} aria-hidden="true">
+        {BEE_PINS.map((pin, index) => (
+          <span
+            key={pin.stem}
+            className={`bee-pin bee-pin--${pin.side}`}
+            style={{
+              left: `var(--pin-${index}-x, 50%)`,
+              top: `var(--pin-${index}-y, 50%)`,
+              opacity: `var(--pin-${index}-on, 0)`,
+            }}
+          >
+            <i aria-hidden="true" />
+            <b>{pin.label}</b>
+          </span>
+        ))}
+      </div>
     </>
   );
 }

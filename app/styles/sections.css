@@ -77,6 +77,25 @@
 
 .education-head { min-width: 0; }
 .education-head h2 { margin: clamp(8px, 1.2vh, 14px) 0 0; }
+/*
+ * The lede that lets the heading be tight.
+ *
+ * "Một nền tảng, ba vai trò." is a count, and a count on its own reads curt —
+ * which is exactly what review said about the heading it replaced. The warmth
+ * moves here instead: one sentence naming the three verbs the three tabs are
+ * about to demonstrate, on the narrow measure the rest of this column uses so
+ * it reads as part of the heading block rather than as body copy that wandered
+ * up. Capped in `ch` because the column's width is a viewport fraction and a
+ * three-line lede here pushes the tab strip into the brief card.
+ */
+.education-head-lede {
+  max-width: 34ch;
+  margin: clamp(10px, 1.5vh, 16px) 0 0;
+  color: var(--color-muted);
+  font-size: clamp(12.5px, 0.95vw, 14px);
+  line-height: 1.55;
+  text-wrap: pretty;
+}
 
 .education-showcase {
   display: grid;
@@ -154,18 +173,22 @@
   display: flex;
   flex-direction: column;
   /*
-   * Content height, capped by the row — not stretched to it.
+   * Stretched to the row, so the card and the player share a bottom edge.
    *
-   * Stretched, the card shared a bottom edge with the player beside it, which
-   * looks tidy and at 1920 put 100 px of empty card under the call to action.
-   * DESIGN.md already settled this argument once, for the version of this panel
-   * that stretched: "two columns of honestly different length read better than
-   * one column with a gap in the middle of it." `max-height` keeps the cap the
-   * `1fr` row was providing, so a short screen still bounds it.
+   * This was `align-self: start` on the argument that "two columns of honestly
+   * different length read better than one column with a gap in the middle of
+   * it" — the gap being up to 100 px of empty card under the call to action at
+   * 1920. That reasoning is sound and the conclusion was wrong: side by side,
+   * two panels of the same visual weight that stop 40 px apart do not read as
+   * honest, they read as a layout that missed.
+   *
+   * The dead space it was avoiding is handled where it belongs, on the CTA:
+   * `margin-top: auto` pushes the button to the card's floor, so the slack
+   * lands between the numbered list and the action instead of below it. The
+   * card fills its column and there is nothing under the button but padding.
    */
-  align-self: start;
+  align-self: stretch;
   min-height: 0;
-  max-height: 100%;
   padding: clamp(16px, 2.4vh, 28px) clamp(16px, 1.5vw, 26px);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
@@ -199,7 +222,9 @@
 }
 
 .education-points {
-  margin: clamp(10px, 1.8vh, 20px) 0 0;
+  /* The bottom margin is the floor on the gap above the call to action, which
+     `margin-top: auto` on the button cannot express on its own. */
+  margin: clamp(10px, 1.8vh, 20px) 0 clamp(14px, 2.2vh, 26px);
   padding: 0;
   border-top: 1px solid var(--color-border-hair);
   list-style: none;
@@ -232,7 +257,11 @@
   align-items: center;
   gap: 9px;
   min-height: clamp(38px, 4.6vh, 44px);
-  margin-top: clamp(14px, 2.2vh, 26px);
+  /* `auto`, so the button sits on the card's floor and the slack from a
+     stretched card collects above it rather than below it. The minimum gap is
+     the list's own bottom margin, because `max()` does not take `auto`.
+     See `.education-brief`. */
+  margin-top: auto;
   padding: 0 clamp(16px, 1.3vw, 22px);
   border-radius: var(--radius-md);
   color: var(--color-accent-on);
@@ -375,25 +404,12 @@
 .edu-tool.is-active { color: var(--color-accent); background: var(--color-accent-wash); }
 
 /* ------------------------------------------------------- stage controls --- */
-.edu-stage-controls {
-  position: absolute;
-  top: clamp(10px, 1.6%, 18px);
-  right: clamp(10px, 1.6%, 18px);
-  display: flex;
-  gap: 6px;
-}
-.edu-stage-control {
-  display: grid;
-  place-items: center;
-  width: clamp(26px, 2.3vw, 32px);
-  height: clamp(26px, 2.3vw, 32px);
-  border: 1px solid var(--color-border-hair);
-  border-radius: var(--radius-xs);
-  color: var(--color-muted);
-  background: rgba(255, 253, 249, 0.92);
-  box-shadow: 0 5px 14px rgba(87, 62, 43, 0.06);
-}
-.edu-stage-control svg { font-size: clamp(13px, 1vw, 15px); }
+/*
+ * The reset / full-screen / menu trio that floated in the stage's top-right
+ * corner is gone, and its rules with it. All three were plain `div`s inside an
+ * `aria-hidden` mock, so they read as buttons and answered none of the clicks
+ * they invited. See the note on `.edu-transport`.
+ */
 
 /* ------------------------------------------------------------------ pins --- */
 /*
@@ -475,18 +491,6 @@
   background: var(--color-surface);
 }
 
-.edu-transport-play {
-  display: grid;
-  place-items: center;
-  width: clamp(32px, 2.9vw, 40px);
-  height: clamp(32px, 2.9vw, 40px);
-  border: 1.4px solid var(--color-accent-line);
-  border-radius: 999px;
-  color: var(--color-accent);
-  background: var(--color-surface-raised);
-}
-.edu-transport-play svg { font-size: clamp(12px, 1vw, 14px); margin-left: 1px; }
-
 .edu-transport-step { display: grid; gap: 2px; min-width: 0; }
 .edu-transport-step small {
   color: var(--color-muted-2);
@@ -541,55 +545,6 @@
   background: var(--color-accent);
   box-shadow: 0 0 0 3px var(--color-surface), 0 2px 7px rgba(0, 170, 171, 0.35);
 }
-
-.edu-transport-spin { display: flex; align-items: center; gap: 8px; }
-.edu-transport-spin span:first-child {
-  color: var(--color-muted);
-  font-size: 10px;
-  font-weight: 580;
-  white-space: nowrap;
-}
-/* A real switch, because auto-rotation is a state rather than a press — the
-   same reading the Library's stage chrome makes of the same control. */
-.edu-switch {
-  position: relative;
-  display: block;
-  width: 34px;
-  height: 19px;
-  border-radius: 999px;
-  background: var(--color-border);
-  transition: background 200ms ease;
-}
-.edu-switch i {
-  position: absolute;
-  top: 2.5px;
-  left: 2.5px;
-  width: 14px;
-  height: 14px;
-  border-radius: 999px;
-  background: #fff;
-  box-shadow: 0 1px 3px rgba(87, 62, 43, 0.28);
-  transition: transform 220ms var(--ease-reveal);
-}
-.edu-switch.is-on { background: var(--color-accent); }
-.edu-switch.is-on i { transform: translateX(15px); }
-
-.edu-transport-steps { display: flex; gap: 6px; }
-.edu-transport-arrow {
-  display: grid;
-  place-items: center;
-  width: clamp(26px, 2.3vw, 32px);
-  height: clamp(26px, 2.3vw, 32px);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-xs);
-  color: var(--color-muted);
-  background: var(--color-surface-raised);
-}
-.edu-transport-arrow svg { font-size: clamp(13px, 1vw, 15px); }
-/* One chevron export, rotated. Two hand-turned marks would be two marks. */
-.edu-transport-arrow--back svg { transform: rotate(90deg); }
-.edu-transport-arrow--next { border-color: var(--color-accent-line); color: var(--color-accent); }
-.edu-transport-arrow--next svg { transform: rotate(-90deg); }
 
 /* -------------------------------------------------------- object column --- */
 .edu-object {
@@ -742,21 +697,6 @@
 }
 .edu-media-slot--clip > span svg { font-size: 9px; margin-left: 1px; }
 
-/* The panel's action, under the panel's content — no longer pushed to the
-   bottom with `margin-top: auto`, because the outline above now owns the slack
-   and two things claiming it fought over the same 150 px. */
-.edu-object-add {
-  padding: clamp(7px, 1.1vh, 10px) 8px;
-  border: 1px solid var(--color-accent-line);
-  border-radius: var(--radius-xs);
-  color: var(--color-accent);
-  background: var(--color-surface-raised);
-  font-size: 10px;
-  font-weight: 620;
-  letter-spacing: -0.008em;
-  text-align: center;
-}
-
 /* ========================================================== capabilities === */
 /*
  * Four cards with a gutter, not one box with dividers — DESIGN.md §5. A divider
@@ -816,123 +756,344 @@
 
 .proof .section-heading { min-height: var(--proof-head); }
 
+/* ------------------------------------------------------------- the belt --- */
 /*
- * Four cards, explicitly four.
+ * A continuously moving strip of lesson cards.
  *
- * `repeat(auto-fit, minmax(258px, 1fr))` looked flexible and behaved as a bug: at
- * 1024 px it silently reflowed to three-plus-one, so the row that is supposed to
- * be evidence of range read as a grid that had run out. Four named columns down
- * to the tablet breakpoint, then two, then one.
+ * It replaced a four-column grid, and the reason is in `ProofSection.tsx`: four
+ * cards prove a lesson exists, a moving strip proves there is a library. What
+ * follows is only how it is built.
+ *
+ * ## The loop
+ *
+ * The track holds the same sixteen cards twice and translates to exactly -50% of
+ * its own width. At the end of that travel the second run is sitting precisely
+ * where the first one started, so the reset to 0 is invisible — there is no gap
+ * to cover and no seam to hide, and it holds at any card count and any card
+ * width without a number here needing to know either.
+ *
+ * `translate3d` rather than `translateX` so the track is composited rather than
+ * repainted: this is the only thing on the page that animates continuously
+ * outside a canvas, and it must cost the main thread nothing.
+ *
+ * ## Three regimes, and why a marquee needs all three
+ *
+ * A strip that moves and cannot be stopped is a strip whose cards cannot be
+ * read, let alone clicked. So:
+ *
+ *   1. **Pointer, motion allowed** — it runs, and hover or keyboard focus
+ *      anywhere inside pauses it. That is the desktop case and the only one that
+ *      animates.
+ *   2. **No hover** — touch has no pointer to park, so a visitor there could
+ *      never pause it. The animation is off and the belt becomes a native
+ *      horizontal scroller with snap points: a shelf you swipe, which is the
+ *      idiom that platform already has.
+ *   3. **Reduced motion** — the same native scroller, for the same reason and by
+ *      the visitor's explicit request.
+ *
+ * In regimes 2 and 3 the clone is `display: none`, because a scroller does not
+ * need a second copy and a person swiping through would reach the same sixteen
+ * lessons twice.
  */
-.proof-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: clamp(14px, 1.4vw, 24px);
-  margin-top: clamp(20px, 3vh, 40px);
+.proof-belt {
+  position: relative;
+  margin-top: clamp(12px, 2.2vh, 32px);
+  /*
+   * Room for the hover, which this did not have.
+   *
+   * `overflow: hidden` clips to the padding box, and with no padding the cards
+   * sat flush to it: measured, the belt was 234 px tall and a card was 234 px
+   * tall at the same top. So `:hover` — which lifts a card 3 px and gives it a
+   * `0 26px 66px` shadow — had its lift sliced off the top edge and its shadow
+   * clipped away entirely. Hovering a card visibly cut its rounded top corner
+   * off, which is the hover bug review reported.
+   *
+   * The clipping itself has to stay: it is what keeps the moving track from
+   * spilling into the section. Only the vertical room was missing. 34 px at the
+   * bottom is the shadow's offset plus half its blur, which is where it has
+   * faded to nothing; the `margin-top` above gives back what the 8 px costs so
+   * the section's rhythm does not change.
+   */
+  padding: 8px 0 34px;
+  overflow: hidden;
+  /* Cards enter and leave through a fade rather than a cut. Without it the strip
+     has two hard vertical edges at the viewport bounds, which is what makes a
+     marquee look like a clipped grid instead of a continuing one. */
+  mask-image: linear-gradient(90deg, transparent 0, #000 5%, #000 95%, transparent 100%);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 5%, #000 95%, transparent 100%);
 }
 
-/*
- * A grid, not a flex column, so the four cards share baselines.
- *
- * The visual, the subject label, the title, the description and the action are
- * five rows, and the description row is the flexible one — so a two-line
- * description on one card cannot push its "Mở bài học" a line below its
- * neighbours'. That alignment across the row is most of what makes four cards
- * read as one set.
- */
-.proof-card {
+.proof-belt-track {
+  display: flex;
+  width: max-content;
+  /* Slow on purpose. DESIGN.md §8: the cinematic budget is spent on the creature
+     stage and the product half stays calm — at 16 cards this is about 55 px/s,
+     which reads as drift rather than as a carousel demanding attention. */
+  animation: proof-belt-run 82s linear infinite;
+}
+.proof-belt:hover .proof-belt-track,
+.proof-belt:focus-within .proof-belt-track { animation-play-state: paused; }
+
+@keyframes proof-belt-run {
+  to { transform: translate3d(-50%, 0, 0); }
+}
+
+.proof-belt-run {
+  display: flex;
+  gap: clamp(14px, 1.4vw, 24px);
+  /* The gap has to continue across the join between the two runs, or the loop
+     shows a double-width space once per cycle. */
+  margin: 0 clamp(7px, 0.7vw, 12px);
+  padding: 0;
+  list-style: none;
+}
+
+/* `stretch` is the default on a flex row and `height: 100%` is what makes the
+   button honour it: without the pair, a card whose subtitle wraps to two lines
+   is taller than its neighbours and the belt's bottom edge ripples as it moves. */
+.proof-belt-item { display: flex; align-items: stretch; }
+
+.proof-belt-card {
   display: grid;
-  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+  width: clamp(212px, 17vw, 272px);
+  height: 100%;
   padding: 0 0 18px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   overflow: hidden;
+  color: inherit;
   background: var(--color-surface);
-  transition: transform 220ms ease, box-shadow 220ms ease;
+  font: inherit;
+  text-align: left;
+  transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease;
 }
-.proof-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lift); }
+.proof-belt-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--color-border-strong);
+  box-shadow: var(--shadow-lift);
+}
 
 /*
- * One height for every visual on the row, scaled to the viewport.
+ * One height for every plate on the belt.
  *
- * 168 px of picture under a 104 px section padding was the reason this row read
- * as four chips in a large empty slab. It is now a fifth of the screen, which on
- * a 1080 display is 216 px and on a 768 laptop is 165 — the same proportion of
- * the page rather than the same number of pixels.
+ * Shorter than the four-card grid's `22svh` because the cards are now 240 px
+ * wide rather than 340: a plate that kept the old height would be taller than it
+ * is wide, and a portrait picture of a horizontal specimen is mostly plate.
  */
-.proof-visual {
+.proof-belt-plate {
   position: relative;
-  height: clamp(146px, 22svh, 260px);
+  height: clamp(124px, 15svh, 176px);
   display: grid;
   place-items: center;
   overflow: hidden;
   background: linear-gradient(160deg, #fdf3ea, #f8e4da);
 }
-.proof-visual img,
-.proof-visual .model-thumbnail { width: 100%; height: 100%; }
-.proof-visual img { object-fit: cover; }
+/* `cover`, including inside a bake. The offscreen renderer frames a specimen
+   with margin around it for the Library's 56 px rail rows, and `contain` in a
+   240 px plate keeps that margin — the bee came out a pale ghost in the middle
+   of an empty plate. Filling the plate is what makes the picture the subject. */
+.proof-belt-plate img,
+.proof-belt-plate .model-thumbnail { width: 100%; height: 100%; }
+.proof-belt-plate img { object-fit: cover; }
 
 /*
- * The two experiences with no bakeable mesh — the periodic table and the globe
- * are a DOM grid and a canvas, so there is no GLB to render — get the same
- * treatment the Library rail gives its drawn marks: the subject's own tint as
- * both the wash and `currentColor`, on a soft dome. That is what stops a line
- * drawing from reading as a missing image next to two photographs.
+ * The baked renders get a deeper plate than the photograph does, and that is a
+ * contrast fix rather than a decoration.
+ *
+ * A cover is a subject on transparency — the bake has no background, on purpose,
+ * so the page can put its own behind it. Half of them are pale: the lungs, the
+ * brain, the eye and the bacterial wall are near-white meshes, and on the blush
+ * plate the photographs use they came out as ghosts. The subject's tint at 9%
+ * over a soft dome gives a pale render something to sit against, and it
+ * colour-codes the belt by subject as it moves — the same job the marks' wash
+ * does, at the strength a photographic subject needs rather than a line drawing.
  */
-.proof-visual--mark {
+/*
+ * A backdrop, not a tinted plate — which is what review asked for in as many
+ * words: *"cho nó tý nền sau các model đc k"*.
+ *
+ * The plate was a single dome from `--color-surface-raised` to `--color-bg`.
+ * Read as a picture that is an even light field, and an object photographed
+ * against an even field has nowhere to be: the renders came back looking like
+ * cut-outs laid on cream however well they were lit, which is why "hình ảnh
+ * chưa đẹp" survived two rounds of fixing the renders themselves. The renders
+ * were not the whole problem. They had no set.
+ *
+ * So this is a small studio, in four layers, and each one does a job a
+ * photographer would recognise:
+ *
+ *   1. **the pool** — a soft key spilling onto the backdrop behind the subject,
+ *      brightest just above where it stands, so the silhouette has light behind
+ *      it to separate from.
+ *   2. **the floor** — a warm band across the bottom third. This is the layer
+ *      that matters most: it is what turns the bake's contact shadow from a grey
+ *      ellipse floating in a field into a shadow *on* something. A subject with
+ *      a shadow and no floor still reads as a cut-out.
+ *   3. **the cove** — the vignette where the backdrop curves away at the edges.
+ *      It closes the frame and stops the plate reading as a crop of a larger
+ *      white space.
+ *   4. **the paper** — the warm base, a touch deeper than the card around it so
+ *      the picture is a window rather than a hole.
+ *
+ * The subject's own tint still arrives on `::before`, so the belt keeps
+ * colour-coding itself by subject as it moves.
+ */
+.proof-belt-plate--cover {
   background:
-    radial-gradient(120% 120% at 32% 22%, var(--color-surface-raised) 0%, var(--color-surface-2) 100%);
+    radial-gradient(56% 42% at 50% 44%, rgba(255, 253, 249, 0.97) 0%, rgba(255, 253, 249, 0) 74%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0) 50%, rgba(122, 94, 66, 0.08) 74%, rgba(122, 94, 66, 0.2) 100%),
+    radial-gradient(124% 94% at 50% 42%, rgba(255, 255, 255, 0) 40%, rgba(98, 74, 54, 0.16) 100%),
+    linear-gradient(168deg, #fbf4ec 0%, #f2e6da 100%);
 }
-.proof-visual--mark::before {
+/*
+ * 0.11 — down from 0.17, which was compensating for two things that are fixed.
+ *
+ * 17% of a subject tint was the answer to a belt half full of near-white meshes:
+ * anatomy may not be repainted to look better (THIRD_PARTY_ASSETS.md), so the
+ * contrast had to come from the surface behind them and the plate had to carry
+ * it alone. Two changes since removed that burden. The pale meshes are off the
+ * belt — the lungs, brain, eye and bacterial wall are in the Library, where they
+ * are rendered live at full size — and every remaining cover is lit as a product
+ * shot with its own contact shadow, so definition now comes from the render.
+ *
+ * At 17% the tint was fighting that: it greyed the baked shadow, which is a warm
+ * neutral, and pulled the gallbladder's green toward the plate's own hue. 11% is
+ * enough to keep colour-coding the belt by subject as it moves — the job the
+ * marks' wash does at 6% — without tinting the photograph on top of it.
+ */
+.proof-belt-plate--cover::before {
   content: '';
   position: absolute;
   inset: 0;
   background: var(--proof-tint, var(--color-accent-strong));
-  /* Enough to colour-code the plate, not enough to make two of the four cards a
-     different temperature from the row they belong to. */
+  /* 0.09 now the backdrop below carries the depth. The tint's only remaining
+     job is to say which subject the card belongs to as it slides past, and a
+     flat wash over a lit set is the one thing that can undo the set — at 0.11 it
+     was greying the floor it sits on. */
+  opacity: 0.09;
+}
+/*
+ * `contain`, not `cover`: the render is a subject on transparency and the plate
+ * is the same 4:3 the bake ships, so filling would crop a wingtip to hide a
+ * background that is not there.
+ *
+ * The inset went from 88% to 96%. Review's note that the pictures were not good
+ * enough was two problems stacked: the bake framed each subject 12% too far away
+ * *and* the plate then inset it another 12%, so a lungs render arrived at about
+ * three quarters of the size it should be, on a card 240 px wide. The bake is
+ * closer now (see `scripts/bake-library-covers.mjs`) and this gives back most of
+ * the rest — 4% is enough that nothing touches the plate's rounded corner.
+ *
+ * No `drop-shadow` here any more, and that is the point rather than a cleanup.
+ *
+ * This carried `drop-shadow(0 10px 12px …)` on the argument that the renders had
+ * no ground plane, so a heart was a cut-out pasted on a gradient. True at the
+ * time; the renders have a real one now — a shadow-catching plane under a
+ * dedicated overhead caster, see `ThumbnailRequest.ground` — so the same
+ * declaration became a *second* shadow, offset from the first and traced around
+ * the whole PNG rather than sitting under the subject. Two shadows from two
+ * directions is worse than none.
+ *
+ * The baked one is also the better shadow for a reason CSS cannot reach: it is
+ * cast *by the geometry*, so the trex's shadow has legs in it and the jellyfish's
+ * is a small pool far below a floating bell.
+ */
+.proof-belt-plate--cover img {
+  position: relative;
+  width: 96%;
+  height: 96%;
+  object-fit: contain;
+}
+
+/*
+ * The drawn marks get the Library rail's own treatment: the subject's tint as
+ * both a 6% wash on a soft dome and as `currentColor` inside the diagram. That
+ * is what stops a line drawing from reading as a missing image beside a
+ * photograph, and it is what colour-codes the belt by subject as it moves.
+ */
+/*
+ * The same set, at a fraction of the contrast.
+ *
+ * A line diagram is not a photographed object: it has no silhouette to separate
+ * and no shadow to land, so it needs no floor and would look wrong standing on
+ * one. What it does need is to belong to the same belt as the eight cards that
+ * do — a flat plate beside a lit one reads as the missing image, which is the
+ * failure this whole variant exists to avoid. So it keeps the pool and the cove
+ * and drops the floor, at about half the strength.
+ */
+.proof-belt-plate--mark {
+  background:
+    radial-gradient(62% 50% at 50% 42%, rgba(255, 253, 249, 0.9) 0%, rgba(255, 253, 249, 0) 76%),
+    radial-gradient(126% 96% at 50% 44%, rgba(255, 255, 255, 0) 46%, rgba(98, 74, 54, 0.07) 100%),
+    linear-gradient(168deg, #fbf5ee 0%, #f5ece3 100%);
+}
+.proof-belt-plate--mark::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--proof-tint, var(--color-accent-strong));
   opacity: 0.06;
 }
-.proof-mark {
+.proof-belt-plate--mark .library-mark {
   position: relative;
-  display: block;
-  width: clamp(96px, 46%, 136px);
+  width: clamp(76px, 44%, 112px);
   height: auto;
   aspect-ratio: 1;
   color: var(--proof-tint, var(--color-accent-deep));
 }
-.proof-mark .library-mark { width: 100%; height: 100%; }
 
-.proof-subject {
-  margin: 16px 18px 0;
+.proof-belt-subject {
+  margin: 15px 16px 0;
   color: var(--color-muted-2);
   font-size: 9.5px;
   font-weight: 650;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
-.proof-card h3 {
-  margin: 6px 18px 0;
-  font-size: 19px;
+.proof-belt-title {
+  margin: 6px 16px 0;
+  font-size: 17px;
   font-weight: 660;
-  letter-spacing: -0.034em;
-  line-height: 1.16;
+  letter-spacing: -0.032em;
+  line-height: 1.18;
 }
-.proof-card > p { margin: 7px 18px 0; color: var(--color-muted); font-size: 12px; line-height: 1.6; }
+.proof-belt-sub {
+  margin: 6px 16px 0;
+  color: var(--color-muted);
+  font-size: 11.5px;
+  line-height: 1.55;
+}
 
-.proof-action {
-  justify-self: start;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin: 14px 18px 0;
-  padding: 0;
-  border: 0;
-  color: var(--color-accent-deep);
-  background: transparent;
-  font-size: 12px;
-  font-weight: 620;
+/* Regimes 2 and 3: a native shelf instead of an animation. See the note above. */
+@media (hover: none), (prefers-reduced-motion: reduce) {
+  .proof-belt {
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    /*
+     * Right edge only. The looping belt fades both sides because cards enter
+     * through one and leave through the other; a scroller has a real first card
+     * sitting at scroll 0, and fading it is indistinguishable from a rendering
+     * fault. The fade that survives is the one still doing a job: it says there
+     * is more to the right.
+     */
+    mask-image: linear-gradient(90deg, #000 0, #000 88%, transparent 100%);
+    -webkit-mask-image: linear-gradient(90deg, #000 0, #000 88%, transparent 100%);
+  }
+  .proof-belt::-webkit-scrollbar { display: none; }
+  .proof-belt-track { animation: none; width: auto; }
+  .proof-belt-run--clone { display: none; }
+  .proof-belt-run {
+    /* The gutters become real padding here: the first and last card of a
+       scroller must clear the screen edge, where a looping belt has no first or
+       last card to worry about. */
+    margin: 0;
+    padding: 0 var(--page-gutter);
+  }
+  .proof-belt-item { scroll-snap-align: center; }
 }
-.proof-action:hover { color: var(--brand-ink); }
 
 .proof-note { max-width: 74ch; margin: clamp(20px, 3vh, 32px) 0 0; color: var(--color-muted); font-size: 11.5px; line-height: 1.7; }
 
@@ -943,13 +1104,57 @@
  * Same four widths as the page chrome — 1180 / 1000 / 860 / 700 — so the whole
  * page changes shape at the same places rather than at seven.
  */
+/*
+ * Short screens, for the one column that could not answer them on its own.
+ *
+ * Everything in the education aside is already height-aware — the display
+ * heading is min(4.1vw, 5.7vh) and comes down to 44 px here on its own, the
+ * gaps are vh clamps — and the column was still 42 px too tall at 1366x768.
+ * The reason is that the five numbered steps are the one part of it made of
+ * fixed sizes: 12.5 px labels over 11.5 px descriptions that wrap to two lines
+ * in this column's measure, so each step is a ~50 px block that no viewport
+ * term touches, times five.
+ *
+ * What was falling off the bottom was not decoration. Both columns of
+ * .education-panel share a bottom edge, and the aside's bottom edge is the
+ * section's call to action, so the last thing off the screen was the button.
+ * Losing the capability row below the panel is the documented trade (see the
+ * header of this section); losing the button is not.
+ *
+ * So this block buys the 42 px back from the rhythm of the list rather than
+ * from its content: tighter row padding, tighter margins around the list, and a
+ * tighter stack between the heading, the tabs and the card. No row is dropped
+ * and no type gets smaller — five steps still read as five even beats, just
+ * closer together, which is the correct response to a short screen.
+ *
+ * 860px, not 900: the panel measures 708 px of content against 666 px of room
+ * at 768, and passes on its own from about 870 up. Sharing pricing's 900 would
+ * compress a composition that already fits.
+ */
+@media (max-height: 860px) and (min-width: 1001px) {
+  .education-aside { gap: clamp(10px, 1.1vh, 24px); }
+  /* The card's own vertical padding, which at 768 was 18 px of the 42. */
+  .education-brief { padding: clamp(13px, 1.8vh, 28px) clamp(16px, 1.5vw, 26px); }
+  .education-points { margin: clamp(8px, 1.1vh, 20px) 0 clamp(10px, 1.4vh, 26px); }
+  .education-points li { padding: clamp(4px, 0.62vh, 10px) 0; }
+}
+
+
 @media (max-width: 1180px) {
   /*
-   * The lesson player stacks under the brief card (KNOWN_LIMITATIONS.md: this is
-   * the section's documented floor). Below it the copy column no longer shares
-   * the row with the player, so the section gives up the one-screen fit and
-   * grows to whatever the stacked content needs — `.education-stage` still uses
-   * `min-height`, never `height`, so that growth was already safe.
+   * The player stacks under the brief. This is the number KNOWN_LIMITATIONS has
+   * recorded for this section since the pass that raised it from 1000 — and the
+   * rule was never written, which is why the two-up survived all the way down to
+   * 390 and the section looked broken on every tablet.
+   *
+   * What it looked like: at 768 the 0.36 column is 240 px, and a point row is
+   * `24px | 132px | 1fr`, so the third cell — the sentence explaining the step —
+   * came out at about 60 px and set one word per line, five words tall. The
+   * `<=700` regime already moved that cell under the label to solve the same
+   * problem on a phone; the tablet never got either fix.
+   *
+   * Stacking solves it at the source rather than with a second reflow: the brief
+   * is the full shell wide, so `1fr` is ~550 px and the row reads as one line.
    */
   .education-panel { grid-template-columns: minmax(0, 1fr); }
   .education-points li { padding: clamp(4px, 0.72vh, 9px) 0; }
@@ -964,24 +1169,43 @@
 }
 
 @media (max-width: 1000px) {
-  /* Stacked already — the switch is at 1180 now. This is where the PLAYER's own
-     three columns start to crowd, and the object column is the first thing it
-     can spare: a specimen is the one thing in the frame that cannot be made
-     smaller and still be evidence. */
+  /* Stacked since 1180. This is where the PLAYER's own three columns start to
+     crowd, and the object column is the first thing it can spare: a specimen is
+     the one thing in the frame that cannot be made smaller and still be
+     evidence. */
   .edu-viewer { grid-template-columns: minmax(0, 1fr) clamp(146px, 22%, 186px); }
   .edu-tool { width: 36px; }
   .edu-tool span { font-size: 8px; }
   .education-points b { font-size: 12px; }
-  .proof-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  /* Two rows of cards instead of one, so each visual gives back what the second
-     row costs: at 22svh the pair of rows was 17 px taller than a 768×1024
-     tablet's viewport. */
-  .proof-visual { height: clamp(140px, 17svh, 210px); }
+  /* The belt is one row at every width — a strip that reflowed to two rows
+     would not be a strip — so the tablet regime only trims the plate. */
+  .proof-belt-plate { height: clamp(118px, 13svh, 156px); }
 }
 
 @media (max-width: 860px) {
   .education-tabs { display: flex; width: 100%; }
   .education-tabs button { flex: 1; justify-content: center; padding: 0 8px; font-size: 12.5px; }
+
+  /*
+   * One column, which this never had.
+   *
+   * `.education-panel` was declared once as `0.36fr / 0.64fr` and had no
+   * collapse at any width, so a 390 px phone was still being asked to run a
+   * two-column application layout: the brief column came out at ~126 px and the
+   * player sat on top of the heading. The section is the only one on the page
+   * that stacks rather than shrinks, because its right half is an interface and
+   * an interface has a minimum width the way a paragraph does not.
+   */
+  .education-panel {
+    grid-template-columns: minmax(0, 1fr);
+    gap: clamp(20px, 3.4vw, 34px);
+  }
+  /* Released from the desktop regime's fixed rows: stacked, each half takes the
+     height its own content needs. */
+  .education-stage { height: auto; min-height: 0; }
+  .education-aside { grid-template-rows: auto; }
+  .education-showcase { grid-template-rows: auto auto; }
+  .education-showcase-lede { max-width: none; }
 }
 
 @media (max-width: 700px) {
@@ -1005,10 +1229,34 @@
   .edu-pin { display: none; }
   .edu-viewer-stage .model-thumbnail { inset: 14px 14px 14px clamp(50px, 16%, 68px); }
   .edu-transport { gap: 10px; padding: 9px 12px; }
-  /* Two readouts and a switch in 350 px is three things saying where you are.
-     The step readout keeps its number and the track keeps the picture of it. */
+  /* Two readouts in 350 px is two things saying where you are. The step
+     readout keeps its number and the track keeps the picture of it. */
   .edu-transport-step b { display: none; }
-  .edu-transport-spin span:first-child { display: none; }
-  .proof-grid { grid-template-columns: minmax(0, 1fr); }
-  .proof-visual { height: clamp(170px, 26svh, 230px); }
+  /* Narrower cards, not fewer: at 390 px this shows about one and a half of
+     them, which is what tells a thumb there is more to the right. */
+  .proof-belt-card { width: clamp(196px, 62vw, 240px); }
+  .proof-belt-plate { height: clamp(124px, 17svh, 164px); }
 }
+
+/*
+ * The education showcase runs the real Library viewer now.
+ *
+ * `LibraryViewer` brings its own chrome — a caption, a spin switch, a first-run
+ * guide card, and for a rigged specimen a clip rail. All of it is correct in the
+ * Library and all of it is duplicate here, because this mock draws its own tool
+ * rail and transport bar over the same stage. Suppressed rather than made
+ * conditional: the viewer's job is to be one component, and a `variant` prop
+ * threaded through four files to hide four elements is a worse trade than four
+ * rules scoped to the one place that hides them.
+ */
+.edu-viewer-stage .stage-caption,
+.edu-viewer-stage .stage-spin,
+.edu-viewer-stage .stage-guide,
+.edu-viewer-stage .stage-rail,
+.edu-viewer-stage .stage-clips { display: none; }
+
+/* The stage fills the mock's frame; the mock owns the rounding and the floor. */
+.edu-viewer-stage .library-viewer-stage,
+.edu-viewer-stage .creature-stage,
+.edu-viewer-stage .model-stage { position: absolute; inset: 0; }
+.edu-viewer-stage canvas { border-radius: inherit; }

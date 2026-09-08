@@ -138,6 +138,22 @@ Two companions to the screenshots, because a picture is bad at proving a number:
   Proof, footer — and where each section's primary block lands relative to the
   fold. It reads **spread = 0 px at all seven viewports**, which is the whole
   "does this page use one grid" question answered numerically.
+
+  Two things it now measures that it did not. Its practice target named
+  `.practice-grid`, a class that stopped existing when that section became a
+  poster wall, so it had been silently reporting `null` — a target that measures
+  nothing asserts nothing, and that is the failure mode to watch for in this
+  file. And it learned `fitTallerThan` alongside `fitAbove`, because Bảng giá is
+  the one section whose one-screen promise is bounded by viewport *height*; with
+  only a width threshold available there was no way to record that promise except
+  to leave it unasserted.
+
+  The snap track is no longer a fixed list either. `lib/story/snap.ts` admits a
+  `[data-snap]` section only while its content fits the viewport, so the anchor
+  count is a function of the viewport: eleven at 1512 × 982, seven on a tablet
+  where Practice, Education and Pricing deliberately stack. `window.__snap
+  .anchors()` in a dev build reports what was admitted, which is the number to
+  check when a settle lands somewhere unexpected.
 - `reference-audit/probe.mjs` evaluates an arbitrary expression in the real page
   at a given viewport. It exists because two of the faults in this round were
   invisible to a screenshot and obvious in three numbers.
@@ -161,6 +177,26 @@ than here; what it did **not** cover:
   watched.
 - **Touch.** Orbit, pinch-zoom and the mobile knowledge sheet were exercised
   with synthetic pointer events, not with fingers on glass.
+- **The kinetic type's feel.** `KineticType`'s play/reverse cycle is verified by
+  reading computed opacity, transform and filter at five scroll positions
+  (`--motion` in `probe.mjs`, added for this — see below), which proves the state
+  machine and says nothing about whether 0.92 s at `power4.out` with a 0.075
+  stagger *looks* right. Nobody has watched it on a trackpad.
+
+  One trap this file should keep: the harness inherits the host OS's animation
+  setting, so on a machine with Windows' "Show animations" off, Chrome reports
+  `prefers-reduced-motion: reduce` and every motion path correctly switches
+  itself off — including the GSAP import. A probe run there reports the opt-out
+  working and asserts nothing about the effect, which is indistinguishable from
+  the effect being broken. `probe.mjs --motion` forces `no-preference`; without
+  it the first verification of this feature was a false pass.
+- **The three embedded practice builds.** They are separate deployments now
+  (DESIGN.md §12b), and nothing in this repository tests what is inside the
+  frame. What is verified here is that the dialog opens, that the frame reaches
+  `load` and fades in over its own spinner, and that all three origins serve
+  without `X-Frame-Options` or a `frame-ancestors` policy — checked with a
+  request to each. If one of them ships either header, its card opens onto a
+  blank frame and only "Mở tab mới" still works.
 - **Assistive technology.** Roles, labels and focus order are authored, and the
   canvases are labelled `role="img"`; no screen reader has read the page.
 
@@ -177,11 +213,28 @@ report says `scrolls` rather than `CUT`:
 | Product bridge | 700 px | The two states stack; the arrow turns vertical |
 | YooStudio | 700 px | Editor keeps its height, the section scrolls |
 | Practice & STEM | 1180 px | Rail becomes a row of tabs above the stage; below 1000 the brief column moves under it |
-| Education | **1180 px** | Lesson player stacks under the brief card; the capability row goes to two columns |
-| Sample lessons | 700 px | Four cards become one column |
+| Education | **1180 px** wide, any tested height | Lesson player stacks under the brief card; the capability row goes to two columns. On screens under 860 px tall the numbered list tightens rather than the panel overflowing — see DESIGN.md §12 |
+| Bảng giá | 900 px tall **and** 1181 px wide | Shorter: the four cards' CTA row falls under the fold — head, switch and 89% of a card stay above it. Narrower: the grid goes two-up and the row's height doubles |
 
-Library, the hero, the three creature chapters and the CTA compose in one
-viewport at **every** tested size, 390 to 1920.
+Library, the hero, the three creature chapters, the sample lessons and the CTA
+compose in one viewport at **every** tested size, 390 to 1920.
+
+> **The numbers in this table were re-measured after `measure.mjs` was fixed.**
+> Until this pass the probe read viewport-relative rects 260 ms after scrolling,
+> which is inside the page's own 300–620 ms settle, so it was reporting where
+> things happened to be mid-flight. It claimed the practice hub was 329 px past
+> the fold at 1366×768 (it has 28 px to spare) and flagged the YooStudio heading
+> as covered by the header at three viewports (it is not). Both readings are now
+> differences between two rects inside the same section and cannot be moved by a
+> scroll — DESIGN.md §9. Every row above is a post-fix number.
+
+**Sample lessons left this table.** It was a four-column grid that reflowed to
+two columns and then to one, so at 390 px it overran the fold by 926 px — the
+worst overrun of any section on the page, on the section whose whole job is to be
+glanceable. It is now a horizontally moving belt of sixteen cards, which is one
+row at every width by construction: `measure.mjs` reports 282–510 px of slack
+across all nine viewports. The composition change was asked for on its own
+merits; fitting the fold on a phone came with it.
 
 **Education's number moved from 1000 to 1180 in this pass**, and the reason is a
 shape change rather than a regression. Its product is now the lesson player —
@@ -200,6 +253,21 @@ two.
 
 ## Rendering that is right but not beautiful
 
+- **The near-white subjects still bake pale, and none of them is on the belt any
+  more.** The 18 covers under `public/asset/Library/cover/` are now lit as
+  product shots with a real contact shadow (DESIGN.md §11b), which fixed the
+  floating cut-out problem for every subject that has colour. It does not fix
+  colour: `gram-wall`, `toolkit`, the lungs, the brain, the eye, the pancreas and
+  the thymus are near-white meshes, and anatomy may not be repainted to look
+  better (THIRD_PARTY_ASSETS.md). `gram-positive-wall` survived one round on the
+  belt on the argument that a peptidoglycan lattice is structurally distinctive
+  in a way a pale organ is not; relighting withdrew the argument, because it was
+  also the only cover in the set with no visible shadow — it is flat on the
+  ground and hides its own. `organ-gallbladder` took the slot, being the one
+  genuinely green organ in the set. All of these covers are still used where the
+  Library shows them larger and live. Fixing them properly means authored
+  materials for subjects that currently have none, which is a change to those
+  entries rather than to the bake.
 - **The eight hand tools** (`KHCN & STEM → Bộ dụng cụ mô hình`) ship with no
   textures at all — every mesh carries the same flat 0.8 grey. They are rendered
   with authored materials (steel, matte plastic, rubber) so the silhouettes read,

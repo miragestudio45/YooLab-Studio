@@ -4,6 +4,7 @@ import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { createProceduralEnvironment, exploreEnvironmentPalette } from './environment';
 import { pixelRatioCap } from './deviceTier';
+import { gfxRelease, trackRenderer } from './gfx';
 import { loadLibraryGltf, refreshSkinnedBounds, registerSpecularGlossiness } from './creatures';
 
 /**
@@ -16,7 +17,7 @@ import { loadLibraryGltf, refreshSkinnedBounds, registerSpecularGlossiness } fro
  * context and one frame per asset for the whole page.
  */
 
-export type ThumbnailPreset = 'opal' | 'ruby' | 'natural' | 'plastic' | 'tissue' | 'steel';
+export type ThumbnailPreset = 'opal' | 'ruby' | 'natural' | 'plastic' | 'tissue' | 'steel' | 'organ';
 
 export type ThumbnailRequest = {
   url: string;
@@ -36,6 +37,18 @@ export type ThumbnailRequest = {
    * bounding sphere shrinks the part worth looking at to a few pixels.
    */
   targetY?: number;
+  /*
+   * Opacity of a ground contact shadow, 0 or absent for none.
+   *
+   * Presence of this also switches the light rig to the studio one below. It is
+   * a flag rather than a default because the two consumers want opposite
+   * things: a Library rail chip is 56 px of a subject on a tinted circle, where
+   * a contact shadow is three grey pixels and the framing has no room to give,
+   * while a belt cover is 240 px of the same subject presented as a product
+   * shot, where the shadow is most of what makes it stop looking like a cut-out
+   * pasted onto cream.
+   */
+  ground?: number;
 };
 
 type Runtime = {
@@ -83,6 +96,15 @@ function ensureRuntime(): Runtime {
    */
   renderer.setPixelRatio(pixelRatioCap('thumb'));
   renderer.setClearColor(0x000000, 0);
+  /*
+   * Named, because this baker is offscreen.
+   *
+   * Its canvas is never inserted and never given a class, so `nameOf` in
+   * `gfx.ts` fell all the way through to `anonymous` — and a census in which
+   * the noisiest context has no name is a census nobody can read. The loss this
+   * module used to raise sat unexplained in reports for that reason alone.
+   */
+  trackRenderer(renderer.domElement, 'thumbnail-baker');
   const draco = new DRACOLoader();
   draco.setDecoderPath('/asset/draco/');
   const loader = new GLTFLoader();
@@ -104,9 +126,25 @@ function scheduleTeardown() {
     runtime.environment.dispose();
     runtime.draco.dispose();
     runtime.renderer.dispose();
+    /* Declared before the fact: this teardown is the point of the timer, and
+       without saying so it reached `appleSafePath` as evidence of a bad GPU and
+       took the page's quality down with it on every machine. */
+    gfxRelease(runtime.renderer.domElement);
     runtime.renderer.forceContextLoss();
     runtime = null;
   }, 6000);
+}
+
+/**
+ * The mesh's first material, for the presets that modify rather than replace.
+ *
+ * `organ` keeps the mesh's own colour, map and vertex-colour flag — the eye and
+ * the heart carry their anatomy in `COLOR_0` rather than in a factor, so
+ * dropping that attribute would render them grey.
+ */
+function material0(mesh: THREE.Mesh): THREE.MeshStandardMaterial | null {
+  const list = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+  return (list[0] as THREE.MeshStandardMaterial | undefined) ?? null;
 }
 
 function applyPreset(root: THREE.Object3D, preset: ThumbnailPreset) {
@@ -138,6 +176,54 @@ function applyPreset(root: THREE.Object3D, preset: ThumbnailPreset) {
         sheen: 0.4,
         sheenColor: new THREE.Color(0xffd8c4),
         sheenRoughness: 0.4,
+        envMapIntensity: 1.05,
+        side: THREE.FrontSide,
+      });
+      return;
+    }
+    if (preset === 'organ') {
+      /*
+       * Wet tissue, keeping the mesh's own anatomical colour.
+       *
+       * `ModelStage` has had this preset since the organs shipped and this baker
+       * never did, so the twelve organ covers were rendering under `natural` —
+       * their authored `baseColorFactor` under a standard material with no
+       * specular life at all. Against the belt's blush plate the lungs, the
+       * brain and the eye came out as ghosts, which is a large part of what
+       * review meant by the pictures not being good enough.
+       *
+       * No `color` is set, deliberately: every value here is a *modifier* and
+       * the base colour stays whatever the HuBMAP mesh painted. Anatomy is the
+       * one thing on this page that may not be restyled for looks — see the
+       * chroma-ceiling note in THIRD_PARTY_ASSETS.md — so what this adds is the
+       * clearcoat and sheen that make a surface read as living tissue rather
+       * than as matte plastic, and nothing else.
+       */
+      const base = material0(mesh);
+      mesh.material = new THREE.MeshPhysicalMaterial({
+        color: base?.color?.clone() ?? new THREE.Color(0xe4a79a),
+        map: base?.map ?? null,
+        vertexColors: base?.vertexColors ?? false,
+        /*
+         * Damp tissue, not a party balloon.
+         *
+         * These were 0.42 / 0.55 / 0.26, and with the studio key on them the
+         * heart, liver and kidney came back as glossy inflatables: a broad
+         * clearcoat highlight over a smooth surface is exactly how latex reads.
+         * Wet tissue has a *narrow* specular over a rougher body, so the
+         * clearcoat drops by more than half and gets rougher, the body roughness
+         * comes up, and the sheen — which is the soft velvet falloff at grazing
+         * angles, the part that actually says "organ" — is left almost intact.
+         * The base colour is still untouched, as above.
+         */
+        roughness: 0.52,
+        metalness: 0,
+        ior: 1.4,
+        clearcoat: 0.24,
+        clearcoatRoughness: 0.42,
+        sheen: 0.34,
+        sheenColor: new THREE.Color(0xffd9cf),
+        sheenRoughness: 0.45,
         envMapIntensity: 1.05,
         side: THREE.FrontSide,
       });
@@ -206,17 +292,6 @@ async function bake(request: ThumbnailRequest): Promise<string | null> {
   applyPreset(visual, request.preset);
   scene.add(visual);
 
-  scene.add(new THREE.HemisphereLight(0xeaf1ff, 0x3a2a56, 1.0));
-  const key1 = new THREE.DirectionalLight(0xfff2fb, 2.6);
-  key1.position.set(-3, 4.5, 5);
-  scene.add(key1);
-  const rim = new THREE.DirectionalLight(0x9fe6ff, 1.7);
-  rim.position.set(4, -1, -4);
-  scene.add(rim);
-  const warm = new THREE.PointLight(0xffb98a, 8, 14, 2);
-  warm.position.set(2.6, 1.2, 2.6);
-  scene.add(warm);
-
   let mixer: THREE.AnimationMixer | undefined;
   if (gltf.animations[0] && request.poseTime) {
     mixer = new THREE.AnimationMixer(visual);
@@ -234,6 +309,148 @@ async function bake(request: ThumbnailRequest): Promise<string | null> {
   const target = sphere.center.clone();
   if (request.targetY !== undefined) {
     target.y = bounds.min.y + (bounds.max.y - bounds.min.y) * request.targetY;
+  }
+
+  /*
+   * The light rig, and why it is built here rather than above.
+   *
+   * Every light below is positioned as a multiple of the subject's bounding
+   * radius, which is only knowable after the model is measured. That is not
+   * tidiness: the models arrive in their own units and the jellyfish's radius is
+   * about 32 against the heart's fraction of one, so the rig this replaced —
+   * three lights at fixed coordinates like `(-3, 4.5, 5)` and a point light with
+   * a 14-unit falloff — lit them completely differently. Directional lights only
+   * carry a direction, so those were harmless for the two big directionals; the
+   * point light was not. At the heart's scale it sat a few radii away and put a
+   * warm kick on the near side, and at the jellyfish's it was buried inside the
+   * animal with its entire falloff spent before reaching the surface. A cover
+   * set has to look like one set of photographs, and it cannot while the lights
+   * are somewhere different for each subject.
+   *
+   * The colours are the page's own: a warm key at 5% above neutral, a teal rim
+   * from behind — DESIGN.md's accent, not the cyan `0x9fe6ff` this had, which
+   * put a cold edge on every white subject — and a dim warm bounce standing in
+   * for light coming back off the plate the cover sits on.
+   */
+  const radius = Math.max(sphere.radius, 1e-4);
+  const studio = (request.ground ?? 0) > 0;
+  scene.add(new THREE.HemisphereLight(0xf3f6ff, studio ? 0x6b5240 : 0x3a2a56, studio ? 0.85 : 1.0));
+
+  const key = new THREE.DirectionalLight(0xfff6f0, studio ? 2.9 : 2.6);
+  const rim = new THREE.DirectionalLight(studio ? 0x8fe4e6 : 0x9fe6ff, studio ? 1.5 : 1.7);
+  if (studio) {
+    /* Three-quarter key from above left, the standard product-shot position:
+       high enough to put a highlight on the top plane and far enough to the side
+       that the form turns before it reaches the shadow. */
+    key.position.set(target.x - radius * 1.5, target.y + radius * 2.2, target.z + radius * 1.9);
+    rim.position.set(target.x + radius * 2.0, target.y + radius * 0.7, target.z - radius * 2.2);
+    const bounce = new THREE.DirectionalLight(0xffd9b8, 0.55);
+    bounce.position.set(target.x + radius * 0.6, target.y - radius * 1.6, target.z + radius * 1.2);
+    scene.add(bounce);
+  } else {
+    key.position.set(-3, 4.5, 5);
+    rim.position.set(4, -1, -4);
+    const warm = new THREE.PointLight(0xffb98a, 8, 14, 2);
+    warm.position.set(2.6, 1.2, 2.6);
+    scene.add(warm);
+  }
+  scene.add(key, rim);
+
+  /*
+   * The ground, which is the whole difference between a render and a photograph.
+   *
+   * `ShadowMaterial` paints black with the shadow's own alpha and nothing
+   * elsewhere, so on a transparent canvas the plane contributes exactly one
+   * thing to the PNG: a soft dark ellipse under the subject. Composited on the
+   * cover plate in CSS that reads as contact shadow, and contact shadow is what
+   * tells the eye the object is resting *in* the frame rather than pasted on it.
+   *
+   * The plane is eight radii wide so its own edge is never in frame, and the
+   * shadow camera is fitted to the subject instead of left at its default 5-unit
+   * box — at the jellyfish's scale that default would have covered a thirtieth
+   * of the animal, and at the heart's it would have spread one shadow map over
+   * sixty times the area it needed and produced a grey smudge.
+   */
+  if (studio) {
+    renderer.shadowMap.enabled = true;
+    /*
+     * VSM, and a separate light to cast it.
+     *
+     * The first pass hung the shadow on the key light, and the result was a
+     * silhouette thrown clear of the subject — the trex, the fish and the
+     * jellyfish each stood beside their own shadow rather than on it. That is
+     * arithmetic, not taste: a key at 1.5 radii to the side and 2.2 up displaces
+     * the shadow by sqrt(1.5² + 1.9²) / 2.2 ≈ 1.1 radii, so an object one radius
+     * off the ground casts its shadow a whole radius away.
+     *
+     * Steepening the key would fix the shadow and ruin the lighting — a light
+     * that far overhead puts a flat highlight on the top of everything and lets
+     * the sides fall away. So the two jobs are split. The key keeps the
+     * three-quarter position that models the form and casts nothing; a second,
+     * nearly overhead light casts the shadow and is dim enough (0.08) to be
+     * invisible in the shading. `ShadowMaterial` reads the shadow mask rather
+     * than any light's intensity, so a dim caster still lays down a full-strength
+     * contact shadow. Its displacement is sqrt(0.5² + 0.8²) / 3.6 ≈ 0.26 radii:
+     * enough for the light to have a direction, not enough to detach.
+     *
+     * PCF soft, and the softness comes from the map being *small*.
+     *
+     * VSM was tried here and had to go. It blurs in shadow space, which widens
+     * the penumbra with distance exactly the way a real soft light does — and it
+     * also returns a small non-zero occlusion everywhere its filter reaches,
+     * including outside the shadow camera's frustum. On a transparent canvas
+     * that turns the whole 8-radius ground plane faintly visible and puts a
+     * straight-edged band across the cover wherever the frustum boundary crosses
+     * it. Which is the same defect as the hero's clipped wash, arrived at from
+     * the opposite direction, and rejected for the same reason: a soft ground
+     * must not have a corner in it.
+     *
+     * PCF returns exactly zero outside the penumbra, so the plane stays
+     * invisible where nothing shadows it. Its filter is a fixed number of texels,
+     * which means the way to widen the penumbra is to make each texel bigger:
+     * 512 with a radius of 9 is a soft pool, where 1024 with a radius of 5 was
+     * an outline of the animal.
+     */
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    const caster = new THREE.DirectionalLight(0xffffff, 0.08);
+    caster.position.set(target.x - radius * 0.5, target.y + radius * 3.6, target.z + radius * 0.8);
+    caster.castShadow = true;
+    caster.shadow.mapSize.set(512, 512);
+    caster.shadow.radius = 9;
+    /* Scaled with the subject: a constant bias is either useless at the
+       jellyfish's size or peels the shadow off the heart's contact point. */
+    caster.shadow.bias = -0.0012 * radius;
+    caster.shadow.camera.near = radius * 0.05;
+    caster.shadow.camera.far = radius * 9;
+    const shadowCamera = caster.shadow.camera as THREE.OrthographicCamera;
+    shadowCamera.left = -radius * 1.7;
+    shadowCamera.right = radius * 1.7;
+    shadowCamera.top = radius * 1.7;
+    shadowCamera.bottom = -radius * 1.7;
+    shadowCamera.updateProjectionMatrix();
+    caster.target.position.copy(target);
+    scene.add(caster, caster.target);
+
+    visual.traverse((child) => {
+      const mesh = child as THREE.Mesh;
+      if (mesh.isMesh) mesh.castShadow = true;
+    });
+
+    const floor = new THREE.Mesh(
+      new THREE.PlaneGeometry(radius * 6, radius * 6),
+      new THREE.ShadowMaterial({ opacity: request.ground, transparent: true }),
+    );
+    floor.rotation.x = -Math.PI / 2;
+    /* A hair below the lowest point, so a flat-bottomed model does not z-fight
+       its own contact shadow. */
+    floor.position.set(sphere.center.x, bounds.min.y - radius * 0.004, sphere.center.z);
+    floor.receiveShadow = true;
+    scene.add(floor);
+
+    /* Room for the shadow to land in. Aiming a little below the subject's centre
+       lifts it in frame; without this the tight cover zooms crop the shadow at
+       the bottom edge, which reads as a torn-off drop shadow. */
+    target.y -= radius * 0.1;
   }
   const distance = (sphere.radius / Math.tan(THREE.MathUtils.degToRad(camera.fov * 0.5))) * (request.zoom ?? 1.18);
   const yaw = request.yaw ?? 0.6;
@@ -312,4 +529,24 @@ export function requestThumbnail(request: ThumbnailRequest): Promise<string | nu
   queue = task;
   inflight.set(id, task);
   return task;
+}
+
+/*
+ * A bake seam, for the build step that turns these renders into files.
+ *
+ * The Library's rail and the lesson belt want pictures of real meshes, and the
+ * runtime baker above is the wrong way to get them for the belt: sixteen cards
+ * would mean fetching sixteen GLBs, and this repository's organ set alone is
+ * 6.4 MB. So `scripts/bake-library-covers.mjs` drives a real Chrome, calls this
+ * from the page, and writes each result to a WebP under
+ * `public/asset/Library/cover/`. The belt then costs ~20 kB a card and fetches
+ * no geometry at all.
+ *
+ * Dev-only, and it has to be: it exists so a build script can reach a renderer
+ * that only exists inside a browser, and shipping a global that bakes GLBs on
+ * demand to production would be a way to make any visitor's tab do it.
+ */
+if (process.env.NODE_ENV !== 'production' && typeof window !== 'undefined') {
+  (window as unknown as { __bakeThumbnail?: unknown }).__bakeThumbnail =
+    (request: ThumbnailRequest) => requestThumbnail(request);
 }

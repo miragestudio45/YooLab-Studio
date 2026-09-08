@@ -7,8 +7,11 @@ import {
   CLOWNFISH_THUMBNAIL,
   GRAM_WALL_THUMBNAIL,
   JELLYFISH_THUMBNAIL,
+  MECH_WHALE_THUMBNAIL,
+  SPIDER_DRONE_THUMBNAIL,
   TOOLKIT_THUMBNAIL,
   TREX_THUMBNAIL,
+  WORK_DRONE_THUMBNAIL,
 } from '../../lib/three/thumbnailRequests';
 import type { ThumbnailRequest } from '../../lib/three/thumbnails';
 import type { RailVisual as RailVisualSpec, ThumbnailKey } from '../../lib/library/types';
@@ -37,6 +40,12 @@ const BAKED: Record<Exclude<ThumbnailKey, 'formula'>, ThumbnailRequest> = {
   trex: TREX_THUMBNAIL,
   'gram-wall': GRAM_WALL_THUMBNAIL,
   toolkit: TOOLKIT_THUMBNAIL,
+  /* Reachable through the type, not through the Library: no manifest entry in
+     `EXPERIENCES` names these three. They are here so the education showcase's
+     entries satisfy the same shape as every other one. */
+  'work-drone': WORK_DRONE_THUMBNAIL,
+  'spider-drone': SPIDER_DRONE_THUMBNAIL,
+  'mech-whale': MECH_WHALE_THUMBNAIL,
 };
 
 /**

@@ -83,3 +83,61 @@ export const TOOLKIT_THUMBNAIL: ThumbnailRequest = {
   pitch: 0.42,
   zoom: 1.02,
 };
+
+/*
+ * The three robotics showcase models.
+ *
+ * `natural`, like the T-rex and for the same reason: all three arrive with real
+ * painted texture sets — base colour, normal and an ORM pack, in WebP — and any
+ * preset here would throw those away and bake three identical grey shapes. See
+ * `app/lib/education/showcase.ts` for what they are and where they are used.
+ *
+ * Each carries one authored clip that runs for ten seconds or more, so
+ * `poseTime` is not a detail: at t = 0 the drone's legs are folded flat against
+ * the chassis, the spider is in its rest crouch and the whale is straight. The
+ * values below land inside the moving part of each reel, where the machine is
+ * doing the thing it is worth a picture of.
+ */
+
+/*
+ * The drone's `poseTime` is also a livery choice.
+ *
+ * `work-drone.glb` carries the machine in four painted finishes as four sibling
+ * subtrees and takes turns between them by scale — Cybertech holds the stage for
+ * 0.04–5.00 s, then RedManga, SciFi and Wood. A bake at t = 6 is a bake of
+ * RedManga with Cybertech collapsed to a dot beside it, so the value below sits
+ * inside the first window: the thumbnail is the blue-grey livery, which is the
+ * one the rail has always shown and the one `showcase.ts` opens the stage on.
+ */
+export const WORK_DRONE_THUMBNAIL: ThumbnailRequest = {
+  url: '/asset/robotics/work-drone.glb',
+  preset: 'natural',
+  width: 224,
+  height: 224,
+  yaw: 0.92,
+  pitch: 0.26,
+  poseTime: 3.2,
+  zoom: 1.04,
+};
+
+export const SPIDER_DRONE_THUMBNAIL: ThumbnailRequest = {
+  url: '/asset/robotics/spider-drone.glb',
+  preset: 'natural',
+  width: 224,
+  height: 224,
+  yaw: 1.1,
+  pitch: 0.34,
+  poseTime: 6.5,
+  zoom: 1.04,
+};
+
+export const MECH_WHALE_THUMBNAIL: ThumbnailRequest = {
+  url: '/asset/robotics/mech-whale.glb',
+  preset: 'natural',
+  width: 224,
+  height: 224,
+  yaw: 1.24,
+  pitch: 0.22,
+  poseTime: 4.4,
+  zoom: 1.02,
+};

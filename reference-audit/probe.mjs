@@ -6,6 +6,7 @@ import net from 'node:net';
 import http from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { devUrl } from './dev-url.mjs';
 
 const CHROME_CANDIDATES = [
   'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
@@ -13,10 +14,18 @@ const CHROME_CANDIDATES = [
 ];
 
 const VIEWPORTS = {
+  /* Above 1920, where the page had no tested regime and a real defect shipped —
+     see the same table in shots.mjs. */
+  w3440: [3440, 1440],
+  w2560: [2560, 1440],
   w1920: [1920, 1080],
   w1512: [1512, 982],
   w1440: [1440, 900],
   w1366: [1366, 768],
+  /* iPad landscape: the untested gap between 1024 and 1366, plus the 1024
+     class itself (iPad mini / iPad 9 in landscape). */
+  w1298: [1298, 970],
+  w1194: [1194, 834],
   w1024: [1024, 768],
   w768: [768, 1024],
   w390: [390, 844],
@@ -144,13 +153,26 @@ const flag = (name, fallback) => {
   argv.splice(index, 2);
   return value;
 };
-const url = flag('--url', 'http://localhost:3000');
+const url = await devUrl(flag('--url', null));
 const key = flag('--viewport', 'w1366');
 /* `--reduced` emulates `prefers-reduced-motion: reduce`. The only way to check a
    reduced-motion path is in a browser that claims it, and Chrome will not take it
    from a command-line flag reliably — CDP's media emulation will. */
 const reduced = argv.includes('--reduced');
 if (reduced) argv.splice(argv.indexOf('--reduced'), 1);
+/*
+ * `--motion` forces `prefers-reduced-motion: no-preference`, and it exists
+ * because the absence of it hid a real bug behind a false pass.
+ *
+ * This harness inherits the host OS's animation setting through Chrome, and on a
+ * Windows machine with "Show animations" off every motion path on the site
+ * correctly switches itself off — `KineticType` does not even import GSAP. A
+ * probe run on that machine reports the opt-out working and says nothing at all
+ * about the thing being opted out of, which is indistinguishable from the effect
+ * being broken. `--reduced` could only ever assert the quiet half.
+ */
+const motion = argv.includes('--motion');
+if (motion) argv.splice(argv.indexOf('--motion'), 1);
 /*
  * `--dpr 2`, because half this project's performance questions are retina
  * questions and this harness could not ask one.
@@ -273,6 +295,7 @@ try {
   });
   const features = [];
   if (reduced) features.push({ name: 'prefers-reduced-motion', value: 'reduce' });
+  if (motion) features.push({ name: 'prefers-reduced-motion', value: 'no-preference' });
   if (handheld) features.push({ name: 'hover', value: 'none' }, { name: 'pointer', value: 'coarse' });
   if (features.length) await send('Emulation.setEmulatedMedia', { features });
   if (handheld) await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });

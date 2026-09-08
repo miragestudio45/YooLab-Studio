@@ -8,6 +8,14 @@ import { READY_EXPERIENCES, SUBJECTS, readyCountForSubject } from '../lib/librar
  * visitor who has been convinced still has five practical reasons not to make an
  * account today. Answering them next to the button is what the section is for.
  *
+ * **And after the price table**, which is the other half of the same rule. It
+ * spent a build between Proof and Pricing, and that ordering answers questions
+ * the visitor has not been given a reason to ask yet — "không cần cài đặt gì" is
+ * reassurance about a commitment they have not been quoted for. Pricing is the
+ * single largest objection generator on the page; the six answers belong on the
+ * far side of it, so the last thing before the button is doubt resolved rather
+ * than a number.
+ *
  * Two rules govern what is allowed in here.
  *
  * The first is PRODUCT.md's: no invented proof. Every answer below is checkable
@@ -74,7 +82,7 @@ export function FaqSection() {
         <div className="section-heading section-heading--split" data-reveal>
           <div>
             <p className="section-kicker section-kicker--light">Trước khi bắt đầu</p>
-            <h2 id="faq-title">Những câu <em>hỏi trước nhất.</em></h2>
+            <h2 id="faq-title" data-kinetic>Những câu <em>hỏi trước nhất.</em></h2>
           </div>
           <p>
             Sáu câu dưới đây là những gì giáo viên hỏi nhiều nhất trước khi tạo

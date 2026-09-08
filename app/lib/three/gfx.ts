@@ -125,6 +125,17 @@ type TrackedContext = {
  */
 const tracked: TrackedContext[] = [];
 const labels = new WeakMap<HTMLCanvasElement, string>();
+/**
+ * Canvases whose next `webglcontextlost` is one WE asked for.
+ *
+ * The distinction this set draws is the difference between a diagnostic and a
+ * false alarm, and getting it wrong cost the page most of its quality on every
+ * machine. `forceContextLoss()` is how a WebGL context is *returned* — it is
+ * the correct way to hand back a renderer nothing needs any more — and the
+ * browser reports it through the same event a GPU reset arrives on. There is no
+ * flag on the event to tell them apart, so the owner has to say so first.
+ */
+const released = new WeakSet<HTMLCanvasElement>();
 
 export type GfxEvent = { at: number; label: string; kind: 'lost' | 'restored' | 'created' | 'disposed' };
 /** Ring buffer. Long enough for a full scroll pass, short enough to never grow. */
@@ -181,6 +192,50 @@ function sweep(): TrackedContext[] {
   return tracked;
 }
 
+/**
+ * Announce a teardown we are performing on purpose.
+ *
+ * Call immediately before `renderer.forceContextLoss()`. The context stays in
+ * the census for as long as it is alive — it is a real context and it really
+ * does count against the limit iOS enforces — but its ending is recorded as
+ * `disposed` rather than `lost`, and it does not raise the session's loss
+ * count.
+ *
+ * ## Why this exists
+ *
+ * `appleSafePath` treats one lost context as proof that this GPU cannot be
+ * trusted, and turns off transmission, HDR, mip chains, bloom, MSAA, the bee's
+ * foreground pass and the liquid simulation for the rest of the visit. That is
+ * the right response to a GPU that dropped a context on its own. It is the
+ * wrong response to this page's own housekeeping — and housekeeping was the
+ * only thing triggering it.
+ *
+ * Measured on Windows/Chrome with nothing wrong with the machine:
+ *
+ *     2078 created anonymous
+ *     2353 created anonymous
+ *     2945 created anonymous
+ *     9056 lost    anonymous      <- 2945 + the 6 s idle timer
+ *
+ * That is `lib/three/thumbnails.ts` returning its offscreen baker six seconds
+ * after the last Library chip was baked, exactly as designed. Every renderer
+ * built after that moment — the Library stages, the Studio editor, every
+ * specimen viewer the visitor scrolls into — read `context-lost` and went to
+ * the fallback path. Reload while scrolled down, so the bakes run before the
+ * hero mounts, and the hero goes with them: no MSAA on the bee's alpha-cut
+ * edges, and no foreground pass, which is what puts the creature *behind* the
+ * flower field.
+ *
+ * `register` already had one escape hatch for this, `dataset.gfxProbe`, but it
+ * works by keeping the context out of the census altogether. That is right for
+ * a 1x1 probe that exists for a microsecond and wrong for a real baker that
+ * holds a context for seconds — hiding it would make `gfxContextCount` lie on
+ * the one platform where the count is the thing that matters.
+ */
+export function gfxRelease(canvas: HTMLCanvasElement) {
+  released.add(canvas);
+}
+
 /** Add one context to the census, once, and watch it for loss. */
 function register(
   canvas: HTMLCanvasElement,
@@ -202,6 +257,20 @@ function register(
   if (tracked.some((entry) => entry.gl === gl)) return;
   tracked.push({ canvas, gl, kind, lost: 0, restored: 0 });
   canvas.addEventListener('webglcontextlost', (event) => {
+    /*
+     * A release we asked for ends here and is not a loss.
+     *
+     * `preventDefault` is deliberately NOT called: it asks the browser to fire
+     * `webglcontextrestored` and keep the canvas revivable, which is exactly
+     * what the owner does not want from a context it has just handed back.
+     */
+    if (released.has(canvas)) {
+      released.delete(canvas);
+      const index = tracked.findIndex((item) => item.gl === gl);
+      if (index >= 0) tracked.splice(index, 1);
+      note(nameOf(canvas), 'disposed');
+      return;
+    }
     /* Prevented so the browser will fire `webglcontextrestored` rather than
        leaving the canvas permanently dead. Whether the owner rebuilds its
        resources is the owner's business; this only keeps the door open. */
@@ -253,7 +322,17 @@ export function trackRenderer(canvas: HTMLCanvasElement, label: string): () => v
   labels.set(canvas, label);
   return () => {
     note(label, 'disposed');
-    labels.delete(canvas);
+    /*
+     * The name is deliberately NOT removed.
+     *
+     * `forceContextLoss` dispatches `webglcontextlost` as a task, so it lands
+     * AFTER the synchronous teardown that asked for it — and a census that had
+     * already forgotten the name reported the same teardown twice under two
+     * different ones (`explore-bee-foreground`, then the raw class name). On a
+     * WeakMap keyed by the canvas there is nothing to reclaim by hand: the
+     * entry dies with the element. Keeping it costs nothing and keeps one
+     * teardown reading as one object.
+     */
   };
 }
 
@@ -275,7 +354,7 @@ export function gfxRecord(key: string, value: unknown) {
 
 export type GfxReport = {
   flags: string[];
-  contexts: { count: number; labels: string[]; lost: number; restored: number };
+  contexts: { count: number; labels: string[]; lost: number; restored: number; sessionLosses: number };
   events: GfxEvent[];
   device: { dpr: number; cores: number; memory: number | null; handheld: boolean; ua: string };
   capabilities: CapabilityRecord;
@@ -293,6 +372,20 @@ export function gfxReport(): GfxReport {
       labels: entries.map((entry) => nameOf(entry.canvas)),
       lost: entries.reduce((total, entry) => total + entry.lost, 0),
       restored: entries.reduce((total, entry) => total + entry.restored, 0),
+      /*
+       * The number that actually decides anything, published beside the one
+       * that does not.
+       *
+       * `lost` above is summed over the LIVE entries, and a lost context is
+       * swept out of that list the next time anything reads it — so a report
+       * from a machine that had just dropped a context showed `lost: 0`. The
+       * session total is what `appleSafePath` consults to decide whether to
+       * turn off transmission, HDR, MSAA and the bee foreground pass, and it
+       * was the one figure a report could not show. A fallback driven by a
+       * number nobody can read is a fallback nobody can debug, which is most
+       * of why the thumbnail baker was able to trip it unnoticed.
+       */
+      sessionLosses: lossTotal,
     },
     events: [...events],
     device: {
@@ -319,6 +412,7 @@ if (typeof window !== 'undefined') {
   (window as unknown as { __gfx?: unknown }).__gfx = {
     report: gfxReport,
     contexts: gfxContextCount,
+    losses: gfxContextLossCount,
     allows: gfxAllows,
   };
 }

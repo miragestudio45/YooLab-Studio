@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { createLibraryStage } from '../../../lib/three/libraryEnvironment';
 import { createOrbitRig, fitBox, type OrbitRig } from '../../../lib/three/framing';
 import { CELLS, cellById, type CellContent, type CellId, type Organelle } from '../../../lib/biology/cells';
+import { useZoomModifier } from '../../../lib/useZoomModifier';
 
 /**
  * Xưởng tế bào — sáu loại tế bào, một component.
@@ -924,6 +925,9 @@ export function CellStudio({ params }: { params?: Record<string, string> }) {
   const cell = useMemo<CellContent>(() => cellById(params?.cell), [params?.cell]);
   const [selected, setSelected] = useState<string | null>(cell.defaultOrganelle);
   const [isolate, setIsolate] = useState(false);
+  /* The wheel only zooms with a modifier now, so the hint has to name it.
+     See `lib/three/wheelZoom.ts`. */
+  const zoomKey = useZoomModifier();
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<HTMLDivElement>(null);
   const orbitRef = useRef<OrbitRig | null>(null);
@@ -1139,7 +1143,7 @@ export function CellStudio({ params }: { params?: Record<string, string> }) {
           is not up there and that a student needs while looking at the model.
         */}
         <div className="cell-badge">{cell.cellClass}</div>
-        <p className="stage-hint">Kéo để xoay · Cuộn để phóng · Nhấp một bào quan để xem</p>
+        <p className="stage-hint">Kéo để xoay · {zoomKey} + cuộn để phóng · Nhấp một bào quan để xem</p>
       </div>
 
       <div className="cell-controls">

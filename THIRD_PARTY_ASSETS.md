@@ -35,6 +35,29 @@ Provenance research and the reasoning behind each decision is in
 | Modification | None to the geometry, the rig or the five clips (`run`, `bite`, `roar`, `attack_tail`, `idle`). Two runtime adaptations, neither written back to the file: `ModelStage` maps the asset's `KHR_materials_pbrSpecularGlossiness` material onto metallic-roughness (three.js dropped that extension in r155, and without the mapping the hand-painted skin does not load at all), and it flattens the `bn_Spine` position track so the animal performs in place instead of walking out of the viewer. |
 | Required attribution | CC BY 4.0 requires author, licence and source. All three are carried in `app/lib/library/subjects/biology.ts` (`credits` on the `trex` entry) and displayed to users under "Nguồn & giấy phép" in the Library's knowledge panel. |
 
+### `public/asset/robotics/*.glb` — 3 robotics models ⚠️ **LICENCE NOT VERIFIED**
+
+| | |
+| --- | --- |
+| Files | `work-drone.glb` (1,158 KB), `spider-drone.glb` (906 KB), `mech-whale.glb` (544 KB) |
+| Source names | `Dv2 Animated 4 Skins Set.glb`, `Spider Drone Animations Reel.glb`, `Biomechanical Whale Animated.glb` |
+| Author | **Unknown** |
+| Licence | **Unknown** |
+| Origin | Sketchfab, per the person who supplied them. The specific entries are not recorded. |
+| Where used | The Education section's lesson player only — `app/lib/education/showcase.ts`. Deliberately **not** in the Library manifest, and they carry no `credits` block, because `app/lib/library/types.ts` requires a verified licence before an entry ships. |
+| Obtained via | Hand-off into `reference-sources/Model -robot/`. |
+| Verified how | **Not verified.** Unlike the T-rex above, none of the three carries `asset.extras` — `glTF-Transform` re-wrote each file and the only thing `asset` declares is its own generator, so there is no author, licence or source string inside the files to check. |
+| Modification | `scripts/build-robotics-models.mjs`. **All three are now copied byte for byte.** `Dv2` used to be subsetted to its Cybertech subtree, and that was a defect rather than an economy: the source is four drones in one file — Cybertech, RedManga, SciFi and Wood — as four sibling subtrees at the origin at scales three orders of magnitude apart, and those scales are the file's **skin switch**. Each `Dummy00N` holds its drone at 1.5708 for one window of the 19.33 s reel and at its own near-zero value for the rest, so exactly one livery is on stage at a time (0.04–5.00 s Cybertech, 5.04–9.63 RedManga, 9.67–13.71 SciFi, 13.75–18.67 Wood). Keeping Cybertech's scale track while deleting the three siblings it takes turns with left a drone that was full size for 5.0 s of every 19.33 and 218× too small for the other 13.7 — measured in a real browser at `Dummy001` scale 0.0072, with the camera, contact shadow and grid all fitted against a 0.015 × 0.010 × 0.030 box. Shipping the file whole restores the authored behaviour and makes the twelve extra images load-bearing rather than dead weight. Two runtime adaptations, not written back: `ModelStage` flattens the root translation track on **all four** roots so each livery performs in place (root rotation is left alone — it reads as yaw plus a mild bank, not a tumble), and the `natural` preset calibrates the file's own materials. |
+| **What is needed** | Three lines per model — the Sketchfab entry URL, the author's name and the licence it is published under. Sketchfab is a marketplace, not a licence: its entries ship under everything from CC0 to "editorial use only" to a paid royalty-free licence with attribution terms, and CC BY needs attribution rendered where a user can see it. **Until those three lines exist for each file, treat these as unlicensed and do not ship this section to production.** Once known, add the `credits` blocks in `showcase.ts` and the entries can move into `app/lib/library/subjects/stem.ts` unchanged. |
+
+A fourth model, `Smart Drone.glb`, was prepared and then dropped rather than
+fixed. Its texture atlas carries another company's wordmark — 完美世界 (Perfect
+World) with three emoji — painted across the disc on the front of the machine, at
+the exact centre of the composition. A third party's branding rendered full size
+on a product page is a trademark question rather than a copyright one, and it is
+not a question worth answering when a clean model was available: the Dv2 above
+replaced it and its Cybertech atlas carries no marks of any kind.
+
 ### `public/asset/Library/Biology/anatomy/*.glb` — 12 human organs
 
 | | |
@@ -51,33 +74,58 @@ Provenance research and the reasoning behind each decision is in
 | Required attribution | CC BY 4.0 requires author, licence and source. All three are carried in `app/lib/library/subjects/human-body.ts` (`HRA_CREDIT`, one block shared by all twelve entries) and displayed to users under "Nguồn & giấy phép" in the Library's knowledge panel. |
 | Scope disclosure | Three titles deliberately do **not** name a whole organ, because three of the meshes are not one. Upstream records that `small_intestine.glb` contains `VH_M_ileum` and `thymus.glb` contains `VH_M_thymus_lobe_L`, so the Library calls them **"Hồi tràng"** and **"Thùy tuyến ức trái"**, and both say so in their own `subtitle`, `description` and readout. `kidney.glb` is the left kidney and is titled "Thận" with the side named in its subtitle. A teaching model that overstates what it shows is worse than no model. |
 
-### `public/asset/practice/robot/*` — the robot cell and the warehouse around it
+### `public/asset/practice/*` — REMOVED, and one open risk closed with them
+
+Two entries used to stand here: the Open-Industry robot cell (nine models,
+twenty texture maps, MIT) and the Mint drone pack (twenty files, terms not
+stated). **Both sets of files are deleted from this repository.** The three
+practice experiences are separate deployments now and this page embeds them —
+see DESIGN.md §12b — so nothing under `public/asset/practice` is a third-party
+model any more. What remains there is 452 kB of WebP posters, listed in the
+"ours" table below.
+
+The MIT set needed no further action: the licence permitted redistribution, the
+notice travelled with the files in `public/asset/practice/robot/LICENSE`, and
+removing the files removes the obligation along with them.
+
+**The drone set is the one worth recording.** It was the single entry in this
+file whose terms were never established. The models were fetched from
+`cdn.mint.gg` and are *not* in the Mint Playground repository — that repo's
+`asset-manifest.json` declares `"assets": []` — so its MIT grant did not reach
+them, and Mint publishes no terms for the CDN artifacts. This project's standing
+rule is not to ship art whose terms are unverified; the position was put to the
+project owner, who reviewed it and directed that the real models be used anyway.
+That was theirs to decide and the row said so.
+
+It is now moot. The files are gone, no unlicensed geometry is served from this
+origin, and the experience a visitor reaches is a build at
+`yoox-drone-iota.vercel.app` whose own asset provenance is that deployment's
+record to keep, not this one's. **Whoever owns that deployment inherits the
+question**: if any of the Mint models are in it, the same unestablished terms
+apply there, and this paragraph is the pointer to why.
+
+Both entries in full — names, checksummed verification, the geometry-preservation
+notes and the 108.9 MB → 8.1 MB and 20.1 MB → 4.6 MB processing records — are in
+this file's git history, at the commit before the practice section was rebuilt.
+
+### `public/asset/robotics/*.glb` — ⚠️ PROVENANCE NOT ESTABLISHED### `public/asset/robotics/*.glb` — ⚠️ PROVENANCE NOT ESTABLISHED
+
+**This is the one entry in this file that does not clear its own bar, and it is
+here to say so rather than to record a clearance.** Every other row above names
+an author, a licence and a source that was checked. These three name none,
+because none arrived with them.
 
 | | |
 | --- | --- |
-| Name | Nine models and twenty texture maps: `Six-Axis_01` articulated robot, `EOAT_Suction` vacuum end effector, `Wall_A` / `Wall_D` building sections, `Roof_A` roof bay, `Floor` slab, `Light_A` high-bay fixture, `Pallet` and `AGV` |
-| Author | **Automation Standard LLC and Contributors** |
-| Licence | **MIT** — <https://github.com/Open-Industry-Project/Open-Industry-Project/blob/main/LICENSE> |
-| Origin | [Open-Industry-Project](https://github.com/Open-Industry-Project/Open-Industry-Project), `assets/3DModels/` — `Six-axis/`, `EOATSuction/`, `WallsAndRoof/`, `Pallet.glb`, `AGV/` |
-| Verified how | The repository carries one MIT `LICENSE` at its root with **no separate carve-out for `assets/`**, and its `README.md` states the terms once, for the project as a whole. So the grant covers these files on the same terms as the code, which is what makes them shippable here where the `quadrotor-sandbox` art was not — that art lives on a CDN outside its repository and is not covered by that repository's licence. |
-| Modification | **Geometry: none.** No vertex is moved, welded, decimated or re-indexed in any of the nine models. `scripts/build-robot-model.mjs` does two things. *(1)* It removes four vertex attributes and repacks the buffer: `COLOR_0` and `COLOR_1` (Godot writes custom per-vertex data into these, and glTF says a `COLOR_n` slot is a vertex colour — so `GLTFLoader` sets `vertexColors: true` and three.js multiplies the base colour by whatever those channels hold, rendering the model in a colour nobody painted; removing them is a **correctness** fix), `TEXCOORD_1` (a lightmap UV set nothing here samples) and `TANGENT` (three.js differentiates the normal map in the fragment shader instead). Positions, normals, `TEXCOORD_0` and indices are copied byte for byte, and the script asserts rather than guesses when it meets anything it does not handle. *(2)* It re-encodes textures. `Pallet.glb` carries 13.7 MB of embedded 4K PNGs for 3,144 triangles and `AGV.glb` 18.2 MB for 54,278 — those are resampled in place to WebP at 1024². The wall, roof, floor and light kit reference external `.tres` materials instead, so their texture sets are exported separately to WebP at 256–1024² and re-bound by material name at runtime. Across everything: **108.9 MB → 8.1 MB, 93% smaller, triangle counts unchanged.** Nothing is written back to the reference copies under `reference-sources/`. |
-| Required attribution | MIT requires the copyright notice and the permission notice to travel with the files. Both are reproduced in `public/asset/practice/robot/LICENSE`, beside the models. The author and licence are also named in `app/lib/robot/sixAxis.ts` and shown to users in the lab. |
-| Rig disclosure | Two things these GLBs do **not** contain, both supplied from other files in the same MIT project. *(a)* The arm's joint hierarchy: the GLB is nine loose meshes, and the chain is transcribed from `parts/SixAxisRobot.tscn` into `app/lib/robot/sixAxis.ts` pivot by pivot, with the joint-limit table and home pose from `src/SixAxisRobot/six_axis_robot.gd`. *(b)* The building's materials: `Wall_A.glb` and friends carry placeholder base colours and no images at all — Godot binds `.tres` materials to them by name at import — so `app/lib/robot/warehouse.ts` makes the same join, `Wall_01` → `BuildingPart_Wall_01_*`. Both are code adapted from an MIT project and are credited in the Code table below. |
-| Runtime tint | The building materials carry a colour multiplier over their base-colour maps. Godot renders these through its own tonemapper; three.js here uses ACES at 0.92 exposure, and the same albedo comes out several stops brighter — untinted, galvanised siding reads as white plastic. The textures are unmodified; the tint corrects for the engine, not for the art. |
-
-### `public/asset/practice/drone/*` — the aircraft, the city and the sky
-
-| | |
-| --- | --- |
-| Name | Twenty files: the `drone-quad` pack (fuselage, motor arm, propeller, landing skid, camera pod), the `city-buildings` pack (eight façades), the `yard-props` pack (six industrial props) and the `sky-backdrop` mountain panorama |
-| Author | Generated with [Mint MCP](https://mcp.mint.gg/) for [Mint Playground](https://play.mint.gg/quadrotor-sandbox); no individual author is named |
-| Licence | **Not stated.** This is the one entry in this file whose terms are not established — see the honesty note. |
-| Origin | `cdn.mint.gg`, addressed by the `runtimeUrl` fields in [`experiences/quadrotor-sandbox/mint-assets.json`](https://github.com/mintdotgg/mint-playground/blob/main/experiences/quadrotor-sandbox/mint-assets.json) |
-| Honesty note | These files are **not in the sandbox's repository** — its own `asset-manifest.json` declares `"assets": []`, and the experience fetches them at runtime. So that repository's MIT licence, which covers "the Software and associated documentation files", does not reach them, and Mint publishes no terms for the CDN artifacts themselves. This project's standing rule is not to ship art whose terms are unverified, and an earlier build of this lab honoured that by generating the aircraft and its course from Three.js primitives instead. **The project owner reviewed that position and directed that the real models be used.** That is theirs to decide; this row exists so the position is on the record rather than lost, and so that reversing it later is a one-directory operation. |
-| Verified how | Every model was checked against the `byteSize` recorded for it in `mint-assets.json` before being processed — all nineteen match exactly, so these are the artifacts that file describes and not something else served at those URLs. |
-| Modification | **No geometry changed** — no vertex moved, welded, decimated or re-indexed, and every triangle count is unchanged. Two things are done, both by `scripts/build-drone-assets.mjs`. *(1) De-interleaving*: these GLBs pack position, normal and UV into one strided buffer view, and the repacker writes each attribute out tightly instead. The bytes are identical; the layout is not, and it is disclosed because it is a real change to the file. Verified afterwards by re-measuring all four airframe parts against the bounds the sandbox's own `assets/drone.ts` records for them — 0.971 × 0.260 × 0.998 for the fuselage and so on, matching to the millimetre. *(2) Texture re-encoding*: each model embeds three PBR maps, which is where the megabyte goes — `setback-tower` is 1.75 MB for 4,103 triangles. They are resampled and re-encoded to WebP at 512² (airframe, which the onboard camera sits inside), 384² (props) and 256² (buildings, never closer than 30 m). The panorama goes to 2048 × 1024 WebP. Total **20.1 MB → 4.6 MB, 77% smaller.** |
-| Source files | Downloaded into `.cache/mint/` (gitignored) and re-fetchable from the URLs in `mint-assets.json`; only the processed output under `public/asset/practice/drone/` is committed. |
-| Files | `fuselage-normalized-6522f19fea2b75a9.glb`, `motor-arm-normalized-6fef996b69c9ac52.glb`, `propeller-normalized-e08127e92a577c02.glb`, `landing-skid-normalized-451b7f833b22aabd.glb`, `camera-pod-normalized-dbc7f71872911c6a.glb`, `glass-tower-normalized-7fcdce95838dd939.glb`, `setback-tower-normalized-797ce47c71e3bdd3.glb`, `corner-office-normalized-214b2fef93ded224.glb`, `apartment-block-normalized-785c7ebf0af12916.glb`, `podium-tower-normalized-84a8a66352e8753b.glb`, `concrete-mid-rise-normalized-d8104d81b8b2906a.glb`, `storefront-block-normalized-6444a878987a7e4f.glb`, `hotel-tower-normalized-a6dfd731c01aaf06.glb`, `shipping-container-normalized-16a139c1ee46ff53.glb`, `scaffold-tower-normalized-5034d54bbc0818d9.glb`, `concrete-barrier-normalized-4e1219aceea984ac.glb`, `cable-drum-normalized-83782e35ffc8a817.glb`, `antenna-mast-normalized-54051007d20b1b55.glb`, `traffic-cone-normalized-9c4e797c99aae7db.glb`, `mountain-horizon-panorama-7c9f3e-069d64edae2fdf24.png` |
+| Files | `smart-drone.glb` (784 KB), `spider-drone.glb` (906 KB), `mech-whale.glb` (544 KB) |
+| Author | **Unknown** |
+| Licence | **Unknown** |
+| Origin | **Unknown.** Handed over as three files in `reference-sources/Model -robot/`, named `Smart Drone.glb`, `Spider Drone Animations Reel.glb` and `Biomechanical Whale Animated.glb`. |
+| What the files themselves say | Nothing. All three were written by `glTF-Transform v4.3.0` and carry `asset.generator` and `asset.version` only — no `asset.extras`, which is where the T-rex above carries its own author, licence and source. Their internal names (`b8d0a9c282cc4ca1b4fd778dc0924ae3.fbx`, `Smart_Drone.FBX`) are export artefacts, not attribution. |
+| Where they are used | The Education section's lesson player, and nowhere else. They are deliberately **not** in the Library manifest — see `app/lib/education/showcase.ts`, which states the same reason: `lib/library/types.ts` requires that "an asset whose licence has not been verified does not get an entry — it does not ship". |
+| Modification | Copied byte for byte by `scripts/build-robotics-models.mjs`, except for one patch to `smart-drone.glb`. Its 2048² base-colour atlas carried a **game studio's wordmark and three emoji** painted onto the display panel that faces the camera, which at the size the page renders it is a legible foreign logo in the middle of a YooLab product page. The script paints that rectangle out in the panel's own interior tone and re-encodes the atlas to WebP (q84, 170,522 → 154,548 bytes), splicing it back at the same byte offset so the meshopt-compressed views around it are untouched. Geometry, rig and animation are unchanged in all three. |
+| Runtime | `natural` preset — all three ship real base-colour, normal and ORM maps, and any other preset would discard them. Each carries one clip (`Scene`), and each has its root joint's translation track flattened at load (`Move_Body`, `Main body driver`, `Core_bone`) so the machine performs on the spot instead of travelling out of the viewer. |
+| **What has to happen before this ships** | Find the author, the licence and the source, and record them here. Then either add a `credits` block to the three entries in `app/lib/education/showcase.ts` and move them into `subjects/stem.ts`, or replace them. Note that painting a logo out is a **visual** fix and not a licence: if the terms turn out to require attribution or to forbid modification, the patch above is itself a problem and the right answer is a different model. |
 
 ### Models **not** shipped, and why
 
@@ -187,8 +235,8 @@ at the point where somebody would be tempted.
 | [IlliniOpenEdu/PhysicsSims](https://github.com/IlliniOpenEdu/PhysicsSims) | MIT | **No code copied.** Studied for simulation-module architecture. `ProjectileLab.tsx` is a YooLab implementation. |
 | [yuryuri/cell-architecture-studio](https://github.com/yuryuri/cell-architecture-studio) | MIT | **No code copied.** Studied for specimen/organelle information architecture; supplied the public-domain GLB above. |
 | [HongChao6/open-anatomy-studio](https://github.com/HongChao6/open-anatomy-studio) | MIT | **No code copied.** The intermediary the twelve Human Reference Atlas organ meshes were obtained through, and the reason their provenance is checkable: its own `THIRD_PARTY_ASSETS.md` records the HRA release, the CC BY 4.0 terms, the Meshopt step and the SHA-256 checksums that were recomputed here. The meshes are HuBMAP’s under CC BY 4.0, not this repository’s under MIT — credited above accordingly. |
-| [mintdotgg/mint-playground — `quadrotor-sandbox`](https://github.com/mintdotgg/mint-playground/tree/main/experiences/quadrotor-sandbox) | MIT (code) | **Code adapted; art taken from its CDN under unstated terms — see the model entry above.** The flight core in `app/lib/drone/flight.ts` is derived from this experience: the six-degree-of-freedom rigid-body integrator, the first-order motor lag, the control-allocation mixer, the derivative-on-measurement PID with conditional integration, the cascaded position→velocity→attitude→rate controller, the seeded sinusoidal wind model and the sink-rate landing grades. Its own upstream is [`CloudyLo001/quadrotorsim`](https://github.com/CloudyLo001/quadrotorsim) at `a6f968c`, whose `UPSTREAM.md` records that the developer approved publication of the Playground adaptation under that mirror's MIT licence. Further modules adapted since: the four-mode camera (`view.ts` — chase-on-heading, the pose interpolation the onboard view needs, the bolted-to-the-airframe onboard rule and its stabilised/raw horizon switch), the rotor-disc blur and the fixed-spatial-interval motion trail (`fx.ts`), the airframe fit table and assembly (`airframe.ts`), and the city's design-height table, footprint cap, block plan and measured-collider rule (`city.ts`). YooLab retunes the airframe to a lighter trainer, drops acro and stabilized modes, replaces the release-position hold with a brake-to-stop anchor, and adds the lesson, the autopilot and the course. Deliberately not carried over: Rapier (1.1 MB of WASM to answer a question fifty axis-aligned boxes answer in fifty comparisons), the 32-ray lidar and occupancy grid, the seven-aircraft roster, the tuning panel and the plots. |
-| [Open-Industry-Project](https://github.com/Open-Industry-Project/Open-Industry-Project) | MIT | **Assets shipped and rig data adapted** — see the model entry above for the two GLBs and their textures, which are redistributed under this licence with the notice beside them. The code side: `app/lib/robot/sixAxis.ts` transcribes the arm's joint hierarchy from `parts/SixAxisRobot.tscn` (every pivot offset, every mesh placement) and its behaviour from `src/SixAxisRobot/six_axis_robot.gd` — the six-axis layout (base yaw, shoulder, elbow, forearm roll, wrist pitch, tool roll), the ±180/±135/±160/±180/±120/±360 degree joint-limit table, the home pose `[0, −45, 90, 25, 75, 0]`, the rate-limited joint interpolation, the shoulder hydraulic strut's aim-at-each-other controller, the suction plate's 5 × 5 cup grid from `parts/EOATSuction.tscn`, and the teach-a-point-then-replay model the lab's pendant is built on. No GDScript is copied — it is Godot, and a Godot editor cannot be embedded in a Next.js page — but the numbers are theirs and the credit is owed for them. The cell around the arm (conveyor, pallet, racking, guarding, floor markings, beacon) is re-authored in Three.js in `app/lib/robot/cellScene.ts`, because upstream generates all of that procedurally too and there is no conveyor asset to import. The analytic tool-down IK replaces its iterative CCD solver, and its OPC-UA / EtherNet/IP / Modbus stack is deliberately not modelled. |
+| [mintdotgg/mint-playground — `quadrotor-sandbox`](https://github.com/mintdotgg/mint-playground/tree/main/experiences/quadrotor-sandbox) | MIT (code) | **REMOVED — no longer in this repository.** `app/lib/drone/*` is deleted along with the art; the drone experience is a separate deployment (DESIGN.md §12b) and its provenance is that deployment's record. The row is kept because the adaptation shipped from here for several builds and the history has to stay legible. What it said at the time: **Code adapted; art taken from its CDN under unstated terms — see the model entry above.** The flight core in `app/lib/drone/flight.ts` is derived from this experience: the six-degree-of-freedom rigid-body integrator, the first-order motor lag, the control-allocation mixer, the derivative-on-measurement PID with conditional integration, the cascaded position→velocity→attitude→rate controller, the seeded sinusoidal wind model and the sink-rate landing grades. Its own upstream is [`CloudyLo001/quadrotorsim`](https://github.com/CloudyLo001/quadrotorsim) at `a6f968c`, whose `UPSTREAM.md` records that the developer approved publication of the Playground adaptation under that mirror's MIT licence. Further modules adapted since: the four-mode camera (`view.ts` — chase-on-heading, the pose interpolation the onboard view needs, the bolted-to-the-airframe onboard rule and its stabilised/raw horizon switch), the rotor-disc blur and the fixed-spatial-interval motion trail (`fx.ts`), the airframe fit table and assembly (`airframe.ts`), and the city's design-height table, footprint cap, block plan and measured-collider rule (`city.ts`). YooLab retunes the airframe to a lighter trainer, drops acro and stabilized modes, replaces the release-position hold with a brake-to-stop anchor, and adds the lesson, the autopilot and the course. Deliberately not carried over: Rapier (1.1 MB of WASM to answer a question fifty axis-aligned boxes answer in fifty comparisons), the 32-ray lidar and occupancy grid, the seven-aircraft roster, the tuning panel and the plots. |
+| [Open-Industry-Project](https://github.com/Open-Industry-Project/Open-Industry-Project) | MIT | **REMOVED — no longer in this repository.** The models, their textures and `app/lib/robot/*` are all deleted; the robot experience is a separate deployment (DESIGN.md §12b). Kept for history. What it said at the time: **Assets shipped and rig data adapted** — see the model entry above for the two GLBs and their textures, which are redistributed under this licence with the notice beside them. The code side: `app/lib/robot/sixAxis.ts` transcribes the arm's joint hierarchy from `parts/SixAxisRobot.tscn` (every pivot offset, every mesh placement) and its behaviour from `src/SixAxisRobot/six_axis_robot.gd` — the six-axis layout (base yaw, shoulder, elbow, forearm roll, wrist pitch, tool roll), the ±180/±135/±160/±180/±120/±360 degree joint-limit table, the home pose `[0, −45, 90, 25, 75, 0]`, the rate-limited joint interpolation, the shoulder hydraulic strut's aim-at-each-other controller, the suction plate's 5 × 5 cup grid from `parts/EOATSuction.tscn`, and the teach-a-point-then-replay model the lab's pendant is built on. No GDScript is copied — it is Godot, and a Godot editor cannot be embedded in a Next.js page — but the numbers are theirs and the credit is owed for them. The cell around the arm (conveyor, pallet, racking, guarding, floor markings, beacon) is re-authored in Three.js in `app/lib/robot/cellScene.ts`, because upstream generates all of that procedurally too and there is no conveyor asset to import. The analytic tool-down IK replaces its iterative CCD solver, and its OPC-UA / EtherNet/IP / Modbus stack is deliberately not modelled. |
 | [thebuggeddev/anatomy](https://github.com/thebuggeddev/anatomy) | **No licence declared** | **Nothing taken** — no code, no CSS, no fonts, no models, no prose. Visual and UX architecture reference only: what a specimen readout is *made of* (a measured table led by per-row marks, a scientific note and a curiosity note in two tints, a list of real-world links), which are categories rather than content. Every sentence in YooLab's panels is written here, about specimens this repository ships. Its nine organ GLBs were **rejected** — see "Models **not** shipped, and why" above. |
 
 ## Fonts
@@ -207,18 +255,21 @@ no third-party terms:
 - `public/asset/bee/*`, `public/asset/fish/*`, `public/asset/Library/Car/*` — the
   bee, clownfish, jellyfish, Formula car, sprue and the eight-piece toolkit,
   including all their textures.
-- The drone course in `app/lib/drone/course.ts` — pads, gates, hoop and the H,
-  all Three.js primitives. **The aircraft, the city, the props and the sky are
-  not ours** — see the Mint entry above, including the note on its terms.
-- The drone autopilot in `app/lib/drone/autopilot.ts` — the guidance law that
-  flies the course by moving the sticks through the ported controller.
-- The palletising cell around the robot arm in `app/lib/robot/cellScene.ts` —
-  conveyor, racking, mesh guarding, floor markings, stack light and cases, all
-  procedural, as upstream also generates them. **The arm, the building, the
-  floor, the pallet and the AGV are not ours** — they are the Open-Industry
-  models listed above.
+- **The eighteen lesson covers under `public/asset/Library/cover/`.** Renders of
+  meshes already listed in this file, produced by
+  `scripts/bake-library-covers.mjs` through this project's own thumbnail
+  pipeline. They carry no terms of their own beyond the ones their source meshes
+  carry — twelve are the HuBMAP organs, which are **CC BY 4.0**, so the
+  attribution obligation for those renders is the same obligation the entries
+  already discharge in the Library's knowledge panel (`HRA_CREDIT` in
+  `subjects/human-body.ts`). A render of a CC BY model is a derivative of it, and
+  the credit travels with the entry the cover belongs to.
 - The three studio renders under `public/asset/practice/poster/`, derived from
-  `public/asset/thuc-hanh/` by `scripts/build-practice-posters.mjs`.
+  `public/asset/thuc-hanh/renew/` by `scripts/build-practice-posters.mjs`. These
+  are the whole of what this section now ships: the flight model, the palletising
+  cell and the excavator's hydraulics all live in separate deployments (DESIGN.md
+  §12b), and the code that used to implement them here — `lib/drone`, `lib/robot`
+  and the three lab components — is deleted.
 - The procedural animal cell in `CellStudio.tsx` — every organelle generated from
   Three.js primitives at runtime; no mesh file involved.
 - The globe engine in `GlobeExplorer.tsx`, which renders the public-domain

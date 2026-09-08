@@ -29,6 +29,7 @@ import net from 'node:net';
 import http from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { devUrl } from './dev-url.mjs';
 
 const CHROME_CANDIDATES = [
   'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
@@ -38,10 +39,28 @@ const CHROME_CANDIDATES = [
 /* -------------------------------------------------------------------- shots --- */
 
 const VIEWPORTS = {
+  /*
+   * Above 1920, which is where this page had no tested regime at all and a real
+   * defect shipped: the hero's legibility wash drew a visible rectangle on a
+   * 2560x1440 display, because its falloff is sized in a mix of fixed pixels and
+   * percentages that only reached zero inside the element up to about 1920.
+   *
+   * 2560x1440 is the common 27" desktop panel; 3440x1440 is the 21:9 ultrawide,
+   * which is the widest aspect the page is likely to meet and the one that
+   * stretches a 12-column shell furthest from the type inside it. Both are here
+   * because a regime nobody measures is a regime that breaks.
+   */
+  'w3440': { width: 3440, height: 1440 },
+  'w2560': { width: 2560, height: 1440 },
   'w1920': { width: 1920, height: 1080 },
   'w1512': { width: 1512, height: 982 },
   'w1440': { width: 1440, height: 900 },
   'w1366': { width: 1366, height: 768 },
+  /* iPad Pro / iPad Air in landscape. Between 1024 and 1366 the page had no
+     tested regime at all, and every iPad in that orientation lands here. */
+  'w1298': { width: 1298, height: 970 },
+  /* iPad Air / Pro 11" landscape, the most common school tablet. */
+  'w1194': { width: 1194, height: 834 },
   'w1024': { width: 1024, height: 768 },
   'w768': { width: 768, height: 1024 },
   'w390': { width: 390, height: 844 },
@@ -77,85 +96,16 @@ const CARD = (title) => `
   }
 `;
 
-/**
- * Opens a lab in its overlay and waits for the stage to exist, then resets it.
- *
- * Two waits, not one. The labs are code-split, so opening one is a chunk fetch,
- * a mount and — for the Formula workshop and both aircraft — a few megabytes of
- * glTF; a fixed sleep raced all of that and intermittently handed the shot a
- * Suspense fallback with no `.lab` in it at all.
- *
- * The reset at the end matters just as much. The harness navigates once and
- * runs every shot against that one document, so a lab is whatever the shot
- * before it left behind — armed, mid-course, finished. Resetting through the
- * visible control is also the honest way to do it: if "Làm lại" ever stops
- * actually resetting a lab, every shot after it starts failing.
- */
-const PRACTICE = (title, selector) => `
-  ${CARD(title)}
-  {
-  const open = document.querySelector('.practice-cta');
-  if (!open) throw new Error('practice: no "Mở trải nghiệm" button');
-  open.click();
-  for (let attempt = 0; attempt < 120; attempt += 1) {
-    if (document.querySelector(${JSON.stringify(selector)})) break;
-    await new Promise((r) => setTimeout(r, 150));
-  }
-  if (!document.querySelector(${JSON.stringify(selector)})) {
-    throw new Error('practice lab never mounted: ' + ${JSON.stringify(selector)});
-  }
-  const restart = [...document.querySelectorAll('.lab-actions .lab-button')]
-    .find((node) => node.textContent.includes('Làm lại'));
-  if (restart) restart.click();
-  await new Promise((r) => setTimeout(r, 1100));
-  }
-`;
 
-/** Closes whatever overlay is open, so the next shot starts from the section. */
+/** Closes the popup if one is open, so the next shot starts from the section. */
 const CLOSE_LAB = `
   {
-  const close = document.querySelector('.practice-overlay-close');
+  const close = document.querySelector('.practice-modal-button--close');
   if (close) close.click();
   await new Promise((r) => setTimeout(r, 420));
   }
 `;
 
-/**
- * Waits for a lab action button to exist, then returns it as `action`.
- *
- * Every practice shot used to assume its lab was interactive by the time the
- * script ran, which held right up until the whole suite was run in one browser
- * session: eleven glTF files, three WebGL contexts and a dev server compiling on
- * demand make "ready" a range rather than a moment, and four shots that each
- * passed alone failed together. Polling costs nothing when the button is
- * already there.
- */
-const ACTION = (text) => `
-  const findAction = (label) => [...document.querySelectorAll('.lab-actions .lab-button')]
-    .find((node) => node.textContent.includes(label));
-  let action = null;
-  for (let attempt = 0; attempt < 120 && !action; attempt += 1) {
-    action = findAction(${JSON.stringify(text)});
-    if (!action) await new Promise((r) => setTimeout(r, 200));
-  }
-  if (!action) throw new Error('practice: no action ' + ${JSON.stringify(text)});
-`;
-
-/**
- * Strips a lab down to its render, for baking a poster.
- *
- * The section's cards are photographs of the labs themselves rather than
- * drawings of them, and they are taken here rather than in an art tool for one
- * reason: they then cannot drift. Re-tune the robot's home pose or reframe the
- * drone's chase camera and the picture on the card is one command away from
- * being true again, instead of being a render somebody made once.
- */
-const BARE = `
-  for (const node of document.querySelectorAll(
-    '.lab-badge, .lab-steps, .lab-brief, .lab-actions, .lab-readout, .lab-keys, .lab-craft, .lab-advanced, .lab-pad, .lab-flash, .lab-status',
-  )) node.style.display = 'none';
-  await new Promise((r) => setTimeout(r, 260));
-`;
 
 const SHOTS = [
   { name: 'hero', at: '#trang-chu', settle: 2600 },
@@ -495,472 +445,106 @@ const SHOTS = [
       tool.click();`,
     settle: 2400,
   },
+  /* Dismiss the trial invitation before shooting anything else. It fires six
+     seconds in, which is inside every settle on this list, so without this it
+     lands on top of whatever is being photographed. */
+  /* The MKT round: new hero positioning, pricing, the consultation dialog and
+     the trial invitation. All DOM, so these are cheap and worth having pinned. */
+  { name: 'hero-copy', at: '#trang-chu', settle: 2600, run: `try { sessionStorage.setItem('yoolab.trial-invite.seen', '1'); } catch {} const t = document.querySelector('.trial-modal .modal-close'); if (t) t.click(); await new Promise((r) => setTimeout(r, 260));`, clipOf: { sel: '.hero-copy', scale: 1.5 } },
+  { name: 'hero-full', at: '#trang-chu', settle: 2800, run: `try { sessionStorage.setItem('yoolab.trial-invite.seen', '1'); } catch {} const t = document.querySelector('.trial-modal .modal-close'); if (t) t.click(); await new Promise((r) => setTimeout(r, 260));` },
+  { name: 'pricing', at: '#bang-gia', settle: 900, run: `try { sessionStorage.setItem('yoolab.trial-invite.seen', '1'); } catch {} const t = document.querySelector('.trial-modal .modal-close'); if (t) t.click(); await new Promise((r) => setTimeout(r, 260));` },
+  { name: 'final-cta', at: '#bat-dau-voi-yoolab', settle: 700, run: `try { sessionStorage.setItem('yoolab.trial-invite.seen', '1'); } catch {} const t = document.querySelector('.trial-modal .modal-close'); if (t) t.click(); await new Promise((r) => setTimeout(r, 260));` },
+  {
+    name: 'consult-modal',
+    at: '#bat-dau-voi-yoolab',
+    settle: 700,
+    run: `
+      try { sessionStorage.setItem('yoolab.trial-invite.seen', '1'); } catch {} const t = document.querySelector('.trial-modal .modal-close'); if (t) t.click(); await new Promise((r) => setTimeout(r, 260));
+      const btn = document.querySelector('.cta-secondary');
+      if (!btn) throw new Error('no "Trao doi them" button');
+      btn.click();
+      await new Promise((r) => setTimeout(r, 420));
+    `,
+  },
+  {
+    name: 'consult-errors',
+    at: '#bat-dau-voi-yoolab',
+    settle: 700,
+    run: `
+      try { sessionStorage.setItem('yoolab.trial-invite.seen', '1'); } catch {} const t = document.querySelector('.trial-modal .modal-close'); if (t) t.click(); await new Promise((r) => setTimeout(r, 260));
+      document.querySelector('.cta-secondary').click();
+      await new Promise((r) => setTimeout(r, 380));
+      document.querySelector('.consult-submit').click();
+      await new Promise((r) => setTimeout(r, 320));
+    `,
+  },
   { name: 'library-empty', at: '#thu-vien', run: OPEN('Khoa học vũ trụ'), settle: 900 },
   /*
-   * The practice hub, three labs deep.
+   * The practice hub, and its one popup.
    *
-   * One shot of this section proves almost nothing: only the selected lab is
-   * mounted, so a capture of the default tells you the Formula workshop loaded
-   * and nothing at all about the two that were adapted for this build. Each of
-   * the three is photographed with its own stage running, and the drone and the
-   * robot are each driven far enough into their guided flow that the step strip,
-   * the objective line and the on-stage controls are all on screen — which is
-   * the whole claim this section makes.
+   * It used to be thirteen shots. The three experiences were in-page WebGL labs
+   * and each had to be driven into its guided flow before a capture proved
+   * anything — arm the drone, fly it through three rings, land it; teach the
+   * robot a cycle; put the Formula car in DRIVE — plus a set of poster bakes
+   * taken from those same labs with their chrome stripped.
+   *
+   * All of it is gone because the labs are. Each experience is its own
+   * deployment now and the popup embeds it (`lib/practice/manifest.ts`), so
+   * there is no local stage to drive, no step strip to reach and nothing this
+   * harness can honestly photograph inside the frame: it is another origin's
+   * first paint, on another origin's schedule.
+   *
+   * What is left is what this page is still responsible for — the poster wall
+   * on each of the three cards, and the dialog's own chrome around the embed.
+   * `settle` is generous on the popup because the frame is a real network
+   * fetch of a real simulator.
    */
   {
     name: 'practice',
     at: '#thuc-hanh',
-    run: `${CLOSE_LAB}${CARD('Xưởng mô hình')}`,
+    run: `${CLOSE_LAB}${CARD('Vận hành')}`,
     settle: 900,
   },
+  { name: 'practice-drone-card', at: '#thuc-hanh', run: `${CLOSE_LAB}${CARD('lái drone')}`, settle: 900 },
+  { name: 'practice-robot-card', at: '#thuc-hanh', run: `${CLOSE_LAB}${CARD('robot')}`, settle: 900 },
   {
-    /*
-     * The overlay, open on the robot.
-     *
-     * The one shot that proves the section's central claim: the cards are
-     * pictures, and behind them is the running thing. It also photographs the
-     * bar — lab tabs, fullscreen, close — which is the only chrome on this page
-     * that has to work while a WebGL scene owns the rest of the screen.
-     */
-    name: 'practice-overlay',
+    /* The dialog, open on card 01. Proves the head — the eyebrow, the title,
+       fullscreen, "Mở tab mới", close — and that the embed reaches `load`
+       rather than sitting on the spinner. */
+    name: 'practice-modal',
     at: '#thuc-hanh',
-    run: `${CLOSE_LAB}${PRACTICE('Vận hành', '.lab--robot')}
-      await new Promise((r) => setTimeout(r, 1800));
-    `,
-    settle: 1200,
-  },
-  {
-    /* The card set, on the drone. Proves the poster, the brief and the rail all
-       track the selection rather than only the first one doing so. */
-    name: 'practice-card-drone',
-    at: '#thuc-hanh',
-    run: `${CLOSE_LAB}${CARD('Trải nghiệm')}`,
-    settle: 700,
-  },
-  {
-    /*
-     * Three labs in one page load, in the order the rail lists them.
-     *
-     * The section's central performance rule is that only one heavy renderer is
-     * ever alive — selecting a lab disposes the previous one's WebGL context,
-     * geometries, materials and animation loop before the next asks for a
-     * context. Browsers cap live contexts, and the failure mode when that cap is
-     * hit is not an error, it is the *first* canvas silently going blank. So the
-     * cycle is walked in one session and the last stage photographed: if a
-     * teardown regresses, this is the shot that comes back empty.
-     */
-    name: 'practice-cycle',
-    at: '#thuc-hanh',
-    run: `${CLOSE_LAB}${PRACTICE('Trải nghiệm', '.lab--drone')}
-      ${PRACTICE('Vận hành', '.lab--robot')}
-      ${PRACTICE('Xưởng mô hình', '.lab--formula')}
-      await new Promise((r) => setTimeout(r, 2600));
-      ${PRACTICE('Vận hành', '.lab--robot')}
-    `,
-    settle: 2600,
-  },
-  {
-    /* The bench. The one frame that proves the kit ⇄ assembled blend still runs
-       in the ivory room, and the one most likely to break when the workshop is
-       moved between two lighting rigs. */
-    name: 'practice-formula-kit',
-    at: '#thuc-hanh',
-    run: `${CLOSE_LAB}${PRACTICE('Xưởng mô hình', '.lab--formula')}
-      /* Waits on the action row, then clicks the step chip: both only exist
-         once the workshop has finished loading. */
-      ${ACTION('Lái thử')}
-      [...document.querySelectorAll('.lab-step')]
-        .find((node) => node.textContent.includes('Lắp ráp')).click();
-    `,
-    settle: 2800,
-  },
-  {
-    name: 'practice-formula-drive',
-    at: '#thuc-hanh',
-    run: `${CLOSE_LAB}${PRACTICE('Xưởng mô hình', '.lab--formula')}
-      ${ACTION('Lái thử')}
-      action.click();
-      await new Promise((r) => setTimeout(r, 900));
-      const stage = document.querySelector('.lab');
-      stage.focus();
-      await new Promise((r) => setTimeout(r, 500));
-      stage.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW', bubbles: true }));
-      await new Promise((r) => setTimeout(r, 1600));
-      stage.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW', bubbles: true }));
-    `,
-    settle: 1400,
-  },
-  {
-    /* Armed and climbing: the props are spinning, the takeoff gate is lit, and
-       the step strip has moved off 01. */
-    name: 'practice-drone',
-    at: '#thuc-hanh',
-    run: `${CLOSE_LAB}${PRACTICE('Trải nghiệm', '.lab--drone')}
-      ${ACTION('Khởi động')}
-      action.click();
-      const stage = document.querySelector('.lab--drone');
-      stage.focus();
-      await new Promise((r) => setTimeout(r, 400));
-      // Hold the climb key for two seconds of simulated flight.
-      stage.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyR', bubbles: true }));
-      await new Promise((r) => setTimeout(r, 2200));
-      stage.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyR', bubbles: true }));
-      await new Promise((r) => setTimeout(r, 600));
-      stage.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW', bubbles: true }));
-      await new Promise((r) => setTimeout(r, 1500));
-      stage.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW', bubbles: true }));
+    run: `${CLOSE_LAB}${CARD('Vận hành')}
+      const open = document.querySelector('.practice-cta');
+      if (!open) throw new Error('practice: no "Mở trải nghiệm" button');
+      open.click();
+      for (let waited = 0; waited < 20000; waited += 200) {
+        if (document.querySelector(".practice-frame[data-ready='true']")) break;
+        await new Promise((r) => setTimeout(r, 200));
+      }
     `,
     settle: 1600,
   },
+
+  /*
+   * The lesson belt, frozen at the start of its loop.
+   *
+   * It is a continuously moving strip, so an unfrozen capture is a picture of
+   * wherever the animation happened to be — two half-cards at the mask edges and
+   * nothing legible. Killing the animation and zeroing the transform puts card
+   * one at the left gutter, which is the only frame in which the covers, the
+   * subject labels and the titles can all be checked at once.
+   */
   {
-    /*
-     * The second airframe.
-     *
-     * One flight model, two aircraft — which is upstream's decision and the
-     * interesting one for a student, but it is also the change most likely to
-     * break silently: the helicopter's rotors spin about axes the quadrotor's
-     * do not, and a wrong mount reads as a helicopter with a stationary disc
-     * rather than as an error.
-     */
-    name: 'practice-heli',
-    at: '#thuc-hanh',
-    run: `${CLOSE_LAB}${PRACTICE('Trải nghiệm', '.lab--drone')}
-      const stage = document.querySelector('.lab--drone');
-      const heli = [...document.querySelectorAll('.lab-craft button')]
-        .find((node) => node.textContent.includes('Trực thăng'));
-      if (!heli) throw new Error('drone: no craft switch');
-      heli.click();
-      for (let attempt = 0; attempt < 90; attempt += 1) {
-        if (!document.querySelector('.lab--drone .lab-status')) break;
-        await new Promise((r) => setTimeout(r, 200));
-      }
-      ${ACTION('Khởi động')}
-      action.click();
-      stage.focus();
-      await new Promise((r) => setTimeout(r, 400));
-      stage.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyR', bubbles: true }));
-      await new Promise((r) => setTimeout(r, 1400));
-      stage.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyR', bubbles: true }));
-    `,
-    settle: 1800,
-  },
-  {
-    /*
-     * The drone's whole lesson, flown end to end.
-     *
-     * This is the shot that proves the guided flow *finishes*. A lab whose
-     * first two steps work and whose fourth never fires strands every student
-     * who gets that far, and no still frame of a hovering drone can tell you
-     * which of those you have.
-     */
-    name: 'practice-drone-landed',
-    at: '#thuc-hanh',
-    run: `${CLOSE_LAB}${PRACTICE('Trải nghiệm', '.lab--drone')}
-      const stage = document.querySelector('.lab--drone');
-      stage.focus();
-      ${ACTION('Khởi động')}
-
-      /* 1.2 s of settling after every release: letting go glides the aircraft
-         to a stop over about a second, and a leg that starts while the last one
-         is still arriving compounds its error into the next gate. */
-      const hold = (codes, ms) => new Promise((done) => {
-        for (const code of codes) stage.dispatchEvent(new KeyboardEvent('keydown', { code, bubbles: true }));
-        setTimeout(() => {
-          for (const code of codes) stage.dispatchEvent(new KeyboardEvent('keyup', { code, bubbles: true }));
-          setTimeout(done, 1200);
-        }, ms);
-      });
-      const tap = (code, ms) => new Promise((done) => {
-        stage.dispatchEvent(new KeyboardEvent('keydown', { code, bubbles: true }));
-        setTimeout(() => {
-          stage.dispatchEvent(new KeyboardEvent('keyup', { code, bubbles: true }));
-          setTimeout(done, 320);
-        }, ms);
-      });
-
-      /* Parsed by hand rather than by regex: this whole script is embedded in a
-         template literal, so a backslash class never survives to the page. */
-      const readout = () => document.querySelector('.lab-readout')?.textContent ?? '';
-      const rings = () => {
-        const mark = readout().indexOf('/3');
-        return mark > 0 ? Number(readout()[mark - 1]) || 0 : 0;
-      };
-      const altitude = () => Number.parseFloat(readout()) || 0;
-      /*
-       * The ring counter only exists while the route step is current: clearing
-       * the third gate advances the lab to "hạ cánh" and the counter leaves the
-       * readout altogether. Reading a missing counter as zero is what sent an
-       * earlier version of this script twenty metres past the course, still
-       * pressing keys at a step that had already finished.
-       */
-      const routeOver = () => !readout().includes('vòng');
-      const cleared = () => (routeOver() ? 3 : rings());
-      /*
-       * A staircase, not a computed leg.
-       *
-       * Two earlier versions converted metres to milliseconds from the flight
-       * model's constants, and both drifted: real travel per press depends on
-       * how long the attitude loop takes to reach the commanded tilt, which is
-       * not a number the envelope states. Alternating short presses along the
-       * leg's two axes walks toward a gate the way a person does and converges
-       * regardless — and because it stops the instant the counter moves, it is
-       * a direct test of the capture radius rather than of arithmetic.
-       */
-      const approach = async (codes, target, presses) => {
-        for (let attempt = 0; attempt < presses && cleared() < target; attempt += 1) {
-          await hold([codes[attempt % codes.length]], 700);
-        }
-        return cleared() >= target;
-      };
-
-      action.click();
-      await new Promise((r) => setTimeout(r, 320));
-      await hold(['KeyR'], 1250);                  // up to the takeoff gate, ~3 m
-      if (!await approach(['KeyW'], 1, 10)) throw new Error('drone: never reached ring 01');
-      await hold(['KeyR'], 700);                   // ring 02 at (7.4, 3.9, −14.2)
-      if (!await approach(['KeyD', 'KeyW'], 2, 16)) throw new Error('drone: never reached ring 02');
-      await hold(['KeyF'], 700);                   // ring 03 at (14.6, 2.7, −7.4)
-      if (!await approach(['KeyD', 'KeyS'], 3, 16)) throw new Error('drone: never reached ring 03');
-
-      // The pad is at (13.6, 0, 1.4); ring 03 leaves the aircraft near
-      // (15.6, ·, −7.5), so one press left and five back covers it.
-      await hold(['KeyA'], 700);
-      for (let attempt = 0; attempt < 5; attempt += 1) await hold(['KeyS'], 700);
-
-      const landed = () => (document.querySelector('.lab-objective')?.textContent ?? '')
-        .includes('Hoàn thành');
-      /* Down in taps rather than one long press: a held descent stick arrives at
-         2.6 m/s, which is survivable and graceless. Taps never let the sink rate
-         build — the technique the lab's own hint describes. */
-      const descend = async () => {
-        await tap('KeyF', 700);
-        for (let attempt = 0; attempt < 16 && altitude() > 0.1 && !landed(); attempt += 1) {
-          await tap('KeyF', 260);
-        }
-      };
-      await descend();
-      /*
-       * Missing the pad is a recoverable mistake in this lab rather than a
-       * failure — the aircraft simply reports "chưa đúng bãi đáp" and waits — so
-       * the script takes the recovery a student would: climb back up, shuffle,
-       * set down again. The pattern spirals rather than repeating one nudge,
-       * because the error after three ring approaches can be a metre and a half
-       * in either direction on either axis. Reaching the pad on the first try is
-       * not what this shot is testing; reaching it at all is.
-       */
-      const SEARCH = ['KeyS', 'KeyA', 'KeyW', 'KeyW', 'KeyD', 'KeyD', 'KeyS', 'KeyS'];
-      for (let attempt = 0; attempt < SEARCH.length && !landed(); attempt += 1) {
-        await hold(['KeyR'], 900);
-        await hold([SEARCH[attempt]], 620);
-        await descend();
-      }
-      if (!landed()) throw new Error('drone: never landed on the pad');
-    `,
-    settle: 2400,
-  },
-  {
-    /*
-     * The robot's whole lesson, end to end.
-     *
-     * Driven through the buttons rather than through the arrow keys, because
-     * that is the mechanism this lab is built on: "Tới khối hàng" and "Tới khay"
-     * command the *same point* the arrow keys move, so a script that uses them
-     * is testing the servo, the reach envelope and the pick/place tolerances —
-     * everything except a human's aim. The jog is still exercised first, since
-     * it is what unlocks step 03.
-     */
-    name: 'practice-robot-done',
-    at: '#thuc-hanh',
-    run: `${CLOSE_LAB}${PRACTICE('Vận hành', '.lab--robot')}
-      const stage = document.querySelector('.lab--robot');
-      stage.focus();
-      ${ACTION('Bắt đầu điều khiển')}
-      const click = (text) => {
-        const button = [...document.querySelectorAll('.lab-actions .lab-button')]
-          .find((node) => node.textContent.includes(text));
-        if (!button) throw new Error('robot: no action ' + text);
-        button.click();
-      };
-      const hold = (code, ms) => new Promise((done) => {
-        stage.dispatchEvent(new KeyboardEvent('keydown', { code, bubbles: true }));
-        setTimeout(() => {
-          stage.dispatchEvent(new KeyboardEvent('keyup', { code, bubbles: true }));
-          setTimeout(done, 260);
-        }, ms);
-      });
-      /* The cell already shows the operator when the tool is over its target —
-         the ring goes green and the readout says "Đúng vị trí" — so the script
-         waits for exactly the signal a person waits for. */
-      const onTarget = () => Boolean(document.querySelector('.lab-readout b.is-ok'));
-      const waitForTarget = async (budgetMs) => {
-        for (let waited = 0; waited < budgetMs; waited += 150) {
-          if (onTarget()) return true;
-          await new Promise((r) => setTimeout(r, 150));
-        }
-        return onTarget();
-      };
-
-      click('Bắt đầu điều khiển');
-      await new Promise((r) => setTimeout(r, 400));
-      // Unlock step 03: the lab wants to see the point actually driven.
-      await hold('ArrowRight', 700);
-      await hold('KeyF', 700);
-      await new Promise((r) => setTimeout(r, 600));
-
-      click('Tới khối hàng');
-      if (!await waitForTarget(9000)) throw new Error('robot: never reached the pick point');
-      click('Bật hút');
-      await new Promise((r) => setTimeout(r, 900));
-
-      click('Tới khay');
-      if (!await waitForTarget(12000)) throw new Error('robot: never reached the tray slot');
-      click('Tắt hút');
-      await new Promise((r) => setTimeout(r, 1100));
-
-      click('Chạy tự động');
-      await new Promise((r) => setTimeout(r, 26000));
-    `,
-    settle: 1800,
-  },
-  {
-    /*
-     * A hint open, and the flash it replaces.
-     *
-     * "Gợi ý" is the one control in this section whose whole job is to render
-     * something — a step with no hint hides the button, so an empty panel is a
-     * silent failure. It is photographed on the drone because that lab's hint is
-     * the longest and the most likely to collide with the objective line above
-     * it or the control pads below.
-     */
-    name: 'practice-hint',
-    at: '#thuc-hanh',
-    run: `${CLOSE_LAB}${PRACTICE('Trải nghiệm', '.lab--drone')}
-      ${ACTION('Khởi động')}
-      action.click();
-      await new Promise((r) => setTimeout(r, 900));
-      const hint = [...document.querySelectorAll('.lab-actions .lab-button')]
-        .find((node) => node.textContent.includes('Gợi ý'));
-      if (!hint) throw new Error('practice: no hint button');
-      hint.click();
-      await new Promise((r) => setTimeout(r, 400));
-      if (!document.querySelector('.lab-hint')) throw new Error('practice: hint did not open');
-    `,
-    settle: 1200,
-  },
-  {
-    /*
-     * The arm, magnified.
-     *
-     * Its hierarchy is transcribed from a Godot scene rather than imported, and
-     * the failure mode of a wrong transform is not an error — it is a linkage
-     * hanging half a metre off the joint it belongs to, which at section scale
-     * looks like a shadow. This is the only shot that would catch that.
-     */
-    name: 'practice-robot-detail',
-    at: '#thuc-hanh',
-    run: `${CLOSE_LAB}${PRACTICE('Vận hành', '.lab--robot')}
-      await new Promise((r) => setTimeout(r, 2200));
-    `,
-    settle: 1400,
-    /* `clipOf`, not `clip`: a raw clip is in document coordinates and this
-       section is only ever photographed after a scroll, so a hand-written box
-       lands somewhere in the hero. */
-    clipOf: { sel: '.lab-view', inset: [70, 190, 60, 170], scale: 2.4 },
-  },
-  {
-    /* Past the look step and jogging, so the target ring, the key legend and
-       the gripper action are all showing at once. */
-    name: 'practice-robot',
-    at: '#thuc-hanh',
-    run: `${CLOSE_LAB}${PRACTICE('Vận hành', '.lab--robot')}
-      ${ACTION('Bắt đầu điều khiển')}
-      action.click();
-      const stage = document.querySelector('.lab--robot');
-      stage.focus();
-      await new Promise((r) => setTimeout(r, 500));
-      stage.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowRight', bubbles: true }));
-      await new Promise((r) => setTimeout(r, 1100));
-      stage.dispatchEvent(new KeyboardEvent('keyup', { code: 'ArrowRight', bubbles: true }));
-      stage.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyF', bubbles: true }));
-      await new Promise((r) => setTimeout(r, 1100));
-      stage.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyF', bubbles: true }));
-    `,
+    name: 'proof-belt',
+    at: '#bai-hoc-mau',
     settle: 2200,
-  },
-  /* ---------------------------------------------------------- posters --- */
-  {
-    name: 'poster-formula',
-    at: '#thuc-hanh',
-    run: `${CLOSE_LAB}${PRACTICE('Xưởng mô hình', '.lab--formula')}
-      ${ACTION('Lái thử')}
-      await new Promise((r) => setTimeout(r, 2400));
-      ${BARE}
+    run: `
+      const track = document.querySelector('.proof-belt-track');
+      if (!track) throw new Error('no .proof-belt-track');
+      track.style.animation = 'none';
+      track.style.transform = 'none';
+      await new Promise((r) => setTimeout(r, 900));
     `,
-    settle: 900,
-    clipOf: { sel: '.lab-view', scale: 2 },
-  },
-  {
-    name: 'poster-drone',
-    at: '#thuc-hanh',
-    run: `${CLOSE_LAB}${PRACTICE('Trải nghiệm', '.lab--drone')}
-      const stage = document.querySelector('.lab--drone');
-      stage.focus();
-      ${ACTION('Khởi động')}
-      action.click();
-      await new Promise((r) => setTimeout(r, 400));
-      stage.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyR', bubbles: true }));
-      await new Promise((r) => setTimeout(r, 850));
-      stage.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyR', bubbles: true }));
-      await new Promise((r) => setTimeout(r, 700));
-      /* Close in. The chase camera sits where a pilot needs it, which is far
-         enough back to read the course — and far too far back for a card that
-         has to say "this is a real aircraft" at a glance. Two wheel notches. */
-      stage.dispatchEvent(new WheelEvent('wheel', { deltaY: -420, bubbles: true, cancelable: true }));
-      stage.dispatchEvent(new WheelEvent('wheel', { deltaY: -240, bubbles: true, cancelable: true }));
-      await new Promise((r) => setTimeout(r, 2200));
-      ${BARE}
-    `,
-    settle: 900,
-    clipOf: { sel: '.lab-view', scale: 2 },
-  },
-  {
-    name: 'poster-robot',
-    at: '#thuc-hanh',
-    run: `${CLOSE_LAB}${PRACTICE('Vận hành', '.lab--robot')}
-      const stage = document.querySelector('.lab--robot');
-      stage.focus();
-      ${ACTION('Bắt đầu điều khiển')}
-      action.click();
-      await new Promise((r) => setTimeout(r, 400));
-      /* "Tới khối hàng" only exists once the jog step is behind you, so the
-         poster has to earn its way to step 03 like anybody else. Skipping this
-         silently photographed the idle pose for three rounds. */
-      const hold = (code, ms) => new Promise((done) => {
-        stage.dispatchEvent(new KeyboardEvent('keydown', { code, bubbles: true }));
-        setTimeout(() => {
-          stage.dispatchEvent(new KeyboardEvent('keyup', { code, bubbles: true }));
-          setTimeout(done, 240);
-        }, ms);
-      });
-      await hold('ArrowRight', 700);
-      await hold('KeyF', 700);
-      let goPick = null;
-      for (let attempt = 0; attempt < 40 && !goPick; attempt += 1) {
-        goPick = [...document.querySelectorAll('.lab-actions .lab-button')]
-          .find((node) => node.textContent.includes('Tới khối hàng'));
-        if (!goPick) await new Promise((r) => setTimeout(r, 150));
-      }
-      if (!goPick) throw new Error('poster: robot never reached step 03');
-      goPick.click();
-      for (let waited = 0; waited < 9000; waited += 150) {
-        if (document.querySelector('.lab-readout b.is-ok')) break;
-        await new Promise((r) => setTimeout(r, 150));
-      }
-      await new Promise((r) => setTimeout(r, 700));
-      ${BARE}
-    `,
-    settle: 900,
-    clipOf: { sel: '.lab-view', scale: 2 },
   },
   { name: 'education', at: '#giao-duc', settle: 3600 },
   /*
@@ -1004,6 +588,24 @@ const SHOTS = [
     run: `document.querySelector('.faq-item').open = true;`,
   },
   { name: 'cta', at: '#bat-dau-voi-yoolab' },
+  /*
+   * The footer, whole.
+   *
+   * `#bat-dau-voi-yoolab` lands the closing band's top edge at viewport 0 and
+   * the footer is 600 px further down, so every previous shot of "the end of the
+   * page" stopped at the pledge strip. Scrolled to the document's end rather
+   * than clipped to the element: `clipOf` captures out of the composited frame,
+   * so the part of the footer below the fold comes back blank.
+   */
+  {
+    name: 'footer',
+    at: '#bat-dau-voi-yoolab',
+    run: `
+      window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'auto' });
+      await new Promise((r) => setTimeout(r, 400));
+    `,
+    settle: 700,
+  },
 
   /*
    * The library deep link, end to end. Run with the fragment in the URL:
@@ -1169,9 +771,19 @@ const readFlag = (flag, fallback) => {
   return value;
 };
 
-const url = readFlag('--url', 'http://localhost:3000');
+const url = await devUrl(readFlag('--url', null));
 const outDir = readFlag('--out', 'reference-audit/shots');
 const viewportKey = readFlag('--viewport', 'w1512');
+/*
+ * Device pixel ratio, because 1 is not where the defects are.
+ *
+ * Every regression this harness was pointed at in the iOS round lived on a 2x
+ * panel and none of them reproduced here, for the plain reason that this file
+ * pinned . An alpha-cut silhouette rendered at a capped
+ * buffer ratio and then scaled up by a retina display is invisible at 1x and
+ * obvious at 2x, so the one screen the whole QA story runs on could not see it.
+ */
+const deviceScale = Number(readFlag('--dpr', '1')) || 1;
 const only = args.filter((value) => !value.startsWith('-'));
 
 const viewport = VIEWPORTS[viewportKey];
@@ -1243,7 +855,7 @@ try {
   await send('Emulation.setDeviceMetricsOverride', {
     width: viewport.width,
     height: viewport.height,
-    deviceScaleFactor: 1,
+    deviceScaleFactor: deviceScale,
     mobile: viewport.width < 700,
   });
 
@@ -1342,6 +954,14 @@ try {
         target.scrollIntoView({ block: 'start', behavior: 'auto' });
         document.documentElement.style.scrollBehavior = previous;
         await new Promise((r) => setTimeout(r, 400));
+      `);
+      /* The trial dialog fires six seconds in and lands on top of whatever is
+         being photographed. Suppressed for every shot, not per shot: it has its
+         own entry when it is the subject. */
+      await evaluate(`
+        try { sessionStorage.setItem('yoolab.trial-invite.seen', '1'); } catch {}
+        const invite = document.querySelector('.trial-modal .modal-close');
+        if (invite) invite.click();
       `);
       if (shot.run) await evaluate(shot.run);
 

@@ -17,20 +17,29 @@
  *   thumb   the rail cell, cropped by CSS to 3:2. Kept at 4:3 for the same
  *           reason.
  *
+ * ## The sources moved, and one subject changed
+ *
+ * `thuc-hanh/renew/` replaced the originals when the three experiences stopped
+ * being in-page WebGL labs and became embedded builds — see
+ * `lib/practice/manifest.ts`. The racing workshop is gone with them: the
+ * experience behind card 01 is now an excavator, so its poster is
+ * `excavator.png` and the old `car.*` pair is deleted rather than left in the
+ * output directory to rot.
+ *
  * Run: node scripts/build-practice-posters.mjs
  */
 
 import sharp from 'sharp';
 import { mkdirSync, statSync } from 'node:fs';
 
-const SRC = 'public/asset/thuc-hanh';
+const SRC = 'public/asset/thuc-hanh/renew';
 const OUT = 'public/asset/practice/poster';
 
 /** Source file → slug used by `lib/practice/manifest.ts`. */
 const POSTERS = [
-  ['car.jpg', 'car'],
-  ['Drone.jpg', 'drone'],
-  ['robot.jpg', 'robot'],
+  ['excavator.png', 'excavator'],
+  ['Drone.png', 'drone'],
+  ['robot.png', 'robot'],
 ];
 
 mkdirSync(OUT, { recursive: true });

@@ -7,6 +7,7 @@ import {
   type CreatureStageMode,
 } from './library/CreatureStage';
 import { LibraryIcon } from './library/LibraryIcons';
+import { useZoomModifier } from '../lib/useZoomModifier';
 
 type FeatureIconName = 'rotate' | 'structure' | 'motion' | 'annotation';
 type ToolIconName = 'model' | 'text' | 'audio' | 'effects';
@@ -147,6 +148,10 @@ export function BridgeSection() {
   const [autoSpin, setAutoSpin] = useState(true);
   const [effectsEnabled, setEffectsEnabled] = useState(true);
   const [speaking, setSpeaking] = useState(false);
+  /* The wheel only zooms with a modifier now, so the hint has to name it.
+     See `lib/three/wheelZoom.ts`. */
+  const zoomKey = useZoomModifier();
+
 
   const activeFeature = FEATURES.find((feature) => feature.id === activeStep) ?? FEATURES[0];
   const activePart = PARTS.find((part) => part.name === selectedPart) ?? null;
@@ -229,8 +234,13 @@ export function BridgeSection() {
         <div className="bridge-copy" data-reveal>
           <div className="bridge-intro">
             <p className="bridge-eyebrow">Bài học · Học sinh xem</p>
-            <h2 id="bridge-title">
-              <span>Bạn vừa khám phá một bài học trong YooLab.</span>
+            <h2 id="bridge-title" data-kinetic>
+              {/* "trong YooLab" → "YooLab". The sentence carried a
+                  preposition that added nothing and cost a line: at this
+                  measure the black half set three lines against the teal half's
+                  two, and review read the block as too much text before the
+                  claim. See `.bridge-copy h2 span`. */}
+              <span>Bạn vừa khám phá một bài học YooLab.</span>
               <em>Và chính bạn cũng có thể tạo ra nó.</em>
             </h2>
             <p className="bridge-lede">
@@ -336,7 +346,7 @@ export function BridgeSection() {
                   <span>Tự xoay</span>
                   <i aria-hidden="true" />
                 </button>
-                <p className="bridge-orbit-hint">Kéo để xoay · Cuộn để phóng</p>
+                <p className="bridge-orbit-hint">Kéo để xoay · {zoomKey} + cuộn để phóng</p>
               </>
             )}
 

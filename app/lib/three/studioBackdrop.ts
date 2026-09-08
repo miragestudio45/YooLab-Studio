@@ -362,15 +362,26 @@ export type LearningGrid = {
   dispose(): void;
 };
 
-export function createLearningGrid(): LearningGrid {
+/**
+ * Line colours, for a room whose plate is not the Library's ivory.
+ *
+ * The defaults are lavender minors under salmon majors, tuned against that
+ * warm cove where they read as pencil on paper. The bridge's plate is cool and
+ * near-neutral, and on it the same salmon is the highest-chroma thing in the
+ * frame — so that stage passes its own low-chroma pair. See
+ * `BRIDGE_GRID_COLORS` in `libraryEnvironment.ts`.
+ */
+export type LearningGridColors = { minor: number; major: number };
+
+export function createLearningGrid(colors?: LearningGridColors): LearningGrid {
   const geometry = new THREE.PlaneGeometry(9.2, 9.2);
   const material = new THREE.ShaderMaterial({
     name: 'yoolab_learning_grid',
     vertexShader: gridVertex,
     fragmentShader: gridFragment,
     uniforms: {
-      uMinor: { value: new THREE.Color(0xbfa9d8) },
-      uMajor: { value: new THREE.Color(0xe18f83) },
+      uMinor: { value: new THREE.Color(colors?.minor ?? 0xbfa9d8) },
+      uMajor: { value: new THREE.Color(colors?.major ?? 0xe18f83) },
     },
     transparent: true,
     depthWrite: false,
