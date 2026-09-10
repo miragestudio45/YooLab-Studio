@@ -110,6 +110,20 @@ function gtag(){dataLayer.push(arguments);}
 gtag('js', new Date());
 gtag('config', '${GA_MEASUREMENT_ID}');`;
 
+const META_PIXEL_ID = '1025211157015141';
+/* The stub loader Meta's own snippet ships, verbatim — it queues calls made
+   before `fbevents.js` has finished loading rather than dropping them. */
+const META_PIXEL_BOOTSTRAP = `!function(f,b,e,v,n,t,s)
+{if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+n.queue=[];t=b.createElement(e);t.async=!0;
+t.src=v;s=b.getElementsByTagName(e)[0];
+s.parentNode.insertBefore(t,s)}(window, document,'script',
+'https://connect.facebook.net/en_US/fbevents.js');
+fbq('init', '${META_PIXEL_ID}');
+fbq('track', 'PageView');`;
+
 /**
  * Arms the scroll reveal before the first paint.
  *
@@ -196,6 +210,20 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         {/* Google tag (gtag.js) */}
         <script async src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`} />
         <script dangerouslySetInnerHTML={{ __html: GA_BOOTSTRAP }} />
+        {/* Meta Pixel Code */}
+        <script dangerouslySetInnerHTML={{ __html: META_PIXEL_BOOTSTRAP }} />
+        <noscript>
+          {/* eslint-disable-next-line @next/next/no-img-element -- a
+              1x1 tracking beacon, not a rendered image; `next/image` cannot
+              stand in for the `noscript` fallback Meta's snippet requires. */}
+          <img
+            height="1"
+            width="1"
+            style={{ display: 'none' }}
+            src={`https://www.facebook.com/tr?id=${META_PIXEL_ID}&ev=PageView&noscript=1`}
+            alt=""
+          />
+        </noscript>
         <StructuredData />
       </head>
       <body>
