@@ -22,7 +22,7 @@
  * precisely so the UI can say "your mail app is open, press send" instead.
  */
 
-export type ConsultAudience = 'ca-nhan' | 'to-chuc';
+export type ConsultAudience = "ca-nhan" | "to-chuc";
 
 export type ConsultLead = {
   name: string;
@@ -36,23 +36,27 @@ export type ConsultLead = {
 
 export type ConsultResult =
   /** A real endpoint accepted it. */
-  | { status: 'sent' }
+  | { status: "sent" }
   /** No endpoint configured: the visitor's mail client was opened, pre-filled. */
-  | { status: 'handoff'; mailto: string }
-  | { status: 'error'; message: string };
+  | { status: "handoff"; mailto: string }
+  | { status: "error"; message: string };
 
-export const CONSULT_MAILBOX = 'hello@yoolab.vn';
+export const CONSULT_MAILBOX = "info@yootek.vn";
 
 /**
- * Set this to a POST endpoint that accepts `ConsultLead` as JSON and the form
- * starts submitting for real. Empty means "no backend yet", which is the
- * current, documented state of this repository.
+ * `ContactRequest/Create` on the same ABP backend every other API call in this
+ * repository targets (`NEXT_PUBLIC_BASE_URL`, see `lib/auth/config.ts`).
  */
-const CONSULT_ENDPOINT = '';
+const CONSULT_ENDPOINT = `${process.env.NEXT_PUBLIC_BASE_URL ?? ""}/social-media/api/services/app/ContactRequest/Create`;
+
+/** Fixed backend enum values this dialog always sends: the lead's channel and
+    the kind of request it always is. Neither varies per submission. */
+const CONTACT_REQUEST_SOURCE = 5;
+const CONTACT_REQUEST_CATEGORY = 4;
 
 const AUDIENCE_LABEL: Record<ConsultAudience, string> = {
-  'ca-nhan': 'Cá nhân',
-  'to-chuc': 'Tổ chức',
+  "ca-nhan": "Cá nhân",
+  "to-chuc": "Tổ chức",
 };
 
 /** RFC-shaped enough to catch a typo without rejecting a valid address. */
@@ -71,17 +75,21 @@ export type ConsultErrors = Partial<Record<keyof ConsultLead, string>>;
  */
 export function validateConsult(lead: ConsultLead): ConsultErrors {
   const errors: ConsultErrors = {};
-  if (!lead.name.trim()) errors.name = 'Cho chúng tôi biết tên của bạn.';
-  else if (lead.name.trim().length < 2) errors.name = 'Tên quá ngắn.';
+  if (!lead.name.trim()) errors.name = "Cho chúng tôi biết tên của bạn.";
+  else if (lead.name.trim().length < 2) errors.name = "Tên quá ngắn.";
 
-  if (!lead.email.trim()) errors.email = 'Cần email để chúng tôi trả lời bạn.';
-  else if (!EMAIL.test(lead.email.trim())) errors.email = 'Email chưa đúng định dạng.';
+  if (!lead.email.trim()) errors.email = "Cần email để chúng tôi trả lời bạn.";
+  else if (!EMAIL.test(lead.email.trim()))
+    errors.email = "Email chưa đúng định dạng.";
 
-  if (!lead.phone.trim()) errors.phone = 'Cần số điện thoại để liên hệ nhanh.';
-  else if (!PHONE.test(lead.phone.trim())) errors.phone = 'Số điện thoại chưa hợp lệ.';
+  if (!lead.phone.trim()) errors.phone = "Cần số điện thoại để liên hệ nhanh.";
+  else if (!PHONE.test(lead.phone.trim()))
+    errors.phone = "Số điện thoại chưa hợp lệ.";
 
-  if (!lead.need.trim()) errors.need = 'Mô tả ngắn nhu cầu để chúng tôi chuẩn bị trước.';
-  else if (lead.need.trim().length < 10) errors.need = 'Viết thêm một chút để chúng tôi hiểu đúng nhu cầu.';
+  if (!lead.need.trim())
+    errors.need = "Mô tả ngắn nhu cầu để chúng tôi chuẩn bị trước.";
+  else if (lead.need.trim().length < 10)
+    errors.need = "Viết thêm một chút để chúng tôi hiểu đúng nhu cầu.";
 
   return errors;
 }
@@ -93,37 +101,69 @@ function composeMailto(lead: ConsultLead): string {
     `Đối tượng: ${AUDIENCE_LABEL[lead.audience]}`,
     `Email: ${lead.email.trim()}`,
     `Số điện thoại: ${lead.phone.trim()}`,
-    lead.source ? `Nguồn: ${lead.source}` : '',
-    '',
-    'Nhu cầu:',
+    lead.source ? `Nguồn: ${lead.source}` : "",
+    "",
+    "Nhu cầu:",
     lead.need.trim(),
-  ].filter(Boolean).join('\n');
+  ]
+    .filter(Boolean)
+    .join("\n");
   return `mailto:${CONSULT_MAILBOX}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
 export async function submitConsult(lead: ConsultLead): Promise<ConsultResult> {
   const errors = validateConsult(lead);
   if (Object.keys(errors).length) {
-    return { status: 'error', message: 'Vui lòng kiểm tra lại các trường còn thiếu.' };
+    return {
+      status: "error",
+      message: "Vui lòng kiểm tra lại các trường còn thiếu.",
+    };
   }
 
   if (!CONSULT_ENDPOINT) {
     /* No backend. Hand the composed message to the visitor's mail client and
        let the UI say exactly that — see the note at the top of this file. */
-    return { status: 'handoff', mailto: composeMailto(lead) };
+    return { status: "handoff", mailto: composeMailto(lead) };
   }
+
+  /*
+   * The backend has one free-text `message` field and no separate "audience"
+   * column, so the audience has to be legible inside the string itself — a
+   * `[Tổ chức]` reply routed as if it came from an individual is a worse
+   * failure than an unlabelled one. `need` is required by `validateConsult`
+   * above, so the fallback sentence here is a second line of defence rather
+   * than the normal path.
+   */
+  const need = lead.need.trim() || "Đây là yêu cầu tư vấn về YooLab.";
+  const message =
+    `[${AUDIENCE_LABEL[lead.audience]}] ${need}`;
 
   try {
     const response = await fetch(CONSULT_ENDPOINT, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(lead),
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fullName: lead.name.trim(),
+        email: lead.email.trim(),
+        phoneNumber: lead.phone.trim(),
+        message,
+        source: CONTACT_REQUEST_SOURCE,
+        category: CONTACT_REQUEST_CATEGORY,
+        sourcePage: typeof window !== "undefined" ? window.location.href : "",
+        consentToContact: true,
+      }),
     });
     if (!response.ok) {
-      return { status: 'error', message: 'Không gửi được lúc này. Bạn thử lại giúp chúng tôi nhé.' };
+      return {
+        status: "error",
+        message: "Không gửi được lúc này. Bạn thử lại giúp chúng tôi nhé.",
+      };
     }
-    return { status: 'sent' };
+    return { status: "sent" };
   } catch {
-    return { status: 'error', message: 'Mất kết nối. Kiểm tra mạng rồi thử lại giúp chúng tôi.' };
+    return {
+      status: "error",
+      message: "Mất kết nối. Kiểm tra mạng rồi thử lại giúp chúng tôi.",
+    };
   }
 }

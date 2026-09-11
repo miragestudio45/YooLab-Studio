@@ -199,9 +199,9 @@ const PLEDGES = [
  * label says which channel it is going to be. Fill these in as they open.
  */
 const SOCIAL = [
-  { kind: 'facebook' as const, label: 'YooLab trên Facebook', href: 'https://www.facebook.com/' },
-  { kind: 'youtube' as const, label: 'YooLab trên YouTube', href: 'https://www.youtube.com/' },
-  { kind: 'linkedin' as const, label: 'YooLab trên LinkedIn', href: 'https://www.linkedin.com/' },
+  { kind: 'facebook' as const, label: 'YooLab trên Facebook', href: 'https://www.facebook.com/profile.php?id=61593602137812' },
+  { kind: 'youtube' as const, label: 'YooLab trên YouTube', href: 'https://www.youtube.com/@yootekofficial' },
+  // { kind: 'linkedin' as const, label: 'YooLab trên LinkedIn', href: 'https://www.linkedin.com/' },
   { kind: 'website' as const, label: 'yoolab.vn', href: 'https://yoolab.vn' },
 ];
 
@@ -332,7 +332,7 @@ export function SiteFooter() {
           <div className="footer-links__contact">
             <b>Kết nối</b>
             <a href="#bat-dau-voi-yoolab"><i aria-hidden="true"><IconMail /></i>Mở YooLab ngay</a>
-            <a href="mailto:hello@yoolab.vn"><i aria-hidden="true"><IconMail /></i>hello@yoolab.vn</a>
+            <a href="mailto:info@yootek.vn"><i aria-hidden="true"><IconMail /></i>info@yootek.vn</a>
             <ul className="footer-social">
               {SOCIAL.map((channel) => (
                 <li key={channel.kind}>
