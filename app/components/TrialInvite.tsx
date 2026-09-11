@@ -8,7 +8,7 @@ import { useConsult } from './ConsultModal';
 /**
  * The trial invitation.
  *
- * Opens on whichever comes first: six seconds on the page, or reaching the
+ * Opens on whichever comes first: twelve seconds on the page, or reaching the
  * fourth section. Once per browsing session, and never again once dismissed.
  *
  * ## Why `sessionStorage` and not `localStorage`
@@ -32,7 +32,7 @@ import { useConsult } from './ConsultModal';
  */
 
 const SEEN_KEY = 'yoolab.trial-invite.seen';
-const DELAY_MS = 6000;
+const DELAY_MS = 12000;
 /** Zero-based: the fourth section on the page. */
 const SECTION_INDEX = 3;
 
