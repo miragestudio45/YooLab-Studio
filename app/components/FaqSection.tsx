@@ -87,7 +87,7 @@ export function FaqSection() {
           <p>
             Sáu câu dưới đây là những gì giáo viên hỏi nhiều nhất trước khi tạo
             tài khoản. Còn thắc mắc khác, viết cho chúng tôi ở{' '}
-            <a href="mailto:hello@yoolab.vn">hello@yoolab.vn</a>.
+            <a href="mailto:info@yootek.vn">info@yootek.vn</a>.
           </p>
         </div>
 

@@ -27,7 +27,7 @@ const GRAPH = {
       '@id': `${SITE}/#organization`,
       name: 'YooLab',
       url: SITE,
-      email: 'hello@yoolab.vn',
+      email: 'info@yootek.vn',
       logo: `${SITE}/brand/yoolab-icon.svg`,
       description:
         'YooLab xây dựng không gian học tập 3D/XR cho giáo dục phổ thông Việt Nam.',

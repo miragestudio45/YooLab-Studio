@@ -683,11 +683,15 @@
      footer into a colour field. */
   background: #23282b;
   color: #fff;
-  transition: background-color 200ms var(--ease-reveal, ease), transform 200ms var(--ease-reveal, ease);
+  transition: background-color 200ms var(--ease-reveal, ease), color 200ms var(--ease-reveal, ease), transform 200ms var(--ease-reveal, ease);
 }
 .footer-social a::after { display: none; }
 .footer-social svg { width: 17px; height: 17px; }
-.footer-social a:hover { background: var(--color-accent-strong, #00aaab); transform: translateY(-2px); }
+.footer-social a:hover {
+  background: #fff;
+  color: var(--color-accent-strong, #00aaab);
+  transform: translateY(-2px);
+}
 
 /* ------------------------------------------------------------- the quote --- */
 
