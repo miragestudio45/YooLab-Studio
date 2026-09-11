@@ -44,11 +44,15 @@ export type ConsultResult =
 export const CONSULT_MAILBOX = "info@yootek.vn";
 
 /**
- * Set this to a POST endpoint that accepts `ConsultLead` as JSON and the form
- * starts submitting for real. Empty means "no backend yet", which is the
- * current, documented state of this repository.
+ * `ContactRequest/Create` on the same ABP backend every other API call in this
+ * repository targets (`NEXT_PUBLIC_BASE_URL`, see `lib/auth/config.ts`).
  */
-const CONSULT_ENDPOINT = "";
+const CONSULT_ENDPOINT = `${process.env.NEXT_PUBLIC_BASE_URL ?? ""}/social-media/api/services/app/ContactRequest/Create`;
+
+/** Fixed backend enum values this dialog always sends: the lead's channel and
+    the kind of request it always is. Neither varies per submission. */
+const CONTACT_REQUEST_SOURCE = 5;
+const CONTACT_REQUEST_CATEGORY = 4;
 
 const AUDIENCE_LABEL: Record<ConsultAudience, string> = {
   "ca-nhan": "Cá nhân",
@@ -122,11 +126,32 @@ export async function submitConsult(lead: ConsultLead): Promise<ConsultResult> {
     return { status: "handoff", mailto: composeMailto(lead) };
   }
 
+  /*
+   * The backend has one free-text `message` field and no separate "audience"
+   * column, so the audience has to be legible inside the string itself — a
+   * `[Tổ chức]` reply routed as if it came from an individual is a worse
+   * failure than an unlabelled one. `need` is required by `validateConsult`
+   * above, so the fallback sentence here is a second line of defence rather
+   * than the normal path.
+   */
+  const need = lead.need.trim() || "Đây là yêu cầu tư vấn về YooLab.";
+  const message =
+    `[${AUDIENCE_LABEL[lead.audience]}] ${need}`;
+
   try {
     const response = await fetch(CONSULT_ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(lead),
+      body: JSON.stringify({
+        fullName: lead.name.trim(),
+        email: lead.email.trim(),
+        phoneNumber: lead.phone.trim(),
+        message,
+        source: CONTACT_REQUEST_SOURCE,
+        category: CONTACT_REQUEST_CATEGORY,
+        sourcePage: typeof window !== "undefined" ? window.location.href : "",
+        consentToContact: true,
+      }),
     });
     if (!response.ok) {
       return {
